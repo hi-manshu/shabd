@@ -1,0 +1,484 @@
+{
+  "title": "Shabd sidebar (sidebar.yaml)",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "anyOf": [
+      {
+        "type": "string",
+        "minLength": 1
+      },
+      {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "badge": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "variant": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "note",
+                      "tip",
+                      "success",
+                      "caution",
+                      "danger"
+                    ]
+                  }
+                },
+                "required": [
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "badge": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "variant": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "note",
+                      "tip",
+                      "success",
+                      "caution",
+                      "danger"
+                    ]
+                  }
+                },
+                "required": [
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "link",
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      {
+        "$ref": "#/definitions/__schema0"
+      },
+      {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "minLength": 1
+          },
+          "badge": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "variant": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "note",
+                      "tip",
+                      "success",
+                      "caution",
+                      "danger"
+                    ]
+                  }
+                },
+                "required": [
+                  "text"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "file": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "badge": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "variant": {
+                              "type": "string",
+                              "enum": [
+                                "default",
+                                "note",
+                                "tip",
+                                "success",
+                                "caution",
+                                "danger"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "text"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "file"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "link": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "badge": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "variant": {
+                              "type": "string",
+                              "enum": [
+                                "default",
+                                "note",
+                                "tip",
+                                "success",
+                                "caution",
+                                "danger"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "text"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "link",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "$ref": "#/definitions/__schema0"
+                }
+              ]
+            }
+          },
+          "autogenerate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "directory": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "collapsed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "directory"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "category"
+        ],
+        "additionalProperties": false
+      }
+    ]
+  },
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "type": "string",
+          "minLength": 1
+        },
+        "collapsed": {
+          "type": "boolean"
+        },
+        "badge": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "variant": {
+                  "type": "string",
+                  "enum": [
+                    "default",
+                    "note",
+                    "tip",
+                    "success",
+                    "caution",
+                    "danger"
+                  ]
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "badge": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "variant": {
+                            "type": "string",
+                            "enum": [
+                              "default",
+                              "note",
+                              "tip",
+                              "success",
+                              "caution",
+                              "danger"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "link": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "badge": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "variant": {
+                            "type": "string",
+                            "enum": [
+                              "default",
+                              "note",
+                              "tip",
+                              "success",
+                              "caution",
+                              "danger"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "link",
+                  "label"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "$ref": "#/definitions/__schema0"
+              }
+            ]
+          }
+        },
+        "autogenerate": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "object",
+              "properties": {
+                "directory": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "collapsed": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "directory"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

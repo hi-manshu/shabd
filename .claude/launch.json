@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "shabd-docs",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["packages/shabd/bin/shabd.js", "dev", "docs", "--port", "4321"],
+      "port": 4321
+    },
+    {
+      "name": "shabd-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["packages/shabd/bin/shabd.js", "preview", "docs", "--port", "4322"],
+      "port": 4322
+    }
+  ]
+}

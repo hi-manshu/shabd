@@ -1,0 +1,222 @@
+@layer shabd.layout {
+  /*
+   * The shell is one grid. Which regions exist is decided per page by the
+   * layout engine and reported as data attributes; the grid adapts to them.
+   * No layout has its own stylesheet.
+   */
+  .sb-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr auto;
+    grid-template-areas:
+      'banner'
+      'header'
+      'main'
+      'footer';
+    min-block-size: 100dvh;
+  }
+
+  .sb-region-banner {
+    grid-area: banner;
+  }
+
+  .sb-region-header {
+    grid-area: header;
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    block-size: var(--sb-header-height);
+    padding-inline: clamp(1rem, 3vw, 1.75rem);
+    background: var(--sb-background);
+    border-block-end: 1px solid var(--sb-border);
+  }
+
+  .sb-region-main {
+    grid-area: main;
+    min-inline-size: 0;
+    padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem) 4rem;
+  }
+
+  .sb-region-main:focus {
+    outline: none;
+  }
+
+  /* Each block is centred in a column whose width the layout chooses. */
+  .sb-region-main > * {
+    max-inline-size: var(--sb-main-width);
+    margin-inline: auto;
+  }
+
+  .sb-shell[data-width='content'] {
+    --sb-main-width: var(--sb-content-width);
+  }
+  .sb-shell[data-width='wide'] {
+    --sb-main-width: 68rem;
+  }
+  .sb-shell[data-width='full'] {
+    --sb-main-width: none;
+  }
+
+  .sb-region-footer {
+    grid-area: footer;
+    padding: 1.5rem clamp(1rem, 4vw, 3rem);
+    border-block-start: 1px solid var(--sb-border);
+    color: var(--sb-muted);
+    font-size: var(--sb-step--1);
+  }
+
+  .sb-region-sidebar,
+  .sb-region-aside {
+    position: sticky;
+    inset-block-start: var(--sb-header-height);
+    align-self: start;
+    block-size: calc(100dvh - var(--sb-header-height));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .sb-region-sidebar {
+    grid-area: sidebar;
+    padding: 1.5rem 1rem 3rem clamp(1rem, 3vw, 1.75rem);
+    border-inline-end: 1px solid var(--sb-border);
+    background: var(--sb-background);
+  }
+
+  .sb-region-aside {
+    grid-area: aside;
+    padding: clamp(1.5rem, 4vw, 3rem) clamp(1rem, 3vw, 1.75rem) 3rem 0;
+  }
+
+  /* Narrow screens: the sidebar is a panel under the header, the outline is dropped. */
+  @media (max-width: 59.99rem) {
+    .sb-region-sidebar {
+      position: fixed;
+      inset: var(--sb-header-height) 0 0 0;
+      z-index: 20;
+      block-size: auto;
+      border: 0;
+      visibility: hidden;
+      transform: translateY(-0.5rem);
+      opacity: 0;
+      transition:
+        opacity 0.14s ease,
+        transform 0.14s ease,
+        visibility 0s 0.14s;
+    }
+
+    .sb-shell[data-sidebar-open] .sb-region-sidebar {
+      visibility: visible;
+      transform: none;
+      opacity: 1;
+      transition-delay: 0s;
+    }
+
+    .sb-region-aside {
+      display: none;
+    }
+  }
+
+  @media (min-width: 60rem) {
+    .sb-shell[data-has-sidebar] {
+      grid-template-columns: var(--sb-sidebar-width) minmax(0, 1fr);
+      grid-template-areas:
+        'banner banner'
+        'header header'
+        'sidebar main'
+        'sidebar footer';
+    }
+  }
+
+  @media (min-width: 60rem) and (max-width: 77.99rem) {
+    .sb-region-aside {
+      display: none;
+    }
+  }
+
+  @media (min-width: 78rem) {
+    .sb-shell[data-has-aside] {
+      grid-template-columns: minmax(0, 1fr) var(--sb-toc-width);
+      grid-template-areas:
+        'banner banner'
+        'header header'
+        'main aside'
+        'footer aside';
+    }
+
+    .sb-shell[data-has-sidebar][data-has-aside] {
+      grid-template-columns: var(--sb-sidebar-width) minmax(0, 1fr) var(--sb-toc-width);
+      grid-template-areas:
+        'banner banner banner'
+        'header header header'
+        'sidebar main aside'
+        'sidebar footer aside';
+    }
+  }
+
+  /* A region whose blocks all rendered nothing takes no space and draws no border. */
+  .sb-region:empty {
+    display: none;
+  }
+
+  .sb-block-error {
+    padding: 1rem 1.25rem;
+    border-block-start: var(--sb-rule) solid var(--sb-danger);
+    border-radius: var(--sb-hang);
+    background: color-mix(in oklab, var(--sb-danger) 8%, transparent);
+  }
+
+  .sb-block-error pre {
+    margin: 0.5rem 0 0;
+    white-space: pre-wrap;
+    font-size: var(--sb-step--1);
+  }
+
+  /* A page that does not compile shows why, where its content would be (dev only). */
+  .sb-page-error {
+    padding: 1rem 1.25rem 1.1rem;
+    border-block-start: var(--sb-rule) solid var(--sb-danger);
+    border-radius: var(--sb-hang);
+    background: color-mix(in oklab, var(--sb-danger) 7%, var(--sb-background));
+  }
+
+  .sb-page-error-title {
+    margin-block-end: 0.75rem;
+    font-weight: 700;
+    font-stretch: var(--sb-wide);
+    color: var(--sb-danger);
+  }
+
+  .sb-page-error-issue + .sb-page-error-issue {
+    margin-block-start: 1rem;
+  }
+
+  .sb-page-error-where {
+    font-family: var(--sb-font-mono);
+    font-size: 0.8rem;
+    color: var(--sb-muted);
+  }
+
+  .sb-page-error-message {
+    font-weight: 600;
+  }
+
+  .sb-page-error pre {
+    margin: 0.5rem 0 0;
+    padding: 0.6rem 0.8rem;
+    overflow-x: auto;
+    border-radius: 4px;
+    background: var(--sb-surface);
+    font-size: 0.8rem;
+    line-height: 1.6;
+  }
+
+  .sb-page-error-hint {
+    margin-block-start: 0.9rem;
+    font-size: var(--sb-step--1);
+    color: var(--sb-muted);
+  }
+}

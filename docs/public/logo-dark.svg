@@ -1,0 +1,37 @@
+<svg width="132" height="152" viewBox="0 0 132 152" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Shabd">
+  <defs>
+    <linearGradient id="n-ink" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#e8e9f5"/><stop offset="1" stop-color="#b3bbff"/></linearGradient>
+    <linearGradient id="n-headL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6b78ea"/><stop offset="1" stop-color="#4654cf"/></linearGradient>
+    <linearGradient id="n-headR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8f9af5"/><stop offset="1" stop-color="#6b78ea"/></linearGradient>
+    <linearGradient id="n-faceL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#e4e8fb"/></linearGradient>
+    <linearGradient id="n-faceR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d6dcfa"/><stop offset="1" stop-color="#aab4f2"/></linearGradient>
+    <linearGradient id="n-chestUL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a4adfa"/><stop offset="1" stop-color="#808cf0"/></linearGradient>
+    <linearGradient id="n-chestUR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#bcc3fd"/><stop offset="1" stop-color="#9aa4f6"/></linearGradient>
+    <linearGradient id="n-chestLL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#808cf0"/><stop offset="1" stop-color="#6672e2"/></linearGradient>
+    <linearGradient id="n-chestLR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a4adfa"/><stop offset="1" stop-color="#808cf0"/></linearGradient>
+    <linearGradient id="n-wingL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5560d6"/><stop offset="1" stop-color="#3a44b4"/></linearGradient>
+    <linearGradient id="n-wingR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7480ea"/><stop offset="1" stop-color="#5560d6"/></linearGradient>
+    <linearGradient id="n-goldL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd96b"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
+    <linearGradient id="n-goldR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb02e"/><stop offset="1" stop-color="#f08a1c"/></linearGradient>
+  </defs>
+  <rect x="6" y="132" width="120" height="16" fill="url(#n-ink)"/>
+  <path d="M58 31L49 13L44 35Z" fill="url(#n-goldL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M74 31L83 13L88 35Z" fill="url(#n-goldR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M60 30L66 6L72 30Z" fill="url(#n-goldL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M66 28L38 38L26 66L66 58Z" fill="url(#n-headL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M66 28L94 38L106 66L66 58Z" fill="url(#n-headR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M26 66L66 58L66 92L32 96Z" fill="url(#n-faceL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M106 66L66 58L66 92L100 96Z" fill="url(#n-faceR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M32 96L66 92L66 114L39 116Z" fill="url(#n-chestUL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M100 96L66 92L66 114L93 116Z" fill="url(#n-chestUR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M39 116L66 114L66 132L46 132Z" fill="url(#n-chestLL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M93 116L66 114L66 132L86 132Z" fill="url(#n-chestLR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M32 96L12 118L24 132L46 132L40 106Z" fill="url(#n-wingL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M100 96L120 118L108 132L86 132L92 106Z" fill="url(#n-wingR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M56 64L66 60L66 98L53 80Z" fill="url(#n-goldL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M66 60L76 64L79 80L66 98Z" fill="url(#n-goldR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <circle cx="45" cy="76" r="5.2" fill="#14163f"/><circle cx="46.6" cy="74.2" r="1.7" fill="#ffffff"/>
+  <circle cx="87" cy="76" r="5.2" fill="#14163f"/><circle cx="88.6" cy="74.2" r="1.7" fill="#ffffff"/>
+  <path d="M45 128L58 128L60 141L43 141Z" fill="url(#n-goldL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <path d="M87 128L74 128L72 141L89 141Z" fill="url(#n-goldR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>

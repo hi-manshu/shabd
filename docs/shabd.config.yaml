@@ -1,0 +1,97 @@
+# yaml-language-server: $schema=../packages/shabd/schemas/config.schema.json
+#
+# Everything about this site is declared here: identity, theme tokens,
+# page layouts and feature switches. Only `site.title` is required.
+
+site:
+  title: Shabd
+  description: Documentation sites configured in YAML, with on-device search and an MCP endpoint for AI agents.
+  # Replace with the address the site is deployed to. Used for canonical URLs, llms.txt and MCP.
+  url: https://docs.example.com
+  base: /
+  lang: en
+  logo:
+    light: /logo-light.svg
+    dark: /logo-dark.svg
+    alt: ""
+  favicon: /favicon.svg
+  # Used for "Edit this page" links.
+  repo:
+    url: https://github.com/hi-manshu/shabd
+    branch: main
+    dir: docs
+  social:
+    github: https://github.com/hi-manshu/shabd
+  nav:
+    - { label: Guide, link: /guide/introduction }
+    - { label: Configuration, link: /configuration/site }
+    - { label: Features, link: /features/search }
+    - { label: Reference, link: /reference/cli }
+  footer: Released under the MIT License.
+
+content:
+  dir: content
+  sidebar: sidebar.yaml
+
+theme:
+  colorMode:
+    default: system # system | light | dark
+    toggle: true
+  colors:
+    # One value applies to both modes; { light, dark } sets them separately.
+    accent: { light: "#2b36a8", dark: "#b3bbff" }
+    highlight: { light: "#f6b40e", dark: "#ffc53d" }
+  typography:
+    baseSize: 16px
+    scale: 1.2 # heading sizes are baseSize × scale^n
+    lineHeight: 1.65
+  layout:
+    contentWidth: 46rem
+    sidebarWidth: 17rem
+    tocWidth: 14rem
+  radius: 8px
+  code:
+    light: github-light
+    dark: tokyo-night
+  css: ./styles/custom.css # your own stylesheet, loaded after the theme
+
+# Applied to every page; frontmatter overrides them per page.
+defaults:
+  layout: doc
+  toc: { minDepth: 2, maxDepth: 3 }
+  editLink: true
+  pagination: true
+
+layouts:
+  # Editing a built-in: every layout inherits from `base`, so this adds the
+  # announcement bar above the header on every page.
+  base:
+    regions:
+      banner: [announcement]
+  # A new layout, selected with `layout: reference` in frontmatter:
+  # the doc layout, wider, without the "On this page" column.
+  reference:
+    extends: doc
+    width: wide
+    regions:
+      aside: []
+
+features:
+  search:
+    enabled: true
+    semantic: true # on-device AI search; needs @huggingface/transformers
+    model: Xenova/all-MiniLM-L6-v2
+  mcp:
+    enabled: true
+    route: /mcp
+  llms: true # llms.txt and llms-full.txt
+  studio: true # in-browser editor, dev server only
+  sandbox: true # ```tsx live code fences
+
+# Components every .mdx file can use without importing them.
+components:
+  Counter: ./components/Counter.tsx
+
+# Blocks that layouts can place in a region by name.
+blocks:
+  announcement: ./components/Announcement.tsx

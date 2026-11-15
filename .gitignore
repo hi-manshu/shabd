@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.shabd/
+*.tsbuildinfo
+.DS_Store
+*.log
+packages/shabd/test/.tmp/
+e2e/.work/
+e2e/.results/
+playwright-report/

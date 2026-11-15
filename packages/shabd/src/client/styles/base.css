@@ -1,0 +1,189 @@
+@layer shabd.base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  :root {
+    /* Derived from the YAML tokens, so a palette change carries through. */
+    --sb-highlight-soft: color-mix(in oklab, var(--sb-highlight) 30%, transparent);
+    --sb-accent-soft: color-mix(in oklab, var(--sb-accent) 10%, transparent);
+    --sb-rule: 2px;
+    /* Flat on top, soft underneath: the shape of a letter hanging from its headline. */
+    --sb-hang: 0 0 var(--sb-radius) var(--sb-radius);
+    --sb-wide: 112%;
+    --sb-wider: 125%;
+    font-size: var(--sb-font-size);
+    scroll-padding-top: calc(var(--sb-header-height) + 1.25rem);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--sb-background);
+    color: var(--sb-text);
+    font-family: var(--sb-font-sans);
+    font-size: var(--sb-step-0);
+    line-height: var(--sb-line-height);
+    font-synthesis-weight: none;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--sb-highlight) 60%, transparent);
+    color: var(--sb-text);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--sb-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  img,
+  svg,
+  video {
+    max-width: 100%;
+    height: auto;
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--sb-font-mono);
+    font-variant-ligatures: none;
+  }
+
+  ul[class],
+  ol[class] {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  p[class] {
+    margin: 0;
+  }
+
+  .sb-icon {
+    flex: none;
+    display: block;
+  }
+
+  .sb-skip-link {
+    position: absolute;
+    inset-block-start: 0.5rem;
+    inset-inline-start: 0.5rem;
+    z-index: 100;
+    padding: 0.5rem 0.875rem;
+    background: var(--sb-text);
+    color: var(--sb-background);
+    border-radius: var(--sb-hang);
+    transform: translateY(-200%);
+  }
+
+  .sb-skip-link:focus {
+    transform: none;
+  }
+
+  .sb-badge {
+    display: inline-block;
+    padding: 0.05em 0.5em;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+    vertical-align: middle;
+    color: var(--sb-badge-color, var(--sb-muted));
+    background: color-mix(in oklab, var(--sb-badge-color, var(--sb-muted)) 13%, transparent);
+  }
+
+  .sb-badge[data-variant='note'] {
+    --sb-badge-color: var(--sb-note);
+  }
+  .sb-badge[data-variant='tip'] {
+    --sb-badge-color: var(--sb-tip);
+  }
+  .sb-badge[data-variant='success'] {
+    --sb-badge-color: var(--sb-success);
+  }
+  .sb-badge[data-variant='caution'] {
+    --sb-badge-color: var(--sb-caution);
+  }
+  .sb-badge[data-variant='danger'] {
+    --sb-badge-color: var(--sb-danger);
+  }
+
+  .sb-icon-button {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 2.25rem;
+    block-size: 2.25rem;
+    border-radius: 6px;
+    color: var(--sb-muted);
+  }
+
+  .sb-icon-button:hover {
+    color: var(--sb-text);
+    background: var(--sb-surface);
+  }
+
+  /* Buttons hang from a bar too: the primary one from the highlight colour. */
+  .sb-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.15rem 0.65rem;
+    border-block-start: 3px solid var(--sb-highlight);
+    border-radius: var(--sb-hang);
+    background: var(--sb-text);
+    color: var(--sb-background);
+    font-weight: 600;
+    font-stretch: var(--sb-wide);
+    line-height: 1.3;
+  }
+
+  .sb-button:hover {
+    background: color-mix(in oklab, var(--sb-text) 86%, var(--sb-background));
+  }
+
+  .sb-button[data-variant='secondary'] {
+    border: 1px solid var(--sb-border);
+    border-block-start: 3px solid var(--sb-text);
+    background: transparent;
+    color: var(--sb-text);
+  }
+
+  .sb-button[data-variant='secondary']:hover {
+    background: var(--sb-surface);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

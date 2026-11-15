@@ -1,0 +1,17 @@
+- category: Guide
+  items:
+    - guide/intro
+    - file: guide/setup
+      badge: New
+    - folder: More
+      collapsed: true
+      items:
+        - guide/hidden-sidebar
+        - guide/wide
+        - guide/hosting
+- category: Play
+  items:
+    - play/sandbox
+- link: https://example.com
+  label: Elsewhere
+# content/api and content/extras are not mentioned, so they are generated.

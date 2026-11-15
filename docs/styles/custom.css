@@ -1,0 +1,13 @@
+/*
+ * This site's own styles, loaded through `theme.css` in shabd.config.yaml.
+ * Theme tokens are available as custom properties, and because the theme
+ * lives in a cascade layer, plain rules here take precedence over it.
+ */
+.announcement {
+  margin: 0;
+  padding: 0.4rem 1rem;
+  text-align: center;
+  font-size: var(--sb-step--1);
+  background: var(--sb-text);
+  color: var(--sb-background);
+}

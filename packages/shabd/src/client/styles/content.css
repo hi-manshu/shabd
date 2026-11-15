@@ -1,0 +1,426 @@
+@layer shabd.content {
+  /* Typography for the Markdown body. */
+  .sb-content {
+    overflow-wrap: break-word;
+  }
+
+  .sb-content > :first-child {
+    margin-block-start: 0;
+  }
+
+  .sb-content > :last-child {
+    margin-block-end: 0;
+  }
+
+  /*
+   * Spacing between blocks of prose. `:where` keeps this as weak as a single
+   * class, and it skips elements that carry a class, so a component's own
+   * paragraphs (a callout title, a card) are not pushed apart by it.
+   */
+  .sb-content :where(p, ul, ol, dl, blockquote, figure, table, details, hr):where(:not([class])) {
+    margin-block: 1.15em;
+  }
+
+  .sb-content :is(h1, h2, h3, h4, h5, h6) {
+    position: relative;
+    margin-block: 2.2em 0.6em;
+    line-height: 1.2;
+    letter-spacing: -0.008em;
+    text-wrap: balance;
+  }
+
+  .sb-content h1 {
+    font-size: var(--sb-step-4);
+    font-weight: 750;
+    font-stretch: var(--sb-wider);
+  }
+
+  .sb-content h2 {
+    font-size: var(--sb-step-3);
+    font-weight: 700;
+    font-stretch: var(--sb-wide);
+  }
+
+  .sb-content h3 {
+    font-size: var(--sb-step-2);
+    font-weight: 650;
+    font-stretch: var(--sb-wide);
+  }
+
+  .sb-content h4 {
+    font-size: var(--sb-step-1);
+    font-weight: 650;
+  }
+
+  .sb-content :is(h5, h6) {
+    font-size: var(--sb-step-0);
+    font-weight: 650;
+  }
+
+  .sb-content :is(h2, h3, h4) + :is(h2, h3, h4) {
+    margin-block-start: 1em;
+  }
+
+  /* The link to a heading appears beside it on hover or keyboard focus. */
+  .sb-anchor {
+    display: inline-block;
+    margin-inline-start: 0.4rem;
+    color: var(--sb-muted);
+    vertical-align: middle;
+    opacity: 0;
+  }
+
+  :is(h1, h2, h3, h4, h5, h6):hover > .sb-anchor,
+  .sb-anchor:focus-visible {
+    opacity: 1;
+  }
+
+  .sb-anchor:hover {
+    color: var(--sb-accent);
+  }
+
+  @media (hover: none) {
+    .sb-anchor {
+      opacity: 0.55;
+    }
+  }
+
+  .sb-content a:not([class]) {
+    color: var(--sb-accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    text-decoration-color: color-mix(in oklab, var(--sb-accent) 45%, transparent);
+  }
+
+  /* Hovering a link runs a highlighter over the words. */
+  .sb-content a:not([class]):hover {
+    background: var(--sb-highlight-soft);
+    text-decoration-color: var(--sb-accent);
+  }
+
+  .sb-content strong {
+    font-weight: 650;
+  }
+
+  .sb-content :is(ul, ol) {
+    padding-inline-start: 1.4em;
+  }
+
+  .sb-content li {
+    margin-block: 0.35em;
+  }
+
+  .sb-content li > :is(ul, ol) {
+    margin-block: 0.35em;
+  }
+
+  .sb-content li::marker {
+    color: var(--sb-muted);
+  }
+
+  .sb-content .contains-task-list {
+    list-style: none;
+    margin-block: 1.15em;
+    padding-inline-start: 0.2em;
+  }
+
+  .sb-content .task-list-item input {
+    margin-inline-end: 0.5em;
+    accent-color: var(--sb-accent);
+  }
+
+  .sb-content blockquote {
+    margin-inline: 0;
+    padding-inline-start: 1.1rem;
+    border-inline-start: var(--sb-rule) solid var(--sb-border);
+    color: var(--sb-muted);
+  }
+
+  .sb-content hr {
+    block-size: 1px;
+    border: 0;
+    background: var(--sb-border);
+  }
+
+  .sb-content img {
+    border-radius: 4px;
+  }
+
+  .sb-content :not(pre) > code {
+    padding: 0.12em 0.36em;
+    border-radius: 4px;
+    background: var(--sb-surface);
+    font-size: 0.875em;
+    overflow-wrap: anywhere;
+  }
+
+  .sb-content kbd {
+    padding: 0.1em 0.4em;
+    border: 1px solid var(--sb-border);
+    border-block-end-width: 2px;
+    border-radius: 4px;
+    font-size: 0.82em;
+  }
+
+  /* ───────────── tables ───────────── */
+
+  .sb-table-scroll {
+    margin-block: 1.4em;
+    overflow-x: auto;
+  }
+
+  .sb-content table {
+    inline-size: 100%;
+    margin: 0;
+    border-collapse: collapse;
+    font-size: 0.94rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sb-content th {
+    padding: 0.5rem 0.75rem;
+    border-block-end: var(--sb-rule) solid var(--sb-text);
+    text-align: start;
+    font-weight: 650;
+    font-stretch: var(--sb-wide);
+    white-space: nowrap;
+  }
+
+  .sb-content td {
+    padding: 0.55rem 0.75rem;
+    border-block-end: 1px solid var(--sb-border);
+    vertical-align: top;
+  }
+
+  /* Identifiers in a table stay whole; a table that gets too wide scrolls inside its own box. */
+  .sb-content :is(th, td) code {
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+
+  .sb-content :is(th, td)[align='right'] {
+    text-align: end;
+  }
+
+  .sb-content :is(th, td)[align='center'] {
+    text-align: center;
+  }
+
+  /* ───────────── code blocks ───────────── */
+
+  .sb-code {
+    margin-block: 1.4em;
+    margin-inline: 0;
+    border: 1px solid var(--sb-border);
+    border-block-start: var(--sb-rule) solid var(--sb-text);
+    border-radius: var(--sb-hang);
+    background: var(--sb-surface);
+  }
+
+  .sb-code-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.3rem 0.4rem 0 0.95rem;
+    font-size: 0.78rem;
+    color: var(--sb-muted);
+  }
+
+  .sb-code-label[data-kind='title'] {
+    color: var(--sb-text);
+    font-family: var(--sb-font-mono);
+  }
+
+  .sb-code-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    color: var(--sb-muted);
+  }
+
+  .sb-code-copy:hover {
+    color: var(--sb-text);
+    background: color-mix(in oklab, var(--sb-text) 8%, transparent);
+  }
+
+  .sb-code pre,
+  .sb-sandbox-fallback {
+    margin: 0;
+    padding: 0.6rem 0 0.95rem;
+    overflow-x: auto;
+    font-size: 0.86rem;
+    line-height: 1.65;
+    tab-size: 2;
+    background: none;
+  }
+
+  .sb-code pre:focus-visible {
+    outline-offset: -2px;
+  }
+
+  /* One grid row per line, so a highlighted line can span the block's full width. */
+  .sb-code code {
+    display: grid;
+    min-inline-size: max-content;
+  }
+
+  .sb-code .line {
+    min-block-size: 1lh;
+    padding-inline: 0.95rem;
+  }
+
+  .sb-code pre[data-wrap] code {
+    min-inline-size: 0;
+  }
+
+  .sb-code pre[data-wrap] .line {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .sb-code .sb-line-highlight {
+    background: var(--sb-highlight-soft);
+    box-shadow: inset var(--sb-rule) 0 0 var(--sb-highlight);
+  }
+
+  .sb-code pre[data-line-numbers] code {
+    counter-reset: line;
+  }
+
+  .sb-code pre[data-line-numbers] .line::before {
+    counter-increment: line;
+    content: counter(line);
+    display: inline-block;
+    inline-size: 1.5rem;
+    margin-inline-end: 1rem;
+    text-align: end;
+    color: color-mix(in oklab, var(--sb-muted) 65%, transparent);
+  }
+
+  /* Shiki emits both themes as variables on every token; the colour mode picks one. */
+  .shiki span {
+    color: var(--shiki-light);
+  }
+
+  :root[data-theme='dark'] .shiki span {
+    color: var(--shiki-dark);
+  }
+
+  /* ───────────── callouts ───────────── */
+
+  .sb-callout {
+    --sb-callout-color: var(--sb-note);
+    margin-block: 1.4em;
+    padding: 0.8rem 1.1rem 0.9rem;
+    border-block-start: var(--sb-rule) solid var(--sb-callout-color);
+    border-radius: var(--sb-hang);
+    background: color-mix(in oklab, var(--sb-callout-color) 8%, var(--sb-background));
+  }
+
+  .sb-callout[data-type='tip'] {
+    --sb-callout-color: var(--sb-tip);
+  }
+  .sb-callout[data-type='important'] {
+    --sb-callout-color: var(--sb-accent);
+  }
+  .sb-callout[data-type='warning'] {
+    --sb-callout-color: var(--sb-caution);
+  }
+  .sb-callout[data-type='caution'] {
+    --sb-callout-color: var(--sb-danger);
+  }
+
+  .sb-callout-title {
+    margin-block-end: 0.3rem;
+    font-weight: 700;
+    font-stretch: var(--sb-wide);
+    color: var(--sb-callout-color);
+  }
+
+  .sb-callout-body > :first-child {
+    margin-block-start: 0;
+  }
+
+  .sb-callout-body > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* ───────────── cards and tabs ───────────── */
+
+  .sb-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+    gap: 1.25rem 2rem;
+    margin-block: 2rem;
+  }
+
+  .sb-card {
+    display: block;
+    padding-block-start: 0.85rem;
+    border-block-start: var(--sb-rule) solid var(--sb-text);
+  }
+
+  a.sb-card:hover {
+    border-block-start-color: var(--sb-highlight);
+  }
+
+  .sb-card-title {
+    margin-block-end: 0.35rem;
+    font-size: var(--sb-step-1);
+    font-weight: 700;
+    font-stretch: var(--sb-wide);
+    line-height: 1.25;
+  }
+
+  .sb-card-body {
+    color: var(--sb-muted);
+  }
+
+  .sb-card-body > :first-child {
+    margin-block-start: 0;
+  }
+
+  .sb-card-body > :last-child {
+    margin-block-end: 0;
+  }
+
+  .sb-tabs {
+    margin-block: 1.4em;
+  }
+
+  .sb-tab-list {
+    display: flex;
+    gap: 0.25rem;
+    border-block-end: 1px solid var(--sb-border);
+  }
+
+  .sb-tab-list button {
+    padding: 0.4rem 0.75rem;
+    margin-block-end: -1px;
+    border-block-end: var(--sb-rule) solid transparent;
+    color: var(--sb-muted);
+    font-weight: 500;
+  }
+
+  .sb-tab-list button:hover {
+    color: var(--sb-text);
+  }
+
+  .sb-tab-list button[aria-selected='true'] {
+    color: var(--sb-text);
+    border-block-end-color: var(--sb-highlight);
+  }
+
+  .sb-tab-panel > :first-child {
+    margin-block-start: 1rem;
+  }
+
+  .sb-not-found {
+    font-size: var(--sb-step-1);
+    color: var(--sb-muted);
+  }
+}

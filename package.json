@@ -1,0 +1,28 @@
+{
+  "name": "shabd-monorepo",
+  "private": true,
+  "type": "module",
+  "description": "Shabd — YAML-driven, local-first documentation framework",
+  "workspaces": [
+    "packages/*",
+    "docs"
+  ],
+  "scripts": {
+    "build": "npm run build -w shabd",
+    "dev": "npm run build -w shabd && npm run dev -w docs",
+    "docs:build": "npm run build -w shabd && npm run build -w docs",
+    "docs:preview": "npm run preview -w docs",
+    "test": "vitest run",
+    "typecheck": "npm run typecheck -w shabd",
+    "test:e2e": "npm run build -w shabd && playwright test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "@sqlite.org/sqlite-wasm": "^3.54.1-build1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

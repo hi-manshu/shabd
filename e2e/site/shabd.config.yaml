@@ -1,0 +1,28 @@
+# A small site that uses every feature once. The browser tests run against copies of it.
+site:
+  title: Fixture
+  description: A site for Shabd's browser tests.
+  url: https://fixture.test
+  favicon: /favicon.svg
+  repo: https://github.com/example/fixture
+  nav:
+    - { label: Guide, link: /guide/intro }
+    - { label: API, link: /api/ping }
+
+theme:
+  colors:
+    highlight: { light: "#f6b40e", dark: "#ffc53d" }
+
+layouts:
+  wide-doc:
+    extends: doc
+    width: wide
+    regions:
+      aside: []
+
+features:
+  search: { semantic: false }
+  studio: { sync: peers }
+
+components:
+  Counter: ./components/Counter.tsx

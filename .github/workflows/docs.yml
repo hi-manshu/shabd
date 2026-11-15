@@ -1,0 +1,54 @@
+# Publishes docs/ to GitHub Pages. A starting point: it has not been run yet.
+#
+# It only runs when started by hand, so that pushes do not fail before Pages
+# is set up. To turn it on:
+#   1. Repository settings → Pages → Source: GitHub Actions
+#   2. In docs/shabd.config.yaml set `site.url` to the Pages origin and, for a
+#      project site, `site.base` to "/<repository name>/"
+#   3. Add `push: { branches: [main] }` under `on:` below
+name: Docs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The embedding model (about 22 MB) and the embeddings of unchanged pages.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/@huggingface/transformers/.cache
+            docs/.shabd
+            docs/node_modules/.shabd
+          key: shabd-search-${{ hashFiles('docs/shabd.config.yaml') }}
+      - run: npm ci
+      - run: npm run docs:build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

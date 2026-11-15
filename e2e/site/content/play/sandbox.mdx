@@ -1,0 +1,24 @@
+---
+title: Sandbox
+---
+
+```tsx live
+export default function Clicker() {
+  const [count, setCount] = useShared('count', 0)
+  return <button onClick={() => setCount(count + 1)}>Clicked {count} times</button>
+}
+```
+
+```tsx live group="level" title="Control"
+export default function Control() {
+  const [level, setLevel] = useShared('level', 40)
+  return <input aria-label="Level" type="range" min="0" max="100" value={level} onChange={(e) => setLevel(Number(e.target.value))} />
+}
+```
+
+```tsx live group="level" title="Meter"
+export default function Meter() {
+  const [level] = useShared('level', 40)
+  return <output>{level}%</output>
+}
+```

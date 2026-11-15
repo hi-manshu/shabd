@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=../packages/shabd/schemas/sidebar.schema.json
+#
+# The sidebar, top to bottom. Four kinds of entry:
+#
+#   - guide/introduction        a page (label = the page's title)
+#   - file: …                   a page, with a custom label or badge
+#   - folder: …                 a collapsible group
+#   - category: …               a section heading (top level only)
+#   - link: …                   a link to somewhere else
+#
+# Any content folder that is not mentioned here is added at the end,
+# sorted alphabetically. `content/reference/` is one: it has no entry below.
+
+- category: Guide
+  items:
+    - guide/introduction
+    - guide/installation
+    - guide/project-structure
+    - folder: Writing content
+      collapsed: false
+      items:
+        - guide/writing/markdown
+        - file: guide/writing/components
+          label: Components in MDX
+          badge: MDX
+
+- category: Configuration
+  items:
+    - configuration/site
+    - configuration/sidebar
+    - configuration/frontmatter
+    - configuration/layouts
+    - configuration/theme
+
+- category: Features
+  items:
+    - file: features/search
+      badge: New
+    - features/mcp
+    - file: features/studio
+      badge: Beta
+    - file: features/sandbox
+      badge: { text: Beta, variant: caution }
+
+- link: https://github.com/hi-manshu/shabd
+  label: GitHub

@@ -1,0 +1,61 @@
+---
+title: Shabd
+description: Documentation sites configured in YAML.
+layout: splash
+hero:
+  title: Documentation, configured in YAML
+  tagline: Point Shabd at a folder of Markdown. Two YAML files decide the navigation, the theme and the layout of every page.
+  actions:
+    - { label: Read the guide, link: /guide/introduction }
+    - { label: See the configuration, link: /configuration/site, variant: secondary }
+---
+
+<CardGrid>
+  <Card title="Layouts are data" href="/configuration/layouts">
+    A layout is a list of regions and the blocks in each. Rearrange a page, or define a new layout, without writing a
+    component.
+  </Card>
+  <Card title="A sidebar that fills itself in" href="/configuration/sidebar">
+    Write the navigation you care about in `sidebar.yaml`. Folders you did not mention are added for you, in
+    alphabetical order.
+  </Card>
+  <Card title="Search that runs in the browser" href="/features/search">
+    Pages are embedded at build time. A Web Worker embeds the query on the reader's device and ranks the results. No
+    search service is involved.
+  </Card>
+  <Card title="Readable by AI agents" href="/features/mcp">
+    Every site gets `llms.txt`, `llms-full.txt` and an MCP endpoint, so coding agents can search and read the docs.
+  </Card>
+  <Card title="Edit in the browser" href="/features/studio">
+    In development, open the Studio on any page. It writes to the Markdown file on disk, and the page beside it
+    updates as you type.
+  </Card>
+  <Card title="Code samples that run" href="/features/sandbox">
+    Mark a code fence `live` and it runs on the page, next to its source and a panel that shows its state.
+  </Card>
+</CardGrid>
+
+## What a site looks like
+
+```text
+my-docs/
+├── shabd.config.yaml   site, theme, layouts, features
+├── sidebar.yaml        navigation
+└── content/
+    ├── index.mdx
+    └── guide/
+        └── introduction.md
+```
+
+```yaml title="shabd.config.yaml"
+site:
+  title: My docs
+
+theme:
+  colors:
+    accent: "#2b36a8"
+
+features:
+  search: { semantic: true }
+  mcp: true
+```

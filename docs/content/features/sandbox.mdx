@@ -1,0 +1,107 @@
+---
+title: Live sandboxes
+description: Code samples that run on the page, with their state shown beside them.
+badges: [Beta]
+---
+
+Add `live` to a `tsx` or `jsx` code fence and it becomes a sandbox: the code on one side, the running result on the
+other. Readers can edit the code and watch the result change.
+
+````md
+```tsx live
+export default function Counter() {
+  const [count, setCount] = useShared('count', 0)
+  return <button onClick={() => setCount(count + 1)}>Clicked {count} times</button>
+}
+```
+````
+
+```tsx live
+export default function Counter() {
+  const [count, setCount] = useShared('count', 0)
+  return (
+    <button className="sb-button" onClick={() => setCount(count + 1)}>
+      Clicked {count} times
+    </button>
+  )
+}
+```
+
+Try three things with the example above:
+
+1. Click the button. The number under it, in the state panel, follows.
+2. Type a number into the state panel. The button follows.
+3. Change the button's text in the code. The count stays where it was.
+
+## State that outlives the code
+
+The third one is the point. Every edit throws the component away and builds a new one, and ordinary `useState` would
+start again from zero each time.
+
+`useShared` keeps its value outside the component:
+
+```tsx
+const [count, setCount] = useShared('count', 0)
+```
+
+It is used like `useState`, with a name in front. The state panel lists every value kept this way and can change
+each one, so code, widget and panel are three views of the same state.
+
+## Sandboxes that share state
+
+Give two sandboxes the same `group` and they share their values. Here the first sets a level and the second shows
+it.
+
+````md
+```tsx live group="level"
+```
+````
+
+```tsx live group="level" title="Control"
+export default function Control() {
+  const [level, setLevel] = useShared('level', 40)
+  return (
+    <label>
+      Level{' '}
+      <input type="range" min="0" max="100" value={level} onChange={(event) => setLevel(Number(event.target.value))} />
+    </label>
+  )
+}
+```
+
+```tsx live group="level" title="Meter"
+export default function Meter() {
+  const [level] = useShared('level', 40)
+  return (
+    <p>
+      <progress max="100" value={level} /> {level}%
+    </p>
+  )
+}
+```
+
+## What a snippet can use
+
+A snippet is either a module with `export default` for its component, or a single JSX element:
+
+```tsx live
+<Counter start={5} />
+```
+
+In scope without importing anything:
+
+- React's hooks: `useState`, `useEffect`, `useMemo`, `useRef`, `useReducer`, `useCallback`, `useId`
+- `useShared`
+- Every component from `components:` in the config. `Counter` above is one
+
+`import` works for `react` and `shabd/client`. Any other import is refused with a message that says so.
+
+## Things to know
+
+- Snippets are TypeScript, but they are not type-checked. Types are removed and the code runs.
+- The compiler is downloaded when a page with a sandbox is opened, not before.
+- A snippet runs in the page, with the page's permissions, like any other script on it. A site with a
+  Content-Security-Policy that forbids `unsafe-eval` cannot run sandboxes.
+- An error in a snippet is shown under its result. The rest of the page carries on.
+
+Set `features.sandbox: false` to render `live` fences as ordinary code blocks.

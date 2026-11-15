@@ -1,0 +1,236 @@
+/**
+ * `shabd build`: a static site in dist/.
+ *
+ *   1. bundle     Vite builds the browser app; each page becomes its own chunk
+ *   2. prerender  Vite builds a server bundle, which renders every route to HTML
+ *   3. extras     llms.txt, per-page Markdown, the search index, MCP data, sitemap
+ *
+ * All three steps share one context, so each page is compiled once (or not at
+ * all, if the on-disk cache already holds it).
+ */
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+import pc from 'picocolors'
+import { build as viteBuild } from 'vite'
+import { withBase } from '../../shared/paths.js'
+import { SEARCH_FILES } from '../../shared/search-core.js'
+import type { RenderedPage } from '../../shared/types.js'
+import { collectProblems, formatProblem } from '../check.js'
+import { createContext, type ShabdContext } from '../context.js'
+import { markdownPath, publicUrl, renderLlmsFull, renderLlmsTxt } from '../llms/llms-txt.js'
+import { pageMarkdown } from '../llms/markdown.js'
+import { DOCS_FILE, SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, type DocsFile } from '../mcp/source.js'
+import { SearchService } from '../search/service.js'
+import { serverOutDir, shabd } from '../vite/plugin.js'
+import { escapeHtml, renderDocument } from './html.js'
+
+export interface BuildOptions {
+  /** Set false to skip embeddings and ship keyword search only. */
+  semantic?: boolean
+}
+
+/** One entry of Vite's build manifest. */
+interface ManifestChunk {
+  file: string
+  src?: string
+  isEntry?: boolean
+  imports?: string[]
+  css?: string[]
+}
+type Manifest = Record<string, ManifestChunk>
+
+const step = (message: string) => console.log(`  ${pc.green('✓')} ${message}`)
+const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
+
+export async function build(root: string, options: BuildOptions = {}): Promise<void> {
+  const started = performance.now()
+  const context = await createContext(root, { dev: false })
+  const { config, store, compiler } = context
+  const outDir = path.join(config.root, 'dist')
+  const pages = store.pages()
+
+  console.log(`\n${pc.bold('shabd build')} ${pc.dim(path.relative(process.cwd(), config.root) || '.')}\n`)
+
+  // Problems in content stop the build before any time is spent bundling.
+  const { problems, detailed } = await collectProblems(context)
+  if (detailed.length) throw detailed[0]
+  step(`${pages.length} pages compiled`)
+
+  const viteOptions = { configFile: false as const, root: config.root, logLevel: 'warn' as const }
+  let phase = performance.now()
+  await viteBuild({ ...viteOptions, plugins: [shabd({ context })] })
+  step(`browser bundle ${pc.dim(seconds(performance.now() - phase))}`)
+
+  phase = performance.now()
+  await viteBuild({ ...viteOptions, plugins: [shabd({ context })], build: { ssr: true } })
+  const serverDir = serverOutDir(config)
+  const { render } = (await import(pathToFileURL(path.join(serverDir, 'entry-server.mjs')).href)) as {
+    render(path: string): Promise<RenderedPage>
+  }
+  const manifest = JSON.parse(await readFile(path.join(outDir, '.vite', 'manifest.json'), 'utf8')) as Manifest
+  const assets = new AssetResolver(manifest, context)
+
+  const write = async (file: string, contents: string | Uint8Array) => {
+    const target = path.join(outDir, file)
+    await mkdir(path.dirname(target), { recursive: true })
+    await writeFile(target, contents)
+  }
+
+  const renderRoute = async (routePath: string, sourceFile?: string) => {
+    const rendered = await render(routePath)
+    return renderDocument({
+      config: config.config,
+      title: rendered.title,
+      description: rendered.description,
+      path: routePath,
+      body: rendered.html,
+      head: assets.headTags(sourceFile),
+      scripts: assets.entryScript(),
+    })
+  }
+
+  for (const page of pages) {
+    const html = await renderRoute(page.path, page.file)
+    await write(page.path === '/' ? 'index.html' : `${page.path.slice(1)}/index.html`, html)
+  }
+  // Static hosts serve 404.html for unknown URLs. A `content/404.md` page customises it.
+  const custom404 = store.byPath('/404')
+  await write('404.html', await renderRoute('/404', custom404?.file))
+  // Intermediates: the prerender bundle, and the manifest the tags above were read from.
+  await rm(serverDir, { recursive: true, force: true })
+  await rm(path.join(outDir, '.vite'), { recursive: true, force: true })
+  step(`${pages.length} pages prerendered ${pc.dim(seconds(performance.now() - phase))}`)
+
+  /* ── for AI agents ── */
+
+  const { features, site } = config.config
+  if (features.llms.enabled) {
+    await write('llms.txt', renderLlmsTxt(context))
+    if (features.llms.full) await write('llms-full.txt', renderLlmsFull(context))
+    for (const page of pages) await write(markdownPath(page.path).slice(1), pageMarkdown(page))
+    step(`llms.txt${features.llms.full ? ', llms-full.txt' : ''} and ${pages.length} Markdown copies`)
+    if (!site.url) {
+      console.log(pc.yellow('    site.url is not set, so links in llms.txt are relative. Set it to the deployed address.'))
+    }
+  }
+
+  if (features.mcp.enabled) {
+    const docs: DocsFile = {
+      version: 1,
+      name: site.title,
+      description: site.description,
+      pages: pages.map((page) => ({
+        path: page.path,
+        title: page.title,
+        description: page.description,
+        url: publicUrl(context, markdownPath(page.path)),
+        markdown: pageMarkdown(page),
+      })),
+    }
+    await write(DOCS_FILE, JSON.stringify(docs))
+  }
+
+  /* ── search ── */
+
+  if (features.search.enabled || features.mcp.enabled) {
+    phase = performance.now()
+    const search = new SearchService(() => context, {
+      ...(options.semantic === false ? { semantic: false } : {}),
+      log: (message) => console.log(pc.yellow(`    ${message}`)),
+    })
+    const index = await search.index()
+    await write(SEARCH_INDEX_FILE, JSON.stringify(index.file))
+    if (index.vectors) {
+      const { buffer, byteOffset, byteLength } = index.vectors
+      await write(SEARCH_VECTORS_FILE, new Uint8Array(buffer, byteOffset, byteLength))
+    }
+    const kind = index.file.semantic
+      ? `semantic, ${index.file.semantic.dims} dimensions, ${index.stats.embedded} newly embedded`
+      : 'keywords only'
+    step(`search index: ${index.stats.docs} sections (${kind}) ${pc.dim(seconds(performance.now() - phase))}`)
+
+    if (features.search.enabled && features.search.store === 'sqlite') {
+      const database = await search.database()
+      if (database) {
+        await write(SEARCH_FILES.database, database.bytes)
+        await write(SEARCH_FILES.manifest, JSON.stringify(database.manifest))
+        step(`search database: ${(database.bytes.length / 1024).toFixed(0)} KB of SQLite`)
+      } else {
+        console.log(
+          pc.yellow(
+            '    features.search.store is "sqlite", but @sqlite.org/sqlite-wasm is not installed. Readers get the in-memory store.',
+          ),
+        )
+      }
+    }
+  }
+
+  if (site.url) {
+    const urls = pages.map((page) => `  <url><loc>${escapeHtml(publicUrl(context, page.path))}</loc></url>`)
+    await write(
+      'sitemap.xml',
+      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`,
+    )
+  }
+
+  await compiler.cache.prune()
+  await compiler.cache.flush()
+
+  if (problems.length) console.log(`\n${problems.map(formatProblem).join('\n')}`)
+  console.log(
+    `\n  ${pc.bold('Done')} in ${seconds(performance.now() - started)}. ` +
+      `Output: ${pc.cyan(path.relative(process.cwd(), outDir) || 'dist')}\n`,
+  )
+}
+
+/** Turns Vite's manifest into the <link> and <script> tags a page needs. */
+class AssetResolver {
+  #manifest: Manifest
+  #entry: ManifestChunk
+  #base: string
+  #root: string
+
+  constructor(manifest: Manifest, context: ShabdContext) {
+    this.#manifest = manifest
+    this.#base = context.config.config.site.base
+    this.#root = context.config.root
+    const entry = Object.values(manifest).find((chunk) => chunk.isEntry)
+    if (!entry) throw new Error('shabd: the build manifest has no entry chunk')
+    this.#entry = entry
+  }
+
+  #url(file: string): string {
+    return escapeHtml(withBase(this.#base, `/${file}`))
+  }
+
+  /** A chunk and everything it statically imports, depth first. */
+  #closure(key: string, seen = new Set<string>()): ManifestChunk[] {
+    if (seen.has(key)) return []
+    seen.add(key)
+    const chunk = this.#manifest[key]
+    if (!chunk) return []
+    return [chunk, ...(chunk.imports ?? []).flatMap((imported) => this.#closure(imported, seen))]
+  }
+
+  /** Stylesheets, plus preloads for the app and for this page's own chunk, so the first render needs no waterfall. */
+  headTags(pageFile?: string): string {
+    const entryKey = Object.keys(this.#manifest).find((key) => this.#manifest[key] === this.#entry)!
+    const seen = new Set<string>()
+    const chunks = this.#closure(entryKey, seen)
+    if (pageFile) {
+      const key = path.relative(this.#root, pageFile).split(path.sep).join('/')
+      chunks.push(...this.#closure(key, seen))
+    }
+    const styles = [...new Set(chunks.flatMap((chunk) => chunk.css ?? []))]
+    const scripts = [...new Set(chunks.map((chunk) => chunk.file))].filter((file) => file !== this.#entry.file)
+    return [
+      ...styles.map((file) => `<link rel="stylesheet" href="${this.#url(file)}">`),
+      ...scripts.map((file) => `<link rel="modulepreload" href="${this.#url(file)}">`),
+    ].join('\n    ')
+  }
+
+  entryScript(): string {
+    return `<script type="module" src="${this.#url(this.#entry.file)}"></script>`
+  }
+}

@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # Shabd has only been run on macOS so far, so Linux is the platform worth checking here.
+    # Add macos-latest and windows-latest as a matrix once this passes; macOS minutes cost ten
+    # times as much on a private repository.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm test
+      # Keyword search only: the build then needs no model download.
+      - run: node packages/shabd/bin/shabd.js check docs
+      - run: node packages/shabd/bin/shabd.js build docs --no-semantic
+
+  # The browser tests have only been run on macOS. This job is the first attempt on Linux.
+  browsers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run test:e2e
+      # The same suite again with the search index held in SQLite.
+      - run: npx playwright test
+        env:
+          SHABD_E2E_STORE: sqlite
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces
+          path: e2e/.results
+

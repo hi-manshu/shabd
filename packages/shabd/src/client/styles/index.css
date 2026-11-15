@@ -1,0 +1,28 @@
+/*
+ * Shabd default theme.
+ *
+ * Nothing in these files names a colour, a font or a size: they read the
+ * custom properties generated from `theme:` in shabd.config.yaml
+ * (src/node/config/theme-css.ts). Everything sits in the `shabd` cascade
+ * layer, so a site's own unlayered CSS always wins without !important.
+ *
+ * The visual idea is the shirorekha, the headline bar that Devanagari letters
+ * hang from. Titles, code blocks, callouts and buttons have a flat ruled top
+ * edge and soft bottom corners, and "the current thing" (active page, active
+ * heading) is marked by wearing that bar.
+ */
+@layer shabd.base, shabd.layout, shabd.blocks, shabd.content, shabd.overlays, shabd.utilities;
+
+@import './base.css';
+@import './layout.css';
+@import './blocks.css';
+@import './content.css';
+@import './overlays.css';
+
+@layer shabd.utilities {
+  /* Elements that swap with the colour mode. Both are in the markup; CSS shows one. */
+  :root[data-theme='dark'] .sb-only-light,
+  :root:not([data-theme='dark']) .sb-only-dark {
+    display: none;
+  }
+}

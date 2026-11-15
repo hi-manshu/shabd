@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="f-tile" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3944b8"/><stop offset="1" stop-color="#151849"/></linearGradient>
+    <linearGradient id="f-goldL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd96b"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
+    <linearGradient id="f-goldR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb02e"/><stop offset="1" stop-color="#f08a1c"/></linearGradient>
+    <linearGradient id="f-headL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#e4e8fb"/></linearGradient>
+    <linearGradient id="f-headR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e4e8fb"/><stop offset="1" stop-color="#c3cbf7"/></linearGradient>
+    <linearGradient id="f-faceL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#f1f3fe"/></linearGradient>
+    <linearGradient id="f-faceR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f1f3fe"/><stop offset="1" stop-color="#dfe4fb"/></linearGradient>
+    <linearGradient id="f-chestUL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#dfe4fb"/><stop offset="1" stop-color="#c3cbf7"/></linearGradient>
+    <linearGradient id="f-chestUR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c3cbf7"/><stop offset="1" stop-color="#aab4f2"/></linearGradient>
+    <linearGradient id="f-chestLL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c3cbf7"/><stop offset="1" stop-color="#aab4f2"/></linearGradient>
+    <linearGradient id="f-chestLR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#aab4f2"/><stop offset="1" stop-color="#8f9af5"/></linearGradient>
+    <linearGradient id="f-wingL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#dfe4fb"/></linearGradient>
+    <linearGradient id="f-wingR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c3cbf7"/><stop offset="1" stop-color="#aab4f2"/></linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#f-tile)"/>
+  <rect x="20" y="104" width="88" height="10" fill="#ffc53d"/>
+  <path d="M58.08 29.26L51.42 15.94L47.72 32.22Z" fill="url(#f-goldL)"/>
+  <path d="M69.92 29.26L76.58 15.94L80.28 32.22Z" fill="url(#f-goldR)"/>
+  <path d="M59.56 28.52L64 10.76L68.44 28.52Z" fill="url(#f-goldL)"/>
+  <path d="M64 27.04L43.28 34.44L34.4 55.16L64 49.24Z" fill="url(#f-headL)"/>
+  <path d="M64 27.04L84.72 34.44L93.6 55.16L64 49.24Z" fill="url(#f-headR)"/>
+  <path d="M34.4 55.16L64 49.24L64 74.4L38.84 77.36Z" fill="url(#f-faceL)"/>
+  <path d="M93.6 55.16L64 49.24L64 74.4L89.16 77.36Z" fill="url(#f-faceR)"/>
+  <path d="M38.84 77.36L64 74.4L64 90.68L44.02 92.16Z" fill="url(#f-chestUL)"/>
+  <path d="M89.16 77.36L64 74.4L64 90.68L83.98 92.16Z" fill="url(#f-chestUR)"/>
+  <path d="M44.02 92.16L64 90.68L64 104L49.2 104Z" fill="url(#f-chestLL)"/>
+  <path d="M83.98 92.16L64 90.68L64 104L78.8 104Z" fill="url(#f-chestLR)"/>
+  <path d="M38.84 77.36L24.04 93.64L32.92 104L49.2 104L44.76 84.76Z" fill="url(#f-wingL)"/>
+  <path d="M89.16 77.36L103.96 93.64L95.08 104L78.8 104L83.24 84.76Z" fill="url(#f-wingR)"/>
+  <path d="M56.6 53.68L64 50.72L64 78.84L54.38 65.52Z" fill="url(#f-goldL)"/>
+  <path d="M64 50.72L71.4 53.68L73.62 65.52L64 78.84Z" fill="url(#f-goldR)"/>
+  <circle cx="48.46" cy="62.56" r="3.85" fill="#14163f"/><circle cx="49.64" cy="61.23" r="1.26" fill="#ffffff"/>
+  <circle cx="79.54" cy="62.56" r="3.85" fill="#14163f"/><circle cx="80.72" cy="61.23" r="1.26" fill="#ffffff"/>
+</svg>

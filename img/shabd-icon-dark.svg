@@ -1,0 +1,41 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Shabd">
+  <defs>
+    <linearGradient id="j-ink" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#e8e9f5"/><stop offset="1" stop-color="#b3bbff"/></linearGradient>
+    <linearGradient id="j-headL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6b78ea"/><stop offset="1" stop-color="#4654cf"/></linearGradient>
+    <linearGradient id="j-headR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8f9af5"/><stop offset="1" stop-color="#6b78ea"/></linearGradient>
+    <linearGradient id="j-faceL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#e4e8fb"/></linearGradient>
+    <linearGradient id="j-faceR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d6dcfa"/><stop offset="1" stop-color="#aab4f2"/></linearGradient>
+    <linearGradient id="j-chestUL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a4adfa"/><stop offset="1" stop-color="#808cf0"/></linearGradient>
+    <linearGradient id="j-chestUR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#bcc3fd"/><stop offset="1" stop-color="#9aa4f6"/></linearGradient>
+    <linearGradient id="j-chestLL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#808cf0"/><stop offset="1" stop-color="#6672e2"/></linearGradient>
+    <linearGradient id="j-chestLR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a4adfa"/><stop offset="1" stop-color="#808cf0"/></linearGradient>
+    <linearGradient id="j-wingL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5560d6"/><stop offset="1" stop-color="#3a44b4"/></linearGradient>
+    <linearGradient id="j-wingR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7480ea"/><stop offset="1" stop-color="#5560d6"/></linearGradient>
+    <linearGradient id="j-goldL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd96b"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
+    <linearGradient id="j-goldR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb02e"/><stop offset="1" stop-color="#f08a1c"/></linearGradient>
+  </defs>
+  <path d="M96.68 172.96L116.4 172.96L102.48 219.36Z" fill="url(#j-wingL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M159.32 172.96L139.6 172.96L153.52 219.36Z" fill="url(#j-wingR)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M116.4 172.96L128 172.96L128 235.6Z" fill="url(#j-headL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M128 172.96L139.6 172.96L128 235.6Z" fill="url(#j-headR)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <rect x="34" y="166" width="188" height="18" fill="url(#j-ink)"/>
+  <path d="M118.72 48.84L108.28 27.96L102.48 53.48Z" fill="url(#j-goldL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M137.28 48.84L147.72 27.96L153.52 53.48Z" fill="url(#j-goldR)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M121.04 47.68L128 19.84L134.96 47.68Z" fill="url(#j-goldL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M128 45.36L95.52 56.96L81.6 89.44L128 80.16Z" fill="url(#j-headL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M128 45.36L160.48 56.96L174.4 89.44L128 80.16Z" fill="url(#j-headR)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M81.6 89.44L128 80.16L128 119.6L88.56 124.24Z" fill="url(#j-faceL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M174.4 89.44L128 80.16L128 119.6L167.44 124.24Z" fill="url(#j-faceR)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M88.56 124.24L128 119.6L128 145.12L96.68 147.44Z" fill="url(#j-chestUL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M167.44 124.24L128 119.6L128 145.12L159.32 147.44Z" fill="url(#j-chestUR)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M96.68 147.44L128 145.12L128 166L104.8 166Z" fill="url(#j-chestLL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M159.32 147.44L128 145.12L128 166L151.2 166Z" fill="url(#j-chestLR)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M88.56 124.24L65.36 149.76L79.28 166L104.8 166L97.84 135.84Z" fill="url(#j-wingL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M167.44 124.24L190.64 149.76L176.72 166L151.2 166L158.16 135.84Z" fill="url(#j-wingR)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M116.4 87.12L128 82.48L128 126.56L112.92 105.68Z" fill="url(#j-goldL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M128 82.48L139.6 87.12L143.08 105.68L128 126.56Z" fill="url(#j-goldR)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <circle cx="103.64" cy="101.04" r="6.03" fill="#14163f"/><circle cx="105.5" cy="98.95" r="1.97" fill="#ffffff"/>
+  <circle cx="152.36" cy="101.04" r="6.03" fill="#14163f"/><circle cx="154.22" cy="98.95" r="1.97" fill="#ffffff"/>
+  <path d="M103.64 161.36L118.72 161.36L121.04 176.44L101.32 176.44Z" fill="url(#j-goldL)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+  <path d="M152.36 161.36L137.28 161.36L134.96 176.44L154.68 176.44Z" fill="url(#j-goldR)" stroke="#1d2063" stroke-width="1.74" stroke-linejoin="round"/>
+</svg>

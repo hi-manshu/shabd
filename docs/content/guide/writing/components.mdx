@@ -1,0 +1,56 @@
+---
+title: Components in MDX
+description: Use the built-in components, and register your own, in .mdx pages.
+sidebar:
+  badge: MDX
+---
+
+A file ending in `.mdx` can use components alongside Markdown. The built-in ones need no import.
+
+## Tabs
+
+<Tabs>
+  <Tab label="npm">
+
+    ```sh
+    npm install shabd
+    ```
+
+  </Tab>
+  <Tab label="pnpm">
+
+    ```sh
+    pnpm add shabd
+    ```
+
+  </Tab>
+</Tabs>
+
+## Cards
+
+<CardGrid>
+  <Card title="A plain card">Cards group short pieces of related content.</Card>
+  <Card title="A linked card" href="/guide/introduction">
+    Give a card an `href` and the whole card becomes a link.
+  </Card>
+</CardGrid>
+
+## Badges
+
+A badge marks a status inline: <Badge text="New" /> <Badge text="Beta" /> <Badge text="Deprecated" />
+<Badge variant="tip">Recommended</Badge>
+
+## Your own components
+
+Register a component in `shabd.config.yaml`, and every `.mdx` file can use it by name.
+
+```yaml title="shabd.config.yaml"
+components:
+  Counter: ./components/Counter.tsx
+```
+
+```mdx
+<Counter start={3} />
+```
+
+<Counter start={3} />
