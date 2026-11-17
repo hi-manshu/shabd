@@ -42,7 +42,7 @@ import { renderDocument } from '../build/html.js'
 import { isShabdError } from '../config/errors.js'
 import { loadConfig, loadSidebar, type ResolvedConfig } from '../config/load.js'
 import { substituteVars } from '../content/vars.js'
-import { compilePage, createContext, type ShabdContext } from '../context.js'
+import { compilePage, createContext, isSplit, type ShabdContext } from '../context.js'
 import { MDX_COMPONENTS_ID } from '../markdown/compile.js'
 import { HMR_RUNTIME_ID, PAGE_ERROR_ID, toErrorModule, toPageModule } from '../markdown/page-module.js'
 import { hasMermaid, mathStylesheet } from '../markdown/user-plugins.js'
@@ -257,6 +257,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
           routePath: page?.path,
           hash: page?.hash,
           liftTitle: page?.titleFromHeading,
+          split: page ? isSplit(context, page) : false,
         })
       } catch (error) {
         // In dev a page that does not compile is served as a module that shows

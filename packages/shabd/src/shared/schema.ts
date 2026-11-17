@@ -470,18 +470,40 @@ const ThemeSchema = z
 
 /* ─────────────────────────────── layouts ──────────────────────────────── */
 
+/** The pages a block is shown on. Left out, it is shown on every page whose layout places it. */
+export interface BlockCondition {
+  /**
+   * Paths the page may have: `/guide/**`. `*` stands for one part of a path
+   * and `**` for any number of them. A pattern that starts with `!` takes
+   * pages away again: `['/**', '!/blog/**']`.
+   */
+  path?: string[] | undefined
+  /** Frontmatter the page must have: each key listed here must equal the page's value. */
+  frontmatter?: Record<string, unknown> | undefined
+}
+
 export interface BlockRef {
   block: string
   props: Record<string, unknown>
+  when?: BlockCondition | undefined
 }
 
-/** `- toc` or `- { block: toc, props: { title: Contents } }`. */
+const BlockConditionSchema = z.strictObject({
+  path: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
+    .optional()
+    .transform((path) => (typeof path === 'string' ? [path] : path)),
+  frontmatter: z.record(z.string(), z.unknown()).optional(),
+})
+
+/** `- toc`, or `- { block: toc, props: { title: Contents }, when: { path: /guide/** } }`. */
 const BlockRefSchema = z
   .union([
     z.string().min(1),
     z.strictObject({
       block: z.string().min(1),
       props: z.record(z.string(), z.unknown()).default({}),
+      when: BlockConditionSchema.optional(),
     }),
   ])
   .transform((ref): BlockRef => (typeof ref === 'string' ? { block: ref, props: {} } : ref))
@@ -493,6 +515,11 @@ const LayoutSchema = z.strictObject({
   extends: z.string().min(1).optional(),
   /** Width of the main column. */
   width: z.enum(LAYOUT_WIDTHS).optional(),
+  /**
+   * Set a page's code samples beside its prose, section by section, on a
+   * screen wide enough for both. The built-in `api` layout does.
+   */
+  split: z.boolean().optional(),
   regions: z.partialRecord(z.enum(REGIONS), z.array(BlockRefSchema)).default({}),
 })
 export type LayoutDefinition = z.output<typeof LayoutSchema>

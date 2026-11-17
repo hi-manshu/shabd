@@ -21,6 +21,8 @@ export interface PageData {
   routePath: string | undefined
   /** Content-relative path of the file, used to resolve `./other.md` links. */
   id: string | undefined
+  /** Set the page's code beside its prose, row by row. The page's layout asks for it. */
+  split?: boolean | undefined
 
   /* outputs */
   title: string | undefined
@@ -42,7 +44,7 @@ export interface PageData {
 
 const KEY = 'shabd'
 
-export function initPageData(file: VFile, input: Pick<PageData, 'liftTitle' | 'routePath' | 'id'>): PageData {
+export function initPageData(file: VFile, input: Pick<PageData, 'liftTitle' | 'routePath' | 'id' | 'split'>): PageData {
   const data: PageData = {
     ...input,
     title: undefined,

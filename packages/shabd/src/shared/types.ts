@@ -72,6 +72,8 @@ export type LayoutWidth = 'content' | 'wide' | 'full'
 export interface ResolvedLayout {
   name: string
   width: LayoutWidth
+  /** Pages of this layout are compiled with their code beside their prose. */
+  split: boolean
   regions: Partial<Record<RegionName, BlockRef[]>>
 }
 

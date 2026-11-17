@@ -176,7 +176,10 @@ export function resolveConfig(root: string, configFile: string, source: string):
     // The presets in the theme menu decide which other syntax themes every code block is coloured in.
     codeThemePlan(config.theme).themes,
     config.features.sandbox.enabled,
-    Object.keys(layouts).sort(),
+    // Which layouts there are, and which of them set code beside prose: pages of those compile differently.
+    Object.keys(layouts)
+      .sort()
+      .map((name) => [name, layouts[name]?.split]),
   ])
   // Token colours are held to a contrast floor against the colours code is drawn on.
   const compileFingerprint = digest([structureFingerprint, codeBackgrounds(config.theme)])

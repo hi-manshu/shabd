@@ -1323,6 +1323,9 @@
               "full"
             ]
           },
+          "split": {
+            "type": "boolean"
+          },
           "regions": {
             "type": "object",
             "propertyNames": {
@@ -1358,6 +1361,35 @@
                           "type": "string"
                         },
                         "additionalProperties": {}
+                      },
+                      "when": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              }
+                            ]
+                          },
+                          "frontmatter": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          }
+                        },
+                        "additionalProperties": false
                       }
                     },
                     "required": [

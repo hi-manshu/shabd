@@ -32,6 +32,7 @@ import { initPageData, type PageData } from './page-data.js'
 import { CodeHighlighter, rehypeCode, type CodeOptions } from './plugins/rehype-code.js'
 import { rehypeHeadings } from './plugins/rehype-headings.js'
 import { rehypeLinks } from './plugins/rehype-links.js'
+import { rehypeSplit } from './plugins/rehype-split.js'
 import { remarkCallouts } from './plugins/remark-callouts.js'
 import { remarkLiftTitle } from './plugins/remark-lift-title.js'
 import type { UserPlugins } from './user-plugins.js'
@@ -61,6 +62,8 @@ export interface CompileInput {
   hash?: string | undefined
   /** Use a leading `# heading` as the title and remove it from the body. */
   liftTitle?: boolean | undefined
+  /** Set code beside prose, as the page's layout asks (`split: true`). */
+  split?: boolean | undefined
 }
 
 export interface CompiledPage {
@@ -123,6 +126,7 @@ export class MarkdownCompiler {
       input.format,
       input.routePath,
       input.liftTitle,
+      input.split === true,
       input.hash ?? input.source,
     )
 
@@ -147,6 +151,7 @@ export class MarkdownCompiler {
       liftTitle: input.liftTitle ?? false,
       routePath: input.routePath,
       id: input.id,
+      split: input.split,
     })
 
     try {
@@ -199,6 +204,8 @@ export class MarkdownCompiler {
           ...(user?.rehypeBeforeCode ?? []),
           [rehypeCode, this.highlighter],
           ...(user?.rehype ?? []),
+          // Last of all, once every piece of the page is what it will be: this one only moves them.
+          rehypeSplit,
           rehypeMdxImportMedia,
         ] as NonNullable<Parameters<typeof createProcessor>[0]>['rehypePlugins'],
       })

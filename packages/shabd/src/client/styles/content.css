@@ -514,6 +514,51 @@
     margin-block-start: 1rem;
   }
 
+  /* ───────────── prose beside code ───────────── */
+
+  /*
+   * A page whose layout is `split` is cut into rows at its headings, each
+   * with its text in one cell and its code in the other. On a narrow screen
+   * the cells simply follow each other.
+   */
+  .sb-split {
+    margin-block: 2.75rem;
+  }
+
+  .sb-split:first-child {
+    margin-block-start: 0;
+  }
+
+  .sb-split-prose > :first-child,
+  .sb-split-code > :first-child {
+    margin-block-start: 0;
+  }
+
+  .sb-split-prose > :last-child,
+  .sb-split-code > :last-child {
+    margin-block-end: 0;
+  }
+
+  @media (min-width: 60rem) {
+    .sb-split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 0 clamp(2rem, 4vw, 4rem);
+      align-items: start;
+    }
+
+    /* The text keeps to a width that reads well, however wide the screen. */
+    .sb-split-prose {
+      max-inline-size: var(--sb-content-width);
+    }
+
+    /* The code stays in view while the text beside it is read. */
+    .sb-split-code {
+      position: sticky;
+      inset-block-start: calc(var(--sb-header-height) + 1.5rem);
+    }
+  }
+
   /* ───────────── diagrams ───────────── */
 
   .sb-mermaid {

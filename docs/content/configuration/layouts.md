@@ -67,7 +67,7 @@ names that exist.
 | `base` | | `header`, `footer`. The other three extend it |
 | `doc` | `content` | adds `sidebar`, `main` and `aside` |
 | `splash` | `wide` | adds `main` with `hero` and `content` |
-| `api` | `full` | adds `sidebar` and `main` with `api-endpoint`. No `aside` |
+| `api` | `full` | adds `sidebar` and `main` with `api-endpoint`. No `aside`. Sets [prose beside code](#prose-beside-code) |
 
 `width` sets how wide the main column may grow: `content` is the reading width from the
 [theme](./theme.md), `wide` is 68rem, and `full` has no limit.
@@ -130,6 +130,58 @@ regions:
 
 `toc` takes `title`, `search` takes `label`, and `page-actions` takes
 [the options listed with it](../features/mcp.md#on-the-page). Your own blocks receive whatever you pass.
+
+## Show a block on some pages only
+
+A block written as an object can carry a condition, `when`. The block is then part of the layout only on the pages
+that meet it.
+
+```yaml title="shabd.config.yaml"
+layouts:
+  base:
+    regions:
+      banner:
+        - block: announcement
+          when:
+            path: /guide/**
+```
+
+| Key | Meaning |
+| --- | --- |
+| `path` | A pattern the page's address must match, or a list of them. `*` stands for one part of a path and `**` for any number, so `/guide/**` is every page under `/guide`, and `/guide` itself. A pattern that starts with `!` takes pages away again |
+| `frontmatter` | Values the page's frontmatter must have. Every key listed must equal the page's value |
+
+```yaml
+when:
+  path: ["/**", "!/blog/**"] # everywhere but the blog
+  frontmatter: { beta: true } # and only on pages that say `beta: true`
+```
+
+With both keys, both must hold. A region whose blocks are all left out is not drawn, as with any other region
+that has nothing in it.
+
+## Prose beside code
+
+A layout with `split: true` sets a page's code samples beside its text on a screen wide enough for both. The page
+is cut into rows at its headings; in each row the text is on the left and the code on the right, and the code stays
+in view while the text beside it is read. On a narrow screen the code follows the text.
+
+The built-in `api` layout does this. The [llms.txt endpoint](../reference/endpoints/llms-txt.md) page shows it. To
+have it on a layout of your own, or to take it off `api`:
+
+```yaml title="shabd.config.yaml"
+layouts:
+  reference:
+    extends: doc
+    width: full
+    split: true
+  api:
+    split: false
+```
+
+A page with no code is left as one column. Only fenced code, [sandboxes](../features/sandbox.mdx) and
+[diagrams](../guide/writing/markdown.md#diagrams) go to the right; tables, callouts and pictures stay with the
+text.
 
 ## Your own blocks
 

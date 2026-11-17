@@ -95,7 +95,7 @@ export function toPageView(site: SiteData, page: LoadedPage): PageView {
       frontmatter,
       toc: [],
       codeCss: '',
-      layout: resolvePageLayout(site, frontmatter, []),
+      layout: resolvePageLayout(site, frontmatter, [], page.path),
       Content: NotFound,
       notFound: true,
     }
@@ -110,7 +110,7 @@ export function toPageView(site: SiteData, page: LoadedPage): PageView {
     description: meta.description,
     frontmatter,
     toc,
-    layout: resolvePageLayout(site, frontmatter, toc),
+    layout: resolvePageLayout(site, frontmatter, toc, page.path),
     Content: page.module.default,
     notFound: false,
   }

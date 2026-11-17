@@ -19,6 +19,12 @@ theme:
     highlight: { light: "#f6b40e", dark: "#ffc53d" }
 
 layouts:
+  # A block with a condition: every layout has the banner, and it is shown under /extras alone.
+  base:
+    regions:
+      banner:
+        - block: notice
+          when: { path: /extras/** }
   wide-doc:
     extends: doc
     width: wide

@@ -41,6 +41,12 @@ export async function createContext(root: string, options: { dev: boolean }): Pr
   return { config, store, compiler, dev: options.dev }
 }
 
+/** Does the page's layout set code beside prose? A page that names no layout has the site's default. */
+export function isSplit(context: ShabdContext, page: PageRecord): boolean {
+  const { layouts, config } = context.config
+  return layouts[page.frontmatter.layout ?? config.defaults.layout]?.split === true
+}
+
 /** Compile a page from the store. Throws the page's frontmatter error if it has one. */
 export function compilePage(context: ShabdContext, page: PageRecord): Promise<CompileResult> {
   if (page.error) throw page.error
@@ -52,5 +58,6 @@ export function compilePage(context: ShabdContext, page: PageRecord): Promise<Co
     routePath: page.path,
     hash: page.hash,
     liftTitle: page.titleFromHeading,
+    split: isSplit(context, page),
   })
 }

@@ -8,6 +8,47 @@ const edges = (locator: Locator) =>
     return { top: Math.round(rect.top), bottom: Math.round(rect.bottom) }
   })
 
+test.describe('a block with a condition', () => {
+  test('is on the pages its condition names and on no others, also after moving between them', async ({ page }) => {
+    // The site puts a notice in every layout's banner, for pages under /extras.
+    await open(page, `${BUILT}/extras/alpha`)
+    await expect(page.locator('.sb-region-banner')).toHaveText('A notice above the header.')
+
+    // Without loading a new document: the layout is worked out again for the page that is arrived at.
+    await page.locator('.sb-region-sidebar').getByRole('link', { name: 'Introduction' }).click()
+    await expect(page).toHaveURL(`${BUILT}/guide/intro`)
+    await expect(page.locator('.sb-region-banner')).toHaveCount(0)
+
+    await page.goBack()
+    await expect(page.locator('.sb-region-banner')).toHaveText('A notice above the header.')
+  })
+})
+
+test.describe('prose beside code', () => {
+  const cells = async (page: import('@playwright/test').Page) => {
+    await open(page, `${BUILT}/api/ping`)
+    const prose = await page.locator('.sb-split-prose').first().boundingBox()
+    const code = await page.locator('.sb-split-code').first().boundingBox()
+    return { prose: prose!, code: code! }
+  }
+
+  test('an api page sets its code beside its text on a wide screen', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    const { prose, code } = await cells(page)
+    // Side by side: the code starts to the right of where the text ends, at the same height.
+    expect(code.x).toBeGreaterThan(prose.x + prose.width)
+    expect(Math.abs(code.y - prose.y)).toBeLessThan(2)
+    await expect(page.locator('.sb-split-code figure.sb-code')).toContainText('curl https://api.fixture.test/v1/ping/eu')
+  })
+
+  test('and under it on a narrow one', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    const { prose, code } = await cells(page)
+    expect(code.y).toBeGreaterThanOrEqual(prose.y + prose.height)
+    expect(Math.abs(code.x - prose.x)).toBeLessThan(2)
+  })
+})
+
 test.describe('a sidebar longer than a small screen', () => {
   test.use({ viewport: { width: 390, height: 480 } })
 
