@@ -1,36 +1,58 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <defs>
     <linearGradient id="f-tile" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#3944b8"/><stop offset="1" stop-color="#151849"/></linearGradient>
-    <linearGradient id="f-goldL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd96b"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
-    <linearGradient id="f-goldR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb02e"/><stop offset="1" stop-color="#f08a1c"/></linearGradient>
-    <linearGradient id="f-headL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#e4e8fb"/></linearGradient>
-    <linearGradient id="f-headR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e4e8fb"/><stop offset="1" stop-color="#c3cbf7"/></linearGradient>
-    <linearGradient id="f-faceL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#f1f3fe"/></linearGradient>
-    <linearGradient id="f-faceR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f1f3fe"/><stop offset="1" stop-color="#dfe4fb"/></linearGradient>
-    <linearGradient id="f-chestUL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#dfe4fb"/><stop offset="1" stop-color="#c3cbf7"/></linearGradient>
-    <linearGradient id="f-chestUR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c3cbf7"/><stop offset="1" stop-color="#aab4f2"/></linearGradient>
-    <linearGradient id="f-chestLL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c3cbf7"/><stop offset="1" stop-color="#aab4f2"/></linearGradient>
-    <linearGradient id="f-chestLR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#aab4f2"/><stop offset="1" stop-color="#8f9af5"/></linearGradient>
-    <linearGradient id="f-wingL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#dfe4fb"/></linearGradient>
-    <linearGradient id="f-wingR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c3cbf7"/><stop offset="1" stop-color="#aab4f2"/></linearGradient>
+    <linearGradient id="f-ink" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#1b1c3a"/><stop offset="1" stop-color="#2b36a8"/></linearGradient>
+    <linearGradient id="f-capL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffc53d"/><stop offset="1" stop-color="#f29d0c"/></linearGradient>
+    <linearGradient id="f-capR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffdf7a"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
+    <linearGradient id="f-faceL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffdf5"/><stop offset="1" stop-color="#fff0c2"/></linearGradient>
+    <linearGradient id="f-faceR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff3cf"/><stop offset="1" stop-color="#ffe29a"/></linearGradient>
+    <linearGradient id="f-blush" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb199"/><stop offset="1" stop-color="#ff8a70"/></linearGradient>
+    <linearGradient id="f-bodyL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffc53d"/><stop offset="1" stop-color="#ee960a"/></linearGradient>
+    <linearGradient id="f-bodyR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd966"/><stop offset="1" stop-color="#f6b40e"/></linearGradient>
+    <linearGradient id="f-belly" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffaf0"/><stop offset="1" stop-color="#ffe9b0"/></linearGradient>
+    <linearGradient id="f-wingL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f29d0c"/><stop offset="1" stop-color="#d97c06"/></linearGradient>
+    <linearGradient id="f-wingR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f6b40e"/><stop offset="1" stop-color="#e08a08"/></linearGradient>
+    <linearGradient id="f-tailL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e08a08"/><stop offset="1" stop-color="#c56f05"/></linearGradient>
+    <linearGradient id="f-tailR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f29d0c"/><stop offset="1" stop-color="#d97c06"/></linearGradient>
+    <linearGradient id="f-tuftL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#dfe4fb"/></linearGradient>
+    <linearGradient id="f-tuftR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eef0fd"/><stop offset="1" stop-color="#c3cbf7"/></linearGradient>
+    <linearGradient id="f-beakL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff9a52"/><stop offset="1" stop-color="#f26a1b"/></linearGradient>
+    <linearGradient id="f-beakR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f26a1b"/><stop offset="1" stop-color="#cf4f0c"/></linearGradient>
+    <linearGradient id="f-beakLow" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c94c0c"/><stop offset="1" stop-color="#a13a07"/></linearGradient>
+    <linearGradient id="f-footL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff9a52"/><stop offset="1" stop-color="#f26a1b"/></linearGradient>
+    <linearGradient id="f-footR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f26a1b"/><stop offset="1" stop-color="#cf4f0c"/></linearGradient>
+    <linearGradient id="f-say" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6f7beb"/><stop offset="1" stop-color="#3944b8"/></linearGradient>
   </defs>
   <rect width="128" height="128" rx="30" fill="url(#f-tile)"/>
-  <rect x="20" y="104" width="88" height="10" fill="#ffc53d"/>
-  <path d="M58.08 29.26L51.42 15.94L47.72 32.22Z" fill="url(#f-goldL)"/>
-  <path d="M69.92 29.26L76.58 15.94L80.28 32.22Z" fill="url(#f-goldR)"/>
-  <path d="M59.56 28.52L64 10.76L68.44 28.52Z" fill="url(#f-goldL)"/>
-  <path d="M64 27.04L43.28 34.44L34.4 55.16L64 49.24Z" fill="url(#f-headL)"/>
-  <path d="M64 27.04L84.72 34.44L93.6 55.16L64 49.24Z" fill="url(#f-headR)"/>
-  <path d="M34.4 55.16L64 49.24L64 74.4L38.84 77.36Z" fill="url(#f-faceL)"/>
-  <path d="M93.6 55.16L64 49.24L64 74.4L89.16 77.36Z" fill="url(#f-faceR)"/>
-  <path d="M38.84 77.36L64 74.4L64 90.68L44.02 92.16Z" fill="url(#f-chestUL)"/>
-  <path d="M89.16 77.36L64 74.4L64 90.68L83.98 92.16Z" fill="url(#f-chestUR)"/>
-  <path d="M44.02 92.16L64 90.68L64 104L49.2 104Z" fill="url(#f-chestLL)"/>
-  <path d="M83.98 92.16L64 90.68L64 104L78.8 104Z" fill="url(#f-chestLR)"/>
-  <path d="M38.84 77.36L24.04 93.64L32.92 104L49.2 104L44.76 84.76Z" fill="url(#f-wingL)"/>
-  <path d="M89.16 77.36L103.96 93.64L95.08 104L78.8 104L83.24 84.76Z" fill="url(#f-wingR)"/>
-  <path d="M56.6 53.68L64 50.72L64 78.84L54.38 65.52Z" fill="url(#f-goldL)"/>
-  <path d="M64 50.72L71.4 53.68L73.62 65.52L64 78.84Z" fill="url(#f-goldR)"/>
-  <circle cx="48.46" cy="62.56" r="3.85" fill="#14163f"/><circle cx="49.64" cy="61.23" r="1.26" fill="#ffffff"/>
-  <circle cx="79.54" cy="62.56" r="3.85" fill="#14163f"/><circle cx="80.72" cy="61.23" r="1.26" fill="#ffffff"/>
+  <rect x="18" y="106" width="92" height="9" fill="#e8e9f5"/>
+  <g>
+      <path class="sb-wing sb-wing-0" d="M44 80.4L32 82.8L25.6 90.8L30.4 99.6L41.6 97.2Z" fill="url(#f-wingL)"/>
+      <path class="sb-wing sb-wing-1" d="M84 80.4L96 82.8L102.4 90.8L97.6 99.6L86.4 97.2Z" fill="url(#f-wingR)"/>
+      <path d="M44.8 77.2L64 77.2L64 106L49.6 106L40.8 99.6L39.2 89.2Z" fill="url(#f-bodyL)"/>
+      <path d="M83.2 77.2L64 77.2L64 106L78.4 106L87.2 99.6L88.8 89.2Z" fill="url(#f-bodyR)"/>
+      <path d="M53.6 82L74.4 82L79.2 94L72.8 102.8L55.2 102.8L48.8 94Z" fill="url(#f-belly)"/>
+      <path d="M43.2 70.8L84.8 70.8L83.2 82L44.8 82Z" fill="url(#f-bodyL)"/>
+    </g>
+    <g class="sb-head">
+      <path class="sb-tuft sb-tuft-0" d="M60.8 29.2L56.8 21.2L48 15.6L51.2 25.2L54.4 30.8Z" fill="url(#f-tuftL)"/>
+      <path class="sb-tuft sb-tuft-1" d="M67.2 29.2L71.2 21.2L80 15.6L76.8 25.2L73.6 30.8Z" fill="url(#f-tuftR)"/>
+      <path class="sb-tuft sb-tuft-2" d="M60 29.2L60.8 18L64 9.2L67.2 18L68 29.2Z" fill="url(#f-tuftL)"/>
+      <path d="M64 26.8L52.8 27.6L42.4 32.4L34.4 41.2L30.4 53.2L64 48.4Z" fill="url(#f-capL)"/>
+      <path d="M64 26.8L75.2 27.6L85.6 32.4L93.6 41.2L97.6 53.2L64 48.4Z" fill="url(#f-capR)"/>
+      <path d="M30.4 53.2L64 48.4L64 81.2L52 81.2L40.8 77.2L32.8 67.6Z" fill="url(#f-faceL)"/>
+      <path d="M97.6 53.2L64 48.4L64 81.2L76 81.2L87.2 77.2L95.2 67.6Z" fill="url(#f-faceR)"/>
+      <path d="M36.8 70.8L41.6 66.8L46.4 70.8L41.6 74.8Z" fill="url(#f-blush)"/>
+      <path d="M91.2 70.8L86.4 66.8L81.6 70.8L86.4 74.8Z" fill="url(#f-blush)"/>
+      <g class="sb-beak-lower"><path d="M60.8 68.4L67.2 68.4L64 73.2Z" fill="url(#f-beakLow)"/></g>
+      <path d="M58.4 64.4L64 59.6L64 70Z" fill="url(#f-beakL)"/>
+      <path d="M64 59.6L69.6 64.4L64 70Z" fill="url(#f-beakR)"/>
+      <g class="sb-eye sb-eye-0"><circle cx="49.6" cy="60.4" r="6.08" fill="#1b1c3a"/><circle cx="51.36" cy="58.48" r="1.95" fill="#ffffff"/></g>
+      <g class="sb-eye sb-eye-1"><circle cx="78.4" cy="60.4" r="6.08" fill="#1b1c3a"/><circle cx="80.16" cy="58.48" r="1.95" fill="#ffffff"/></g>
+    </g>
+  <g>
+      <path d="M51.2 103.6L55.2 103.6L56 112.4L50.4 112.4Z" fill="url(#f-footL)"/>
+      <path d="M56 103.6L60 103.6L60.8 112.4L55.2 112.4Z" fill="url(#f-footR)"/>
+      <path d="M72 103.6L68 103.6L67.2 112.4L72.8 112.4Z" fill="url(#f-footL)"/>
+      <path d="M76.8 103.6L72.8 103.6L72 112.4L77.6 112.4Z" fill="url(#f-footR)"/>
+    </g>
 </svg>

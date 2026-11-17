@@ -6,14 +6,13 @@
   }
 
   :root {
-    /* Derived from the YAML tokens, so a palette change carries through. */
+    /*
+     * Derived from the YAML tokens, so a palette change carries through.
+     * The 30% is also LINE_HIGHLIGHT_STRENGTH in shared/presets.ts: code on a
+     * highlighted line is coloured to be readable on exactly this tint.
+     */
     --sb-highlight-soft: color-mix(in oklab, var(--sb-highlight) 30%, transparent);
     --sb-accent-soft: color-mix(in oklab, var(--sb-accent) 10%, transparent);
-    --sb-rule: 2px;
-    /* Flat on top, soft underneath: the shape of a letter hanging from its headline. */
-    --sb-hang: 0 0 var(--sb-radius) var(--sb-radius);
-    --sb-wide: 112%;
-    --sb-wider: 125%;
     font-size: var(--sb-font-size);
     scroll-padding-top: calc(var(--sb-header-height) + 1.25rem);
     -webkit-text-size-adjust: 100%;
@@ -26,21 +25,56 @@
     color: var(--sb-text);
     font-family: var(--sb-font-sans);
     font-size: var(--sb-step-0);
+    font-weight: var(--sb-font-weight);
     line-height: var(--sb-line-height);
     font-synthesis-weight: none;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
 
+  /* A picture behind the whole page (`colors.backdrop`). It shows only through translucent panels. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: var(--sb-backdrop);
+    pointer-events: none;
+  }
+
   ::selection {
-    background: color-mix(in oklab, var(--sb-highlight) 60%, transparent);
+    background: var(--sb-selection);
     color: var(--sb-text);
+  }
+
+  /*
+   * Titles and headings take the heading font. The selectors are listed here,
+   * at no specificity, so that each one's own rule only has to say how it
+   * differs: its size, its weight, its width.
+   */
+  :where(
+      .sb-site-title,
+      .sb-page-title,
+      .sb-hero-title,
+      .sb-content :is(h1, h2, h3, h4, h5, h6),
+      .sb-card-title,
+      .sb-callout-title,
+      .sb-nav-heading,
+      .sb-toc-title,
+      .sb-pagination-title
+    ) {
+    font-family: var(--sb-font-heading);
+    text-transform: var(--sb-heading-case);
+  }
+
+  :where(.sb-page-title, .sb-hero-title, .sb-content :is(h1, h2, h3, h4, h5, h6)) {
+    color: var(--sb-heading);
   }
 
   :focus-visible {
     outline: 2px solid var(--sb-accent);
     outline-offset: 2px;
-    border-radius: 2px;
+    border-radius: min(2px, var(--sb-radius));
   }
 
   a {
@@ -107,7 +141,7 @@
   .sb-badge {
     display: inline-block;
     padding: 0.05em 0.5em;
-    border-radius: 3px;
+    border-radius: min(3px, var(--sb-radius));
     font-size: 0.72rem;
     font-weight: 600;
     line-height: 1.5;
@@ -138,7 +172,7 @@
     place-items: center;
     inline-size: 2.25rem;
     block-size: 2.25rem;
-    border-radius: 6px;
+    border-radius: min(6px, var(--sb-radius));
     color: var(--sb-muted);
   }
 
@@ -153,9 +187,10 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.6rem 1.15rem 0.65rem;
-    border-block-start: 3px solid var(--sb-highlight);
+    border-block-start: calc(var(--sb-rule) + 1px) solid var(--sb-highlight);
     border-radius: var(--sb-hang);
-    background: var(--sb-text);
+    background: var(--sb-button);
+    box-shadow: var(--sb-shadow);
     color: var(--sb-background);
     font-weight: 600;
     font-stretch: var(--sb-wide);
@@ -163,12 +198,12 @@
   }
 
   .sb-button:hover {
-    background: color-mix(in oklab, var(--sb-text) 86%, var(--sb-background));
+    background: color-mix(in oklab, var(--sb-button) 86%, var(--sb-background));
   }
 
   .sb-button[data-variant='secondary'] {
-    border: 1px solid var(--sb-border);
-    border-block-start: 3px solid var(--sb-text);
+    border: var(--sb-line) solid var(--sb-border);
+    border-block-start: calc(var(--sb-rule) + 1px) solid var(--sb-bar);
     background: transparent;
     color: var(--sb-text);
   }

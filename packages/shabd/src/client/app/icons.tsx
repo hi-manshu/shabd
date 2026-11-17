@@ -24,6 +24,12 @@ const ICONS = {
   ),
   moon: stroke(<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a7.5 7.5 0 1 0 10.5 10.5z" />),
   chevron: stroke(<path d="M9 6l6 6-6 6" />),
+  palette: stroke(
+    <>
+      <path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.4 0 2-.9 2-1.8 0-1.6-1.2-1.7-1.2-3 0-1 .8-1.7 1.9-1.7h1.8a4 4 0 0 0 4-4c0-3.6-3.8-6.5-8.5-6.5z" />
+      <path d="M7.6 12.2h.01M9.4 8.3h.01M13.6 7.4h.01" strokeWidth="2.6" />
+    </>,
+  ),
   copy: stroke(
     <>
       <rect x="9" y="9" width="11" height="11" rx="2" />

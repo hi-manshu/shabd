@@ -60,6 +60,7 @@ export function greet(name: string) {
 | `{2,4-6}` | Highlights those lines |
 | `showLineNumbers` | Numbers the lines |
 | `wrap` | Wraps long lines instead of scrolling |
+| `noLineNumbers`, `noWrap` | Turn either off for this block when [the theme](../../configuration/theme.md#code) turns it on for all |
 
 ## Links
 

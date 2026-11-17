@@ -11,3 +11,54 @@
   background: var(--sb-text);
   color: var(--sb-background);
 }
+
+/*
+ * The chick from the logo, perched on the home page's headline bar.
+ *
+ * The drawing (public/bird-light.svg, bird-dark.svg) is 136 units wide. The
+ * chick stands in the top 136 units, the next 13 are left empty for a bar,
+ * and the tail hangs below them. So when one unit is a thirteenth of the
+ * bar's thickness, the feet land on the bar and the tail passes behind it.
+ * The chick moves; the drawing itself stops that under prefers-reduced-motion.
+ */
+.sb-hero {
+  --bird-unit: calc(0.6rem / 13);
+  position: relative;
+  margin-block-start: 4.5rem; /* room for the chick between the header and the bar */
+  /* The perch stays, whatever a palette from the theme menu does to bars. */
+  border-block-start: 0.6rem solid var(--sb-text);
+}
+
+.sb-hero::before {
+  content: '';
+  position: absolute;
+  /* measured from the underside of the bar: the bar's 13 units, then the chick's 136 */
+  inset-block-start: calc(-149 * var(--bird-unit));
+  inset-inline-end: 1.5rem;
+  inline-size: calc(136 * var(--bird-unit));
+  block-size: calc(172 * var(--bird-unit));
+  background: url('/bird-light.svg') no-repeat 0 0 / 100% auto;
+  pointer-events: none;
+}
+
+:root[data-theme='dark'] .sb-hero::before {
+  background-image: url('/bird-dark.svg');
+}
+
+/*
+ * On a narrow screen the chick is two thirds the size. The gap in the drawing
+ * is then thinner than the bar, so the box stops at the chick's feet and the
+ * tail is left out.
+ */
+@media (max-width: 40rem) {
+  .sb-hero {
+    --bird-unit: 0.03rem;
+    margin-block-start: 3.5rem;
+  }
+
+  .sb-hero::before {
+    inset-block-start: calc(-0.6rem - 136 * var(--bird-unit));
+    inset-inline-end: 0.75rem;
+    block-size: calc(145 * var(--bird-unit));
+  }
+}

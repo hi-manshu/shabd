@@ -71,6 +71,8 @@ export interface PageView {
   description: string
   frontmatter: Frontmatter
   toc: TocEntry[]
+  /** The colours of the page's code tokens, as a stylesheet. */
+  codeCss: string
   /** The layout chosen by frontmatter, with this page's region switches applied. */
   layout: ActiveLayout
   Content: ComponentType<Record<string, unknown>>
@@ -90,6 +92,7 @@ export function toPageView(site: SiteData, page: LoadedPage): PageView {
       description: '',
       frontmatter,
       toc: [],
+      codeCss: '',
       layout: resolvePageLayout(site, frontmatter, []),
       Content: NotFound,
       notFound: true,
@@ -97,6 +100,7 @@ export function toPageView(site: SiteData, page: LoadedPage): PageView {
   }
   const { frontmatter, toc } = page.module
   return {
+    codeCss: page.module.codeCss ?? '',
     path: page.path,
     id: meta.id,
     title: meta.title,

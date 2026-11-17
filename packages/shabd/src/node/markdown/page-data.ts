@@ -23,6 +23,8 @@ export interface PageData {
   sections: PageSection[]
   /** Internal links found in the page, as route paths (with `#hash` when present). */
   links: string[]
+  /** The colours of the page's code tokens, as a stylesheet. Empty when the page has no highlighted code. */
+  codeCss: string
   /** Every heading id on the page, for checking `#fragment` links that point here. */
   anchors: string[]
 }
@@ -30,7 +32,7 @@ export interface PageData {
 const KEY = 'shabd'
 
 export function initPageData(file: VFile, input: Pick<PageData, 'liftTitle' | 'routePath' | 'id'>): PageData {
-  const data: PageData = { ...input, title: undefined, toc: [], sections: [], links: [], anchors: [] }
+  const data: PageData = { ...input, title: undefined, toc: [], sections: [], links: [], anchors: [], codeCss: '' }
   file.data[KEY] = data
   return data
 }

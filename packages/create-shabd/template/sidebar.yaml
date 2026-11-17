@@ -1,0 +1,7 @@
+# The navigation, in the order written here. A page is named by its path under content/,
+# without the extension. Folders that are not mentioned are added at the end, in alphabetical order.
+
+- category: Guide
+  items:
+    - guide/getting-started
+    - guide/writing

@@ -56,12 +56,37 @@ with Shabd:
 | `url` | none | The deployed origin, such as `https://docs.example.com`. Needed for canonical URLs, `sitemap.xml` and absolute links in `llms.txt` |
 | `base` | `/` | The path the site is served from, such as `/docs/` |
 | `lang` | `en` | The `lang` attribute of every page |
-| `logo` | none | A path, or `{ light, dark, alt }` |
+| `logo` | none | A path to an image, or the [settings below](#logo) |
 | `favicon` | none | A path to an icon in `public/` |
 | `repo` | none | A repository URL, or `{ url, branch, dir }`. Enables "Edit this page" |
 | `social` | none | `{ github: https://… }`, or a list of `{ icon, href, label }` |
 | `nav` | none | Header links: a list of `{ label, link, badge }` |
 | `footer` | none | Text for the page footer |
+
+### Logo
+
+A path on its own is one image for both colour modes. To give each mode its own image, or to change how the logo
+sits in the header, write the settings out:
+
+```yaml title="shabd.config.yaml"
+site:
+  logo:
+    light: /logo-light.svg
+    dark: /logo-dark.svg
+    height: 2rem
+    replacesTitle: true
+```
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `src` | none | One image for both colour modes |
+| `light`, `dark` | none | An image for each colour mode. Give both, or `src` |
+| `alt` | empty | Text for screen readers. Leave it empty while the title is shown beside the logo |
+| `height` | `1.75rem` | Height in the header. The width follows from the image, and the logo is kept inside the header |
+| `href` | `/` | Where the logo and the title link to: a page path or a URL |
+| `replacesTitle` | `false` | Show the logo without the site title beside it. The title becomes the image's `alt` unless you set one |
+
+The files go in `public/`. Any format a browser shows as an image works, and an SVG may carry its own animation.
 
 ## content
 

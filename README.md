@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="img/shabd-logo-dark.svg"/>
-    <img src="img/shabd-logo.svg" alt="Shabd" width="360"/>
+    <img src="img/shabd-logo.svg" alt="Shabd" width="420"/>
   </picture>
 </p>
 
@@ -28,6 +28,9 @@ described there, not in components.
 
 - **Layouts as data.** A layout is a table of regions (`header`, `sidebar`, `main`, …) and the blocks in each. A page
   picks one with `layout:` in its frontmatter. Editing a layout, or adding one, is a YAML change.
+- **Themes as tokens.** Twenty-two built-in presets, each with a light and a dark mode, and an optional menu that
+  lets readers switch between them; code blocks follow in each preset's own syntax colours, adjusted where a
+  colour would be hard to read. Every colour, font, width and corner is a token in YAML.
 - **A sidebar that fills itself in.** `sidebar.yaml` is used as written. Any content folder it does not mention is
   appended, sorted alphabetically.
 - **Errors that point at the YAML.** Config, sidebar and frontmatter problems are reported with file, line, column and,
@@ -56,6 +59,15 @@ npm run dev
 
 `npm run dev` builds the `shabd` package and starts the dev server for `docs/`, which is Shabd's own documentation
 written with Shabd. Edit anything in `docs/` and watch it update.
+
+To start a site of your own from the clone, pack Shabd and run the starter. The new site installs Shabd from the
+packed file, because it is not on npm yet:
+
+```sh
+npm run build
+npm pack -w shabd --pack-destination ..
+node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../shabd-0.1.0.tgz
+```
 
 ```sh
 npm test             # unit and integration tests
@@ -98,6 +110,10 @@ shabd/
 │   │       ├── sandbox/            live code sandboxes
 │   │       └── styles/             the default theme
 │   └── test/                       unit and integration tests
+├── packages/create-shabd/          the starter (npm package "create-shabd")
+│   ├── src/create.js               writes a new site; no dependencies
+│   └── template/                   the files it copies, laid out as the site they become
+├── scripts/logo/                   draws the logo files
 ├── e2e/                            browser tests, and the small site they run against
 └── docs/                           the documentation site, built with Shabd
     ├── shabd.config.yaml
@@ -153,9 +169,16 @@ See [ROADMAP.md](./ROADMAP.md) for what comes next and how to put the project on
 
 ## The logo
 
-The parrot is the bird that repeats words. It sits on the shirorekha, the headline bar that letters hang from in
-Devanagari, and the name hangs from the same bar. The site's theme uses that bar the same way: page titles, code
-blocks and callouts hang from one. The files are in [`img/`](./img).
+The chick is a young parrot, the bird that repeats words. It sits on the shirorekha, the headline bar that letters
+hang from in Devanagari, and the name hangs from the same bar. The site's theme uses that bar the same way: page
+titles, code blocks and callouts hang from one.
+
+The chick is marigold on a light background and indigo on a dark one. In the logo it hops once, then every ten
+seconds cocks its head and says something. The motion is CSS inside the SVG, and it stops for readers who have
+asked their system to reduce motion.
+
+The files are in [`img/`](./img). They are drawn by [`scripts/logo/make-logo.mjs`](./scripts/logo/make-logo.mjs);
+after changing it, run `npm run logo`.
 
 ## License
 

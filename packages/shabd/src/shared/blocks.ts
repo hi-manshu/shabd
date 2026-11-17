@@ -18,6 +18,7 @@ export const BUILTIN_BLOCKS = [
   'search',
   'social',
   'theme-toggle',
+  'theme-menu',
   'studio-toggle',
   // sidebar
   'sidebar-nav',

@@ -71,6 +71,8 @@ export interface CompiledPage {
   links: string[]
   /** Heading ids on this page. */
   anchors: string[]
+  /** The colours of the page's code tokens, as a stylesheet. The page module exports it. */
+  codeCss: string
 }
 
 export interface CompileResult extends CompiledPage {
@@ -92,6 +94,17 @@ export class MarkdownCompiler {
     this.options = options
     this.highlighter = new CodeHighlighter(options)
     this.cache = new SlotCache(options.cacheDir)
+  }
+
+  /**
+   * The colours behind code changed, as they do when a palette is edited
+   * while the dev server runs. Pages compile to something else from here on:
+   * the new fingerprint keeps them apart from what is cached.
+   */
+  recolour(backgrounds: CodeOptions['backgrounds'], fingerprint: string): void {
+    this.options.backgrounds = backgrounds
+    this.options.fingerprint = fingerprint
+    this.highlighter.forget()
   }
 
   async compile(input: CompileInput): Promise<CompileResult> {
@@ -141,6 +154,7 @@ export class MarkdownCompiler {
       sections: data.sections,
       links: data.links,
       anchors: data.anchors,
+      codeCss: data.codeCss,
     }
   }
 

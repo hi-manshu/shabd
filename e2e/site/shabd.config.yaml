@@ -10,6 +10,9 @@ site:
     - { label: API, link: /api/ping }
 
 theme:
+  # Readers may switch to any preset; the site's own palette is the default one with one colour changed.
+  # Every preset is on offer so that the tests can put each theme on a real page.
+  picker: true
   colors:
     highlight: { light: "#f6b40e", dark: "#ffc53d" }
 

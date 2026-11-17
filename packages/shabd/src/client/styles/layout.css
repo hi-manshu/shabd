@@ -30,8 +30,17 @@
     gap: 0.25rem;
     block-size: var(--sb-header-height);
     padding-inline: clamp(1rem, 3vw, 1.75rem);
-    background: var(--sb-background);
-    border-block-end: 1px solid var(--sb-border);
+    background: var(--sb-header);
+    /* Only shows when `colors.header` is translucent: the page blurs behind it. */
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    border-block-end: var(--sb-line) solid var(--sb-border);
+  }
+
+  .sb-region-main,
+  .sb-region-aside,
+  .sb-region-footer {
+    background: var(--sb-main);
   }
 
   .sb-region-main {
@@ -54,7 +63,7 @@
     --sb-main-width: var(--sb-content-width);
   }
   .sb-shell[data-width='wide'] {
-    --sb-main-width: 68rem;
+    --sb-main-width: var(--sb-wide-width);
   }
   .sb-shell[data-width='full'] {
     --sb-main-width: none;
@@ -63,7 +72,7 @@
   .sb-region-footer {
     grid-area: footer;
     padding: 1.5rem clamp(1rem, 4vw, 3rem);
-    border-block-start: 1px solid var(--sb-border);
+    border-block-start: var(--sb-line) solid var(--sb-border);
     color: var(--sb-muted);
     font-size: var(--sb-step--1);
   }
@@ -82,8 +91,11 @@
   .sb-region-sidebar {
     grid-area: sidebar;
     padding: 1.5rem 1rem 3rem clamp(1rem, 3vw, 1.75rem);
-    border-inline-end: 1px solid var(--sb-border);
-    background: var(--sb-background);
+    border-inline-end: var(--sb-line) solid var(--sb-border);
+    background: var(--sb-sidebar);
+    /* Only shows when `colors.sidebar` is translucent: what is behind it blurs, like frosted glass. */
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
   }
 
   .sb-region-aside {
@@ -208,7 +220,7 @@
     margin: 0.5rem 0 0;
     padding: 0.6rem 0.8rem;
     overflow-x: auto;
-    border-radius: 4px;
+    border-radius: min(4px, var(--sb-radius));
     background: var(--sb-surface);
     font-size: 0.8rem;
     line-height: 1.6;

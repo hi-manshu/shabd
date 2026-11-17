@@ -77,9 +77,24 @@ export interface ResolvedLayout {
 
 /* ─────────────────────────── site data (client) ───────────────────────── */
 
+/** One entry in the reader's theme menu. */
+export interface PaletteChoice {
+  /** A preset name. */
+  name: string
+  label: string
+  /** Page, accent and highlight colour, for the swatch beside the label. */
+  swatch: Record<'light' | 'dark', [string, string, string]>
+  /** True when the preset changes more than colours: fonts, corners, how code is framed. */
+  look: boolean
+  /** Which syntax theme code takes under this preset, in the light and in the dark mode (`data-code`). */
+  code: [light: string, dark: string]
+}
+
 export interface SiteData {
   site: ShabdConfig['site']
   colorMode: ShabdConfig['theme']['colorMode']
+  /** The site's own palette first. Empty when `theme.picker` is off. */
+  palettes: PaletteChoice[]
   defaults: ShabdConfig['defaults']
   features: ShabdConfig['features']
   layouts: Record<string, ResolvedLayout>
@@ -96,6 +111,8 @@ export interface SiteData {
 export interface PageExports {
   frontmatter: Frontmatter
   toc: TocEntry[]
+  /** The colours of the page's code tokens, as a stylesheet. */
+  codeCss: string
 }
 
 /** What the prerender bundle returns for one route. */

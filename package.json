@@ -14,7 +14,8 @@
     "docs:preview": "npm run preview -w docs",
     "test": "vitest run",
     "typecheck": "npm run typecheck -w shabd",
-    "test:e2e": "npm run build -w shabd && playwright test"
+    "test:e2e": "npm run build -w shabd && playwright test",
+    "logo": "node scripts/logo/make-logo.mjs"
   },
   "engines": {
     "node": ">=22"

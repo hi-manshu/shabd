@@ -43,6 +43,7 @@ A page has up to six regions. A region with no blocks is not rendered, and the p
 | `search` | header | The search field |
 | `studio-toggle` | header | Opens the [Studio](../features/studio.md). Dev server only |
 | `social` | header | The links from `site.social` |
+| `theme-menu` | header | The palette menu, when [`theme.picker`](./theme.md#a-theme-menu-for-readers) is on |
 | `theme-toggle` | header | Light and dark switch |
 | `sidebar-nav` | sidebar | The [sidebar](./sidebar.md) |
 | `breadcrumbs` | main | The sidebar groups above this page |

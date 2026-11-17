@@ -70,18 +70,109 @@ describe('markdown pipeline', () => {
     expect(html).toContain('<blockquote>\n<p>Just a quote.</p>')
   })
 
+  it('applies site-wide line numbers and wrapping, which a block can turn off', async () => {
+    const numbered = new MarkdownCompiler({
+      themes: { light: 'github-light', dark: 'tokyo-night' },
+      wrap: true,
+      lineNumbers: true,
+      sandbox: false,
+      fingerprint: 'test-code-defaults',
+    })
+    const html = await renderCompiled(
+      (await numbered.compile(page('```ts\nconst a = 1\n```\n\n```ts noLineNumbers noWrap\nconst b = 2\n```\n'))).code,
+    )
+    const [first, second] = html.match(/<pre [^>]*>/g) ?? []
+    expect(first).toContain('data-line-numbers=""')
+    expect(first).toContain('data-wrap=""')
+    expect(second).not.toContain('data-line-numbers')
+    expect(second).not.toContain('data-wrap')
+  })
+
+  it('colours code for every syntax theme a reader can pick, and says which rule is which', async () => {
+    const menu = new MarkdownCompiler({
+      themes: { light: 'github-light', dark: 'tokyo-night' },
+      more: ['everforest-light', 'everforest-dark'],
+      sandbox: false,
+      fingerprint: 'test-code-themes',
+    })
+    const result = await menu.compile(page('```ts\nconst a = 1\n```\n\nNo code here.\n'))
+    const html = await renderCompiled(result.code)
+    const keyword = /<span class="(sbk-[a-z0-9]+)">const<\/span>/.exec(html)?.[1]
+    const block = (key: string) => new RegExp(`:root\\[data-code=${key}\\]\\{([^}]*\\})*?\\.${keyword}\\{--sb-tok:(#[0-9a-f]{6})\\}`).exec(result.codeCss)?.[2]
+    // The site's own two keep their names; the others are numbered.
+    expect(block('light')).toBe('#d73a49')
+    expect(block('dark')).toBe('#9d7cd8')
+    expect(block('t2')).toMatch(/^#[0-9a-f]{6}$/)
+    expect(block('t3')).toMatch(/^#[0-9a-f]{6}$/)
+    expect(block('t2')).not.toBe(block('light'))
+
+    // The same colours give the same class in another compiler, so cached pages agree with fresh ones.
+    const again = new MarkdownCompiler({
+      themes: { light: 'github-light', dark: 'tokyo-night' },
+      more: ['everforest-light', 'everforest-dark'],
+      sandbox: false,
+      fingerprint: 'test-code-themes-2',
+    })
+    expect(await renderCompiled((await again.compile(page('```ts\nconst b = 2\n```\n'))).code)).toContain(`class="${keyword}">const<`)
+
+    // A page without code has no stylesheet at all.
+    expect((await menu.compile(page('Just text.\n'))).codeCss).toBe('')
+  })
+
+  it('moves a syntax colour that is too faint for the code background, and only that one', async () => {
+    const options = {
+      themes: { light: 'github-light', dark: 'tokyo-night' },
+      // No tint is known for highlighted lines, so they go by the plain background.
+      backgrounds: { code: [['#ffffff'], ['#1a1b26']], highlighted: [[], []] },
+      minContrast: 4.5,
+      sandbox: false,
+    }
+    const held = new MarkdownCompiler({ ...options, fingerprint: 'held' })
+    const source = page('```ts {1}\nfunction greet(name) {}\nconst a = 1\n```\n')
+    const result = await held.compile(source)
+    const html = await renderCompiled(result.code)
+    const colourOf = (text: string, css = result.codeCss, markup = html) => {
+      const token = new RegExp(`<span class="(sbk-[a-z0-9]+)">${text}</span>`).exec(markup)?.[1]
+      return new RegExp(`^(?:\\.sbk-[a-z0-9]+\\{[^}]*\\})*?\\.${token}\\{--sb-tok:(#[0-9a-f]{6})\\}`).exec(css)?.[1]
+    }
+    // GitHub Light's orange is 3.3:1 on white. Its red is 4.6:1 and stays as it is.
+    expect(colourOf('name')).toMatch(/^#[0-9a-f]{6}$/)
+    expect(colourOf('name')).not.toBe('#e36209')
+    expect(colourOf('const')).toBe('#d73a49')
+
+    // The colours behind code change, as when a palette is edited while the dev server runs.
+    held.recolour({ code: [['#d0d0d0'], ['#1a1b26']], highlighted: [[], []] }, 'held-again')
+    const again = await held.compile(source)
+    const after = await renderCompiled(again.code)
+    expect(colourOf('const', again.codeCss, after)).not.toBe('#d73a49')
+    expect(again.cached).toBe(false)
+  })
+
   it('highlights code at compile time for both colour modes', async () => {
     const result = await compiler.compile(
       page('```ts title="src/app.ts" {2} showLineNumbers\nconst a = 1\nconst b = 2\n```\n\n```nonsense\nplain\n```\n'),
     )
     const html = await renderCompiled(result.code)
-    expect(html).toMatch(/<pre class="shiki[^"]*"/)
+    expect(html).toMatch(/<pre class="shiki sbk-[a-z0-9]+"/)
     expect(html).toContain('data-lang="ts"')
     expect(html).toContain('data-title="src/app.ts"')
     expect(html).toContain('data-line-numbers=""')
-    expect(html).toContain('--shiki-light:')
-    expect(html).toContain('--shiki-dark:')
     expect(html.match(/class="line/g)).toHaveLength(3)
+
+    // A token carries a class, not its colours. The page's stylesheet has the colours, for both modes.
+    expect(html).not.toContain('--shiki-')
+    expect(html).not.toContain('style=')
+    const keyword = /<span class="(sbk-[a-z0-9]+)">const<\/span>/.exec(html)?.[1]
+    expect(keyword).toBeDefined()
+    expect(result.codeCss).toContain(`.${keyword}{--sb-tok:#d73a49}`)
+    expect(result.codeCss).toMatch(new RegExp(`\\[data-theme=dark\\]\\{[^}]*(\\}[^}]*)*\\.${keyword}\\{--sb-tok:#9d7cd8\\}`))
+    expect(result.codeCss).toContain('@media (prefers-color-scheme:dark){:root:not([data-theme]){')
+    // No theme menu, so no rules for other themes.
+    expect(result.codeCss).not.toContain('data-code')
+
+    // Tokens neither theme coloured are marked, so a site's theme can colour them (`colors.codeText`).
+    expect(html).toContain('<span class="sb-plain">plain</span>')
+    expect(html).not.toMatch(/<span class="sb-plain"[^>]*>const<\/span>/)
     expect(html.match(/sb-line-highlight/g)).toHaveLength(1)
     // An unknown language falls back to plain text rather than failing the build.
     expect(html).toContain('data-lang="nonsense"')

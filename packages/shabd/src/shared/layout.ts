@@ -24,6 +24,7 @@ export const BUILTIN_LAYOUT_DEFINITIONS: Record<string, LayoutDefinition> = {
         'search',
         'studio-toggle',
         'social',
+        'theme-menu',
         'theme-toggle',
       ),
       footer: blocks('footer'),
@@ -161,7 +162,7 @@ export function resolveTocOptions(
  * every client navigation, so server and client markup cannot disagree.
  */
 export function resolvePageLayout(
-  site: Pick<SiteData, 'layouts' | 'defaults'> & Partial<Pick<SiteData, 'site' | 'features'>>,
+  site: Pick<SiteData, 'layouts' | 'defaults'> & Partial<Pick<SiteData, 'site' | 'features' | 'palettes'>>,
   frontmatter: Pick<Frontmatter, 'layout' | 'sidebar' | 'toc' | 'pagination'> & Partial<Pick<Frontmatter, 'api'>>,
   toc: TocEntry[],
 ): ActiveLayout {
@@ -189,6 +190,7 @@ export function resolvePageLayout(
     if (site.site.social.length === 0) hidden.add('social')
   }
   if (site.features && !site.features.search.enabled) hidden.add('search')
+  if (!site.palettes?.length) hidden.add('theme-menu')
 
   const regions: ActiveLayout['regions'] = {}
   for (const region of REGIONS) {

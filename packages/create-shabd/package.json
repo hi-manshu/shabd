@@ -1,0 +1,33 @@
+{
+  "name": "create-shabd",
+  "version": "0.1.0",
+  "description": "Starts a Shabd documentation site: npm create shabd my-docs",
+  "keywords": [
+    "shabd",
+    "documentation",
+    "starter",
+    "create"
+  ],
+  "homepage": "https://github.com/hi-manshu/shabd#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hi-manshu/shabd.git",
+    "directory": "packages/create-shabd"
+  },
+  "bugs": {
+    "url": "https://github.com/hi-manshu/shabd/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "create-shabd": "./bin/create-shabd.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "template"
+  ],
+  "engines": {
+    "node": ">=22"
+  }
+}

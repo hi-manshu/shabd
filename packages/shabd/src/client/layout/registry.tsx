@@ -10,7 +10,17 @@ import { ApiEndpoint } from './blocks/ApiEndpoint.js'
 import { Breadcrumbs } from './blocks/Breadcrumbs.js'
 import { Content } from './blocks/Content.js'
 import { Footer } from './blocks/Footer.js'
-import { MenuToggle, Nav, SearchButton, SiteTitle, Social, Spacer, StudioToggle, ThemeToggle } from './blocks/Header.js'
+import {
+  MenuToggle,
+  Nav,
+  SearchButton,
+  SiteTitle,
+  Social,
+  Spacer,
+  StudioToggle,
+  ThemeMenu,
+  ThemeToggle,
+} from './blocks/Header.js'
 import { Hero } from './blocks/Hero.js'
 import { PageFooter } from './blocks/PageFooter.js'
 import { PageHeader } from './blocks/PageHeader.js'
@@ -30,6 +40,7 @@ const builtinBlocks: Record<BuiltinBlockName, AnyBlock> = {
   search: SearchButton,
   social: Social,
   'theme-toggle': ThemeToggle,
+  'theme-menu': ThemeMenu,
   'studio-toggle': StudioToggle,
   'sidebar-nav': SidebarNav,
   breadcrumbs: Breadcrumbs,

@@ -95,6 +95,11 @@ describe('layouts', () => {
     ).config
     const rich = resolvePageLayout({ ...site, site: full.site, features: full.features }, page({}), toc)
     expect(blocksOf(rich.regions.footer)).toEqual(['footer'])
+    // The theme menu is there only when the site offers readers a choice of palette.
+    const choice = { name: 'ink', label: 'Ink', look: false, code: ['light', 't2'], swatch: { light: ['#fff', '#00f', '#0ff'], dark: ['#000', '#99f', '#0ff'] } }
+    const offered = resolvePageLayout({ ...site, site: full.site, features: full.features, palettes: [choice] as never }, page({}), toc)
+    expect(blocksOf(offered.regions.header)).toContain('theme-menu')
+    expect(blocksOf(rich.regions.header)).not.toContain('theme-menu')
     expect(blocksOf(rich.regions.header)).toEqual([
       'menu-toggle',
       'site-title',

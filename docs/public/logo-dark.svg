@@ -1,37 +1,56 @@
-<svg width="132" height="152" viewBox="0 0 132 152" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Shabd">
+<svg width="108" height="146" viewBox="0 0 108 146" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Shabd">
   <defs>
     <linearGradient id="n-ink" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#e8e9f5"/><stop offset="1" stop-color="#b3bbff"/></linearGradient>
-    <linearGradient id="n-headL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6b78ea"/><stop offset="1" stop-color="#4654cf"/></linearGradient>
-    <linearGradient id="n-headR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8f9af5"/><stop offset="1" stop-color="#6b78ea"/></linearGradient>
+    <linearGradient id="n-capL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6b78ea"/><stop offset="1" stop-color="#4654cf"/></linearGradient>
+    <linearGradient id="n-capR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#8f9af5"/><stop offset="1" stop-color="#6b78ea"/></linearGradient>
     <linearGradient id="n-faceL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#e4e8fb"/></linearGradient>
-    <linearGradient id="n-faceR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d6dcfa"/><stop offset="1" stop-color="#aab4f2"/></linearGradient>
-    <linearGradient id="n-chestUL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a4adfa"/><stop offset="1" stop-color="#808cf0"/></linearGradient>
-    <linearGradient id="n-chestUR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#bcc3fd"/><stop offset="1" stop-color="#9aa4f6"/></linearGradient>
-    <linearGradient id="n-chestLL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#808cf0"/><stop offset="1" stop-color="#6672e2"/></linearGradient>
-    <linearGradient id="n-chestLR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a4adfa"/><stop offset="1" stop-color="#808cf0"/></linearGradient>
+    <linearGradient id="n-faceR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e4e8fb"/><stop offset="1" stop-color="#bcc5f5"/></linearGradient>
+    <linearGradient id="n-blush" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffc9a3"/><stop offset="1" stop-color="#ff9f7a"/></linearGradient>
+    <linearGradient id="n-bodyL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a4adfa"/><stop offset="1" stop-color="#808cf0"/></linearGradient>
+    <linearGradient id="n-bodyR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#bcc3fd"/><stop offset="1" stop-color="#9aa4f6"/></linearGradient>
+    <linearGradient id="n-belly" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset="1" stop-color="#d6dcfa"/></linearGradient>
     <linearGradient id="n-wingL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5560d6"/><stop offset="1" stop-color="#3a44b4"/></linearGradient>
     <linearGradient id="n-wingR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7480ea"/><stop offset="1" stop-color="#5560d6"/></linearGradient>
-    <linearGradient id="n-goldL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd96b"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
-    <linearGradient id="n-goldR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb02e"/><stop offset="1" stop-color="#f08a1c"/></linearGradient>
+    <linearGradient id="n-tailL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5560d6"/><stop offset="1" stop-color="#3a44b4"/></linearGradient>
+    <linearGradient id="n-tailR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7480ea"/><stop offset="1" stop-color="#5560d6"/></linearGradient>
+    <linearGradient id="n-tuftL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd96b"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
+    <linearGradient id="n-tuftR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb02e"/><stop offset="1" stop-color="#f08a1c"/></linearGradient>
+    <linearGradient id="n-beakL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd96b"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
+    <linearGradient id="n-beakR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb02e"/><stop offset="1" stop-color="#f08a1c"/></linearGradient>
+    <linearGradient id="n-beakLow" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e58a1e"/><stop offset="1" stop-color="#c46d0e"/></linearGradient>
+    <linearGradient id="n-footL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd96b"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
+    <linearGradient id="n-footR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb02e"/><stop offset="1" stop-color="#f08a1c"/></linearGradient>
+    <linearGradient id="n-say" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd96b"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
   </defs>
-  <rect x="6" y="132" width="120" height="16" fill="url(#n-ink)"/>
-  <path d="M58 31L49 13L44 35Z" fill="url(#n-goldL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M74 31L83 13L88 35Z" fill="url(#n-goldR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M60 30L66 6L72 30Z" fill="url(#n-goldL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M66 28L38 38L26 66L66 58Z" fill="url(#n-headL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M66 28L94 38L106 66L66 58Z" fill="url(#n-headR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M26 66L66 58L66 92L32 96Z" fill="url(#n-faceL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M106 66L66 58L66 92L100 96Z" fill="url(#n-faceR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M32 96L66 92L66 114L39 116Z" fill="url(#n-chestUL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M100 96L66 92L66 114L93 116Z" fill="url(#n-chestUR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M39 116L66 114L66 132L46 132Z" fill="url(#n-chestLL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M93 116L66 114L66 132L86 132Z" fill="url(#n-chestLR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M32 96L12 118L24 132L46 132L40 106Z" fill="url(#n-wingL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M100 96L120 118L108 132L86 132L92 106Z" fill="url(#n-wingR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M56 64L66 60L66 98L53 80Z" fill="url(#n-goldL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M66 60L76 64L79 80L66 98Z" fill="url(#n-goldR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <circle cx="45" cy="76" r="5.2" fill="#14163f"/><circle cx="46.6" cy="74.2" r="1.7" fill="#ffffff"/>
-  <circle cx="87" cy="76" r="5.2" fill="#14163f"/><circle cx="88.6" cy="74.2" r="1.7" fill="#ffffff"/>
-  <path d="M45 128L58 128L60 141L43 141Z" fill="url(#n-goldL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
-  <path d="M87 128L74 128L72 141L89 141Z" fill="url(#n-goldR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+  <rect x="6" y="126" width="96" height="16" fill="url(#n-ink)"/>
+  <g>
+      <path class="sb-wing sb-wing-0" d="M29 94L14 97L6 107L12 118L26 115Z" fill="url(#n-wingL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path class="sb-wing sb-wing-1" d="M79 94L94 97L102 107L96 118L82 115Z" fill="url(#n-wingR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M30 90L54 90L54 126L36 126L25 118L23 105Z" fill="url(#n-bodyL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M78 90L54 90L54 126L72 126L83 118L85 105Z" fill="url(#n-bodyR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M41 96L67 96L73 111L65 122L43 122L35 111Z" fill="url(#n-belly)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M28 82L80 82L78 96L30 96Z" fill="url(#n-bodyL)"/>
+    </g>
+    <g class="sb-head">
+      <path class="sb-tuft sb-tuft-0" d="M50 30L45 20L34 13L38 25L42 32Z" fill="url(#n-tuftL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path class="sb-tuft sb-tuft-1" d="M58 30L63 20L74 13L70 25L66 32Z" fill="url(#n-tuftR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path class="sb-tuft sb-tuft-2" d="M49 30L50 16L54 5L58 16L59 30Z" fill="url(#n-tuftL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M54 27L40 28L27 34L17 45L12 60L54 54Z" fill="url(#n-capL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M54 27L68 28L81 34L91 45L96 60L54 54Z" fill="url(#n-capR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M12 60L54 54L54 95L39 95L25 90L15 78Z" fill="url(#n-faceL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M96 60L54 54L54 95L69 95L83 90L93 78Z" fill="url(#n-faceR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M20 82L26 77L32 82L26 87Z" fill="url(#n-blush)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M88 82L82 77L76 82L82 87Z" fill="url(#n-blush)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <g class="sb-beak-lower"><path d="M50 79L58 79L54 85Z" fill="url(#n-beakLow)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/></g>
+      <path d="M47 74L54 68L54 81Z" fill="url(#n-beakL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M54 68L61 74L54 81Z" fill="url(#n-beakR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <g class="sb-eye sb-eye-0"><circle cx="36" cy="69" r="7.6" fill="#14163f"/><circle cx="38.2" cy="66.6" r="2.43" fill="#ffffff"/></g>
+      <g class="sb-eye sb-eye-1"><circle cx="72" cy="69" r="7.6" fill="#14163f"/><circle cx="74.2" cy="66.6" r="2.43" fill="#ffffff"/></g>
+    </g>
+  <g>
+      <path d="M38 123L43 123L44 134L37 134Z" fill="url(#n-footL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M44 123L49 123L50 134L43 134Z" fill="url(#n-footR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M64 123L59 123L58 134L65 134Z" fill="url(#n-footL)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M70 123L65 123L64 134L71 134Z" fill="url(#n-footR)" stroke="#1d2063" stroke-width="1.5" stroke-linejoin="round"/>
+    </g>
 </svg>

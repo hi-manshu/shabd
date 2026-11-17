@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=./node_modules/shabd/schemas/config.schema.json
+#
+# The whole site is configured here. Only `site.title` is required.
+# Shabd's documentation describes every key, under Configuration.
+
+site:
+  title: {{title}}
+  description: {{description}}
+  # The address the site will be served from. Needed for canonical URLs and the sitemap.
+  # url: https://docs.example.com
+  nav:
+    - { label: Guide, link: /guide/getting-started }
+
+theme:
+  # A built-in theme: shabd, macos, forest, newsprint and others.
+  preset: {{preset}}
+  # Uncomment for a menu in the header that lets readers try every theme.
+  # picker: true
+
+features:
+  search:
+    # Search matches keywords. To also match by meaning, install @huggingface/transformers
+    # and set this to true.
+    semantic: false

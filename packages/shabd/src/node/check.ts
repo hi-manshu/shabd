@@ -88,11 +88,12 @@ export async function check(root: string): Promise<boolean> {
 
   const errors = detailed.length + problems.filter((problem) => problem.level === 'error').length
   const warnings = problems.filter((problem) => problem.level === 'warning').length
-  const pages = context.store.pages().length
+  const count = context.store.pages().length
+  const pages = `${count} ${count === 1 ? 'page' : 'pages'}`
   console.log(
     errors || warnings
-      ? `\n${pc.bold(`${pages} pages checked:`)} ${errors} ${errors === 1 ? 'error' : 'errors'}, ${warnings} ${warnings === 1 ? 'warning' : 'warnings'}\n`
-      : `\n${pc.green('✓')} ${pages} pages checked, no problems found\n`,
+      ? `\n${pc.bold(`${pages} checked:`)} ${errors} ${errors === 1 ? 'error' : 'errors'}, ${warnings} ${warnings === 1 ? 'warning' : 'warnings'}\n`
+      : `\n${pc.green('✓')} ${pages} checked, no problems found\n`,
   )
   return errors === 0
 }

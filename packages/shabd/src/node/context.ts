@@ -3,6 +3,7 @@
  * graph, and the Markdown compiler with its caches. The dev server, the build
  * and the MCP server each create one context and pass it around.
  */
+import { codeBackgrounds, codeThemePlan } from '../shared/presets.js'
 import path from 'node:path'
 import { loadConfig, type ResolvedConfig } from './config/load.js'
 import { ContentStore } from './content/store.js'
@@ -20,8 +21,14 @@ export interface ShabdContext {
 export async function createContext(root: string, options: { dev: boolean }): Promise<ShabdContext> {
   const config = await loadConfig(root)
   const store = await ContentStore.load(config, { drafts: options.dev })
+  const { theme } = config.config
   const compiler = new MarkdownCompiler({
-    themes: config.config.theme.code,
+    themes: { light: theme.code.light, dark: theme.code.dark },
+    more: codeThemePlan(theme).themes.slice(2),
+    backgrounds: codeBackgrounds(theme),
+    minContrast: theme.code.minContrast,
+    wrap: theme.code.wrap,
+    lineNumbers: theme.code.lineNumbers,
     sandbox: config.config.features.sandbox.enabled,
     fingerprint: config.compileFingerprint,
     cacheDir: path.join(config.cacheDir, 'pages'),

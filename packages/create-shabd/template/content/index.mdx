@@ -1,0 +1,20 @@
+---
+title: {{title}}
+description: {{description}}
+layout: splash
+hero:
+  title: {{title}}
+  tagline: This is the home page. It is content/index.mdx, and everything on it can be changed.
+  actions:
+    - { label: Get started, link: /guide/getting-started }
+    - { label: Writing pages, link: /guide/writing, variant: secondary }
+---
+
+<CardGrid>
+  <Card title="Pages are Markdown files" href="/guide/writing">
+    Every file under `content/` is a page. Its path is its address.
+  </Card>
+  <Card title="The site is two YAML files" href="/guide/getting-started">
+    `shabd.config.yaml` holds the title, the theme and the layouts. `sidebar.yaml` holds the navigation.
+  </Card>
+</CardGrid>

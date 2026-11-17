@@ -34,13 +34,15 @@ content:
   sidebar: sidebar.yaml
 
 theme:
+  # A built-in palette. Anything under `colors` is laid over it, for example:
+  #   colors:
+  #     accent: { light: "#2b36a8", dark: "#b3bbff" }
+  preset: shabd
+  # A menu in the header that lets readers try the other palettes.
+  picker: true
   colorMode:
     default: system # system | light | dark
     toggle: true
-  colors:
-    # One value applies to both modes; { light, dark } sets them separately.
-    accent: { light: "#2b36a8", dark: "#b3bbff" }
-    highlight: { light: "#f6b40e", dark: "#ffc53d" }
   typography:
     baseSize: 16px
     scale: 1.2 # heading sizes are baseSize × scale^n
@@ -50,9 +52,6 @@ theme:
     sidebarWidth: 17rem
     tocWidth: 14rem
   radius: 8px
-  code:
-    light: github-light
-    dark: tokyo-night
   css: ./styles/custom.css # your own stylesheet, loaded after the theme
 
 # Applied to every page; frontmatter overrides them per page.

@@ -8,6 +8,7 @@
  *   2. validate  – shape, via the Zod schema (defaults and shorthands applied)
  *   3. resolve   – cross-references: layout inheritance, block names, file paths
  */
+import { codeBackgrounds, codeThemePlan } from '../../shared/presets.js'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
@@ -19,7 +20,7 @@ import { ShabdError, type SourceIssue } from './errors.js'
 import { locateIssues, parseYamlWithSchema } from './yaml.js'
 
 /** Bump when compiled page output changes shape, to invalidate on-disk caches. */
-export const PIPELINE_VERSION = 3
+export const PIPELINE_VERSION = 6
 
 export const CONFIG_FILE_NAMES = ['shabd.config.yaml', 'shabd.config.yml'] as const
 
@@ -43,6 +44,12 @@ export interface ResolvedConfig {
   stylesheets: string[]
   /** Changes whenever a setting that affects compiled pages changes. Part of every cache key. */
   compileFingerprint: string
+  /**
+   * The same without the colours behind code. When only those change, pages
+   * need compiling again but nothing else about the site does: the dev
+   * server recolours in place instead of restarting.
+   */
+  structureFingerprint: string
 }
 
 export function findConfigFile(root: string): string | undefined {
@@ -108,18 +115,18 @@ export function resolveConfig(root: string, configFile: string, source: string):
   }
 
   const contentDir = path.resolve(root, config.content.dir)
-  const compileFingerprint = createHash('sha1')
-    .update(
-      JSON.stringify([
-        PIPELINE_VERSION,
-        config.site.base,
-        config.theme.code,
-        config.features.sandbox.enabled,
-        Object.keys(layouts).sort(),
-      ]),
-    )
-    .digest('hex')
-    .slice(0, 12)
+  const digest = (value: unknown) => createHash('sha1').update(JSON.stringify(value)).digest('hex').slice(0, 12)
+  const structureFingerprint = digest([
+    PIPELINE_VERSION,
+    config.site.base,
+    config.theme.code,
+    // The presets in the theme menu decide which other syntax themes every code block is coloured in.
+    codeThemePlan(config.theme).themes,
+    config.features.sandbox.enabled,
+    Object.keys(layouts).sort(),
+  ])
+  // Token colours are held to a contrast floor against the colours code is drawn on.
+  const compileFingerprint = digest([structureFingerprint, codeBackgrounds(config.theme)])
 
   return {
     root,
@@ -135,6 +142,7 @@ export function resolveConfig(root: string, configFile: string, source: string):
     blocks,
     stylesheets,
     compileFingerprint,
+    structureFingerprint,
   }
 }
 

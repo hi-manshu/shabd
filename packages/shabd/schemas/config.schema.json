@@ -50,6 +50,18 @@
                 },
                 "alt": {
                   "type": "string"
+                },
+                "height": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                "href": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "replacesTitle": {
+                  "type": "boolean"
                 }
               },
               "additionalProperties": false
@@ -210,6 +222,73 @@
       "default": {},
       "type": "object",
       "properties": {
+        "preset": {
+          "default": "shabd",
+          "type": "string",
+          "enum": [
+            "shabd",
+            "ink",
+            "macos",
+            "blueprint",
+            "newsprint",
+            "brutal",
+            "aurora",
+            "cosmos",
+            "sunrise",
+            "zen",
+            "paper",
+            "marigold",
+            "forest",
+            "mint",
+            "ocean",
+            "slate",
+            "grape",
+            "rose",
+            "sunset",
+            "ember",
+            "terminal",
+            "contrast"
+          ]
+        },
+        "picker": {
+          "default": false,
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "shabd",
+                  "ink",
+                  "macos",
+                  "blueprint",
+                  "newsprint",
+                  "brutal",
+                  "aurora",
+                  "cosmos",
+                  "sunrise",
+                  "zen",
+                  "paper",
+                  "marigold",
+                  "forest",
+                  "mint",
+                  "ocean",
+                  "slate",
+                  "grape",
+                  "rose",
+                  "sunset",
+                  "ember",
+                  "terminal",
+                  "contrast"
+                ]
+              }
+            }
+          ]
+        },
         "colorMode": {
           "default": {},
           "type": "object",
@@ -581,6 +660,325 @@
                   "additionalProperties": false
                 }
               ]
+            },
+            "link": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "heading": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "bar": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "button": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "header": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "sidebar": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "main": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "backdrop": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "code": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "codeText": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "selection": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "^[^;{}<>]+$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "light": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    },
+                    "dark": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^;{}<>]+$"
+                    }
+                  },
+                  "required": [
+                    "light",
+                    "dark"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
             }
           },
           "additionalProperties": false
@@ -590,13 +988,28 @@
           "type": "object",
           "properties": {
             "sans": {
-              "default": "\"Anek Latin Variable\", ui-sans-serif, system-ui, sans-serif",
               "type": "string",
               "minLength": 1,
               "pattern": "^[^;{}<>]+$"
             },
             "mono": {
-              "default": "\"Red Hat Mono Variable\", ui-monospace, \"SF Mono\", Menlo, monospace",
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^;{}<>]+$"
+            },
+            "heading": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^;{}<>]+$"
+            },
+            "headingCase": {
+              "type": "string",
+              "enum": [
+                "none",
+                "uppercase"
+              ]
+            },
+            "headingTracking": {
               "type": "string",
               "minLength": 1,
               "pattern": "^[^;{}<>]+$"
@@ -618,6 +1031,26 @@
               "type": "number",
               "minimum": 1,
               "maximum": 3
+            },
+            "weight": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 900
+            },
+            "headingWeight": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 900
+            },
+            "headingWidth": {
+              "type": "number",
+              "minimum": 50,
+              "maximum": 200
+            },
+            "displayWidth": {
+              "type": "number",
+              "minimum": 50,
+              "maximum": 200
             }
           },
           "additionalProperties": false
@@ -628,6 +1061,12 @@
           "properties": {
             "contentWidth": {
               "default": "46rem",
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^[^;{}<>]+$"
+            },
+            "wideWidth": {
+              "default": "68rem",
               "type": "string",
               "minLength": 1,
               "pattern": "^[^;{}<>]+$"
@@ -654,24 +1093,67 @@
           "additionalProperties": false
         },
         "radius": {
-          "default": "8px",
           "type": "string",
           "minLength": 1,
           "pattern": "^[^;{}<>]+$"
+        },
+        "corners": {
+          "type": "string",
+          "enum": [
+            "hang",
+            "round"
+          ]
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^;{}<>]+$"
+        },
+        "line": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^;{}<>]+$"
+        },
+        "shadow": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^;{}<>]+$"
+        },
+        "bars": {
+          "type": "boolean"
         },
         "code": {
           "default": {},
           "type": "object",
           "properties": {
             "light": {
-              "default": "github-light",
               "type": "string",
               "minLength": 1
             },
             "dark": {
-              "default": "tokyo-night",
               "type": "string",
               "minLength": 1
+            },
+            "frame": {
+              "type": "string",
+              "enum": [
+                "bar",
+                "window"
+              ]
+            },
+            "wrap": {
+              "default": false,
+              "type": "boolean"
+            },
+            "lineNumbers": {
+              "default": false,
+              "type": "boolean"
+            },
+            "minContrast": {
+              "default": 4.5,
+              "type": "number",
+              "minimum": 0,
+              "maximum": 21
             }
           },
           "additionalProperties": false

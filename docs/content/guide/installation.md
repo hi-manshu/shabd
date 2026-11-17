@@ -7,13 +7,53 @@ Shabd needs Node.js 22 or newer.
 
 ## Create a site
 
-Make a folder and install Shabd with React:
+The starter writes a small site that runs as it is: `package.json`, `.gitignore`, `shabd.config.yaml`,
+`sidebar.yaml`, a home page and two guide pages.
+
+Shabd is not on npm yet. Until it is, run the starter from a clone of the repository, and point the new site at a
+packed copy of Shabd:
+
+```sh
+git clone https://github.com/hi-manshu/shabd.git
+cd shabd
+npm install
+npm run build
+npm pack -w shabd --pack-destination ..
+node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../shabd-0.1.0.tgz
+cd ../my-docs
+npm install
+npm run dev
+```
+
+Once `shabd` and `create-shabd` are published, one command is meant to replace the first six lines. It cannot be
+tried before then:
+
+```sh
+npm create shabd@latest my-docs
+```
+
+| Option | Meaning |
+| --- | --- |
+| `--title <text>` | The site's title. Without it, the directory name is used: `my-docs` becomes "My docs" |
+| `--preset <name>` | A [built-in theme](../configuration/theme.md#presets), such as `forest` or `macos` |
+| `--shabd <spec>` | What to install as `shabd`: a version range, or the path of a local build or tarball |
+| `--force` | Write into a directory that is not empty. Files that are already there are kept, not replaced |
+
+The starter refuses a directory that already has files in it unless you pass `--force`. A `.git` folder does not
+count, so you can run `git init` first. It never deletes or replaces a file.
+
+### By hand
+
+A site needs very little. Make a folder and install Shabd with React:
 
 ```sh
 mkdir my-docs && cd my-docs
 npm init -y
 npm install shabd react react-dom
 ```
+
+Until Shabd is on npm, give the path of the packed file from the steps above in place of the name `shabd`:
+`npm install ../shabd-0.1.0.tgz react react-dom`.
 
 Add the one required file. `site.title` is the only key Shabd insists on.
 
@@ -61,4 +101,5 @@ Semantic search is optional and needs one more package:
 npm install @huggingface/transformers
 ```
 
-Without it, search still works and matches keywords.
+Without it, search still works and matches keywords. A site made by the starter has `features.search.semantic` set
+to `false`; set it to `true` once the package is installed.

@@ -1,0 +1,102 @@
+<svg width="136" height="172" viewBox="0 0 136 172" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A chick">
+  <defs>
+    <linearGradient id="p-ink" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#1b1c3a"/><stop offset="1" stop-color="#2b36a8"/></linearGradient>
+    <linearGradient id="p-capL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffc53d"/><stop offset="1" stop-color="#f29d0c"/></linearGradient>
+    <linearGradient id="p-capR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffdf7a"/><stop offset="1" stop-color="#ffc53d"/></linearGradient>
+    <linearGradient id="p-faceL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffdf5"/><stop offset="1" stop-color="#fff0c2"/></linearGradient>
+    <linearGradient id="p-faceR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff3cf"/><stop offset="1" stop-color="#ffe29a"/></linearGradient>
+    <linearGradient id="p-blush" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffb199"/><stop offset="1" stop-color="#ff8a70"/></linearGradient>
+    <linearGradient id="p-bodyL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffc53d"/><stop offset="1" stop-color="#ee960a"/></linearGradient>
+    <linearGradient id="p-bodyR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffd966"/><stop offset="1" stop-color="#f6b40e"/></linearGradient>
+    <linearGradient id="p-belly" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fffaf0"/><stop offset="1" stop-color="#ffe9b0"/></linearGradient>
+    <linearGradient id="p-wingL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f29d0c"/><stop offset="1" stop-color="#d97c06"/></linearGradient>
+    <linearGradient id="p-wingR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f6b40e"/><stop offset="1" stop-color="#e08a08"/></linearGradient>
+    <linearGradient id="p-tailL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e08a08"/><stop offset="1" stop-color="#c56f05"/></linearGradient>
+    <linearGradient id="p-tailR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f29d0c"/><stop offset="1" stop-color="#d97c06"/></linearGradient>
+    <linearGradient id="p-tuftL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#4d5ad6"/><stop offset="1" stop-color="#2b36a8"/></linearGradient>
+    <linearGradient id="p-tuftR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6f7beb"/><stop offset="1" stop-color="#4d5ad6"/></linearGradient>
+    <linearGradient id="p-beakL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff9a52"/><stop offset="1" stop-color="#f26a1b"/></linearGradient>
+    <linearGradient id="p-beakR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f26a1b"/><stop offset="1" stop-color="#cf4f0c"/></linearGradient>
+    <linearGradient id="p-beakLow" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c94c0c"/><stop offset="1" stop-color="#a13a07"/></linearGradient>
+    <linearGradient id="p-footL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ff9a52"/><stop offset="1" stop-color="#f26a1b"/></linearGradient>
+    <linearGradient id="p-footR" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f26a1b"/><stop offset="1" stop-color="#cf4f0c"/></linearGradient>
+    <linearGradient id="p-say" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#6f7beb"/><stop offset="1" stop-color="#3944b8"/></linearGradient>
+    <clipPath id="p-off-bar"><rect width="136" height="136"/><rect y="149" width="136" height="23"/></clipPath>
+  </defs>
+  <style>
+    .sb-hop { transform-origin: 84px 136px; animation: sb-hop 0.8s ease-out 0.4s 1; }
+    @keyframes sb-hop { 0%, 100% { transform: translateY(0px) scale(1, 1); } 30% { transform: translateY(-11px) scale(1, 1); } 56% { transform: translateY(0px) scale(1.05, 0.93); } 76% { transform: translateY(0px) scale(0.99, 1.02); } }
+    .sb-head { transform-origin: 84px 102px; animation: sb-head 10s ease-in-out infinite; }
+    @keyframes sb-head { 0%, 30%, 62%, 70%, 76%, 82%, 88%, 100% { transform: rotate(0deg) translateY(0px); } 37%, 56% { transform: rotate(-9deg) translateY(0px); } 73%, 79%, 85% { transform: rotate(0deg) translateY(-2px); } }
+    .sb-tuft-0 { transform-origin: 76px 41px; animation: sb-tuft-0 10s ease-in-out infinite; }
+    @keyframes sb-tuft-0 { 0%, 30%, 62%, 100% { transform: rotate(0deg); } 38%, 54% { transform: rotate(-15deg); } }
+    .sb-tuft-1 { transform-origin: 92px 41px; animation: sb-tuft-1 10s ease-in-out infinite; }
+    @keyframes sb-tuft-1 { 0%, 30%, 62%, 100% { transform: rotate(0deg); } 38%, 54% { transform: rotate(15deg); } }
+    .sb-tuft-2 { transform-origin: 84px 40px; animation: sb-tuft-2 10s ease-in-out infinite; }
+    @keyframes sb-tuft-2 { 0%, 30%, 62%, 100% { transform: rotate(0deg); } 38%, 54% { transform: rotate(0deg); } }
+    .sb-eye-0 { transform-origin: 66px 79px; }
+    .sb-eye-1 { transform-origin: 102px 79px; }
+    .sb-eye { animation: sb-blink 4.6s linear infinite; }
+    @keyframes sb-blink { 0%, 92%, 98%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.08); } }
+    .sb-tail { transform-origin: 84px 144px; animation: sb-sway 5s ease-in-out infinite; }
+    @keyframes sb-sway { 0%, 50%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
+    .sb-wing-0 { transform-origin: 57px 112px; animation: sb-wing-0 10s ease-in-out infinite; }
+    @keyframes sb-wing-0 { 0%, 70%, 88%, 100% { transform: rotate(0deg); } 73%, 79%, 85% { transform: rotate(30deg); } 76%, 82% { transform: rotate(7.5deg); } }
+    .sb-wing-1 { transform-origin: 111px 112px; animation: sb-wing-1 10s ease-in-out infinite; }
+    @keyframes sb-wing-1 { 0%, 70%, 88%, 100% { transform: rotate(0deg); } 73%, 79%, 85% { transform: rotate(-30deg); } 76%, 82% { transform: rotate(-7.5deg); } }
+    .sb-beak-lower { animation: sb-beak 10s linear infinite; }
+    @keyframes sb-beak { 0%, 70%, 88%, 100% { transform: translateY(0px); } 73%, 79%, 85% { transform: translateY(2.5px); } 76%, 82% { transform: translateY(0.6px); } }
+    .sb-say-0 { animation: sb-say-0 10s ease-out 0s infinite; }
+    @keyframes sb-say-0 { 0%, 71%, 90%, 100% { opacity: 0; transform: translate(3.94px, 0.69px); } 76% { opacity: 1; } 84% { opacity: 1; } 89% { opacity: 0; transform: translate(-7.88px, -1.39px); } }
+    .sb-say-1 { animation: sb-say-1 10s ease-out 0.22s infinite; }
+    @keyframes sb-say-1 { 0%, 71%, 90%, 100% { opacity: 0; transform: translate(3.53px, 1.88px); } 76% { opacity: 1; } 84% { opacity: 1; } 89% { opacity: 0; transform: translate(-7.06px, -3.76px); } }
+    .sb-say-2 { animation: sb-say-2 10s ease-out 0.44s infinite; }
+    @keyframes sb-say-2 { 0%, 71%, 90%, 100% { opacity: 0; transform: translate(2.78px, 2.88px); } 76% { opacity: 1; } 84% { opacity: 1; } 89% { opacity: 0; transform: translate(-5.56px, -5.75px); } }
+    @media (prefers-reduced-motion: reduce) { .sb-hop, .sb-head, .sb-tuft, .sb-eye, .sb-tail, .sb-wing, .sb-beak-lower, .sb-say { animation: none; } }
+  </style>
+  <g clip-path="url(#p-off-bar)">
+  <g class="sb-hop">
+    <g class="sb-tail">
+      <path d="M70 142L84 142L84 170L75 165L69 154Z" fill="url(#p-tailL)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M84 142L98 142L99 154L93 165L84 170Z" fill="url(#p-tailR)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+    </g>
+  </g>
+  </g>
+  <g class="sb-hop">
+    <g>
+      <path class="sb-wing sb-wing-0" d="M59 104L44 107L36 117L42 128L56 125Z" fill="url(#p-wingL)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path class="sb-wing sb-wing-1" d="M109 104L124 107L132 117L126 128L112 125Z" fill="url(#p-wingR)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M60 100L84 100L84 136L66 136L55 128L53 115Z" fill="url(#p-bodyL)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M108 100L84 100L84 136L102 136L113 128L115 115Z" fill="url(#p-bodyR)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M71 106L97 106L103 121L95 132L73 132L65 121Z" fill="url(#p-belly)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M58 92L110 92L108 106L60 106Z" fill="url(#p-bodyL)"/>
+    </g>
+    <g class="sb-head">
+      <path class="sb-tuft sb-tuft-0" d="M80 40L75 30L64 23L68 35L72 42Z" fill="url(#p-tuftL)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path class="sb-tuft sb-tuft-1" d="M88 40L93 30L104 23L100 35L96 42Z" fill="url(#p-tuftR)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path class="sb-tuft sb-tuft-2" d="M79 40L80 26L84 15L88 26L89 40Z" fill="url(#p-tuftL)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M84 37L70 38L57 44L47 55L42 70L84 64Z" fill="url(#p-capL)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M84 37L98 38L111 44L121 55L126 70L84 64Z" fill="url(#p-capR)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M42 70L84 64L84 105L69 105L55 100L45 88Z" fill="url(#p-faceL)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M126 70L84 64L84 105L99 105L113 100L123 88Z" fill="url(#p-faceR)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M50 92L56 87L62 92L56 97Z" fill="url(#p-blush)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M118 92L112 87L106 92L112 97Z" fill="url(#p-blush)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <g class="sb-beak-lower"><path d="M80 89L88 89L84 95Z" fill="url(#p-beakLow)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/></g>
+      <path d="M77 84L84 78L84 91Z" fill="url(#p-beakL)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M84 78L91 84L84 91Z" fill="url(#p-beakR)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <g class="sb-eye sb-eye-0"><circle cx="66" cy="79" r="7.6" fill="#1b1c3a"/><circle cx="68.2" cy="76.6" r="2.43" fill="#ffffff"/></g>
+      <g class="sb-eye sb-eye-1"><circle cx="102" cy="79" r="7.6" fill="#1b1c3a"/><circle cx="104.2" cy="76.6" r="2.43" fill="#ffffff"/></g>
+    </g>
+    <g>
+      <path d="M68 133L73 133L74 144L67 144Z" fill="url(#p-footL)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M74 133L79 133L80 144L73 144Z" fill="url(#p-footR)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M94 133L89 133L88 144L95 144Z" fill="url(#p-footL)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M100 133L95 133L94 144L101 144Z" fill="url(#p-footR)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+    </g>
+    <g>
+      <path class="sb-say sb-say-0" opacity="0" d="M28.85 74.28L21.69 77.48L13.09 71.5L23.21 68.81Z" fill="url(#p-say)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path class="sb-say sb-say-1" opacity="0" d="M34.55 57.71L26.75 58.54L20.43 50.2L30.88 50.77Z" fill="url(#p-say)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+      <path class="sb-say sb-say-2" opacity="0" d="M45.1 43.72L37.42 42.1L33.98 32.21L43.75 35.98Z" fill="url(#p-say)" stroke="#1b1c3a" stroke-width="1.5" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>

@@ -44,9 +44,15 @@ test.describe('hot updates', () => {
     await open(page, `${DEV}/guide/intro`)
     const stillThere = await markPage(page)
     expect(await cssVariable(page, '--sb-highlight')).toBe('#f6b40e')
+    // A token on a highlighted line of code. It is coloured to be readable on that line's tint.
+    const keyword = page.locator('.sb-code .sb-line-highlight span', { hasText: /^const$/ })
+    const colour = () => keyword.evaluate((element) => getComputedStyle(element).color)
+    const before = await colour()
 
     await site.edit('shabd.config.yaml', (text) => text.replace('light: "#f6b40e"', 'light: "#00aa55"'))
     await expect.poll(() => cssVariable(page, '--sb-highlight')).toBe('#00aa55')
+    // The tint is darker now, so the token has to be too: the page's code is compiled again, in place.
+    await expect.poll(colour).not.toBe(before)
 
     await site.edit('sidebar.yaml', (text) => text.replace('- category: Guide', '- category: Handbook'))
     await expect(page.locator('.sb-nav-heading').first()).toHaveText('Handbook')

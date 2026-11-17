@@ -198,6 +198,63 @@ test.describe('components', () => {
     await expect(html).toHaveAttribute('data-theme', 'dark')
   })
 
+  test('the theme menu changes the palette in both colour modes and remembers it', async ({ page, problems }) => {
+    await page.emulateMedia({ colorScheme: 'light' })
+    await open(page, `${BUILT}/guide/intro`)
+    const html = page.locator('html')
+    const token = (name: string) =>
+      page.evaluate((property) => getComputedStyle(document.documentElement).getPropertyValue(property).trim(), name)
+    expect(await token('--sb-accent')).toBe('#2b36a8')
+
+    // The colour of a keyword in the page's code block, which each preset draws in its own syntax theme.
+    const keyword = page.locator('figure.sb-code span[class^="sbk-"]').first()
+    const ink = () => keyword.evaluate((span) => getComputedStyle(span).color)
+    const own = await ink()
+
+    const menu = page.getByRole('button', { name: 'Choose a theme' })
+    await menu.click()
+    const list = page.getByRole('group', { name: 'Theme' })
+    const options = list.getByRole('button')
+    // The site's own palette first, then the presets that change the whole look, then the ones that only recolour.
+    await expect(options.first()).toHaveText('Shabd')
+    await expect(options.first()).toHaveAttribute('aria-pressed', 'true')
+    await expect(list.locator('.sb-theme-menu-heading')).toHaveText(['Themes', 'Palettes'])
+    await expect(options.nth(1)).toHaveText('macOS')
+
+    await options.filter({ hasText: 'Forest' }).click()
+    await expect(html).toHaveAttribute('data-palette', 'forest')
+    await expect(menu).toHaveAttribute('aria-expanded', 'false')
+    expect(await token('--sb-accent')).toBe('#1f6f43')
+    const forest = await ink()
+    expect(forest).not.toBe(own)
+
+    // The palette has a dark form of its own, and so does its syntax theme.
+    await page.locator('.sb-theme-toggle').click()
+    await expect(html).toHaveAttribute('data-theme', 'dark')
+    expect(await token('--sb-accent')).toBe('#7fd69b')
+    const forestDark = await ink()
+    expect(forestDark).not.toBe(forest)
+
+    // All of it comes back after a reload: the inline script applies it before the app starts.
+    await page.reload()
+    await expect(html).toHaveAttribute('data-palette', 'forest')
+    await expect(html).toHaveAttribute('data-theme', 'dark')
+    expect(await ink()).toBe(forestDark)
+    await menu.click()
+    await expect(options.filter({ hasText: 'Forest' })).toHaveAttribute('aria-pressed', 'true')
+
+    // Escape closes the menu. Choosing the site's own palette forgets the choice.
+    await page.keyboard.press('Escape')
+    await expect(menu).toHaveAttribute('aria-expanded', 'false')
+    await menu.click()
+    await options.first().click()
+    await expect(html).not.toHaveAttribute('data-palette', /.+/)
+    await expect(html).not.toHaveAttribute('data-code', /.+/)
+    expect(await page.evaluate(() => localStorage.getItem('shabd-palette'))).toBeNull()
+    expect(await token('--sb-accent')).toBe('#b3bbff')
+    expect(problems).toEqual([])
+  })
+
   test('the copy button puts the code on the clipboard', async ({ page, context, browserName }) => {
     test.skip(browserName !== 'chromium', 'clipboard permissions can only be granted to Chromium')
     await context.grantPermissions(['clipboard-read', 'clipboard-write'])

@@ -48,13 +48,17 @@ will.
 
 ### 5. Publish to npm
 
-The names `shabd` and `create-shabd` were unclaimed on npm on 11 November 2026. Check again before you rely on that.
+The names `shabd` and `create-shabd` were unclaimed on npm on 16 November 2026. Check again before you rely on that.
 
 ```sh
 npm login
 npm run build
 npm publish -w shabd --access public
+npm publish -w create-shabd --access public
 ```
+
+`create-shabd` writes `"shabd": "^0.1.0"` into a new site, so publish `shabd` first. After both are out, run
+`npm create shabd@latest my-docs` in an empty folder: that command has never been run.
 
 After the first release, switch to trusted publishing so no token is stored: on npmjs.com, open the package's
 settings, add a trusted publisher for this repository, and publish from a workflow that runs on version tags with
@@ -88,6 +92,10 @@ settings, add a trusted publisher for this repository, and publish from a workfl
 | Studio: folder saving (File System Access API) | Built, tested in Chromium against real file handles; the system folder picker itself needs a person |
 | Studio: peer editing over WebRTC | Built, tested between two browser sessions on one machine; not across networks |
 | Live sandboxes | Built, tested in three browser engines |
+| Themes: 22 presets, the reader's menu, code colours that follow the chosen preset | Built, tested in three browser engines |
+| Readable code: every syntax colour at 4.5:1 or more against what is behind it | Built, tested for all 22 presets in both modes on a sample of code in eight languages |
+| Contrast of every preset | Tested: colour against colour for all 22, and text against every pixel of the rendered page for the nine themes, in three browser engines |
+| `create-shabd`, the starter | Built, tested. A generated site was installed from a packed copy of Shabd, checked, built and served. `npm create shabd` itself needs the packages published |
 
 "Three browser engines" means the Chromium, Firefox and WebKit builds that Playwright drives, on macOS. It does not
 mean Chrome, Firefox and Safari as people install them, and it does not cover Linux or Windows.
@@ -104,7 +112,14 @@ mean Chrome, Firefox and Safari as people install them, and it does not cover Li
 - A benchmark with 1,000 and 5,000 real pages: startup, build time, index size. The design scans and holds every
   page in memory, which is fine for hundreds and unmeasured beyond. The search stores have been measured on their
   own, up to 20,000 synthetic sections.
-- `create-shabd`, a starter that writes the three files a site needs.
+- Frosted panels in real browsers. The Firefox and WebKit builds the tests drive do not blur what is behind a
+  translucent header or sidebar; Chromium does. The themes are readable either way, which the contrast test
+  checks, but whether Firefox and Safari as people install them blur it has not been looked at.
+- The logo's animation under "Reduce motion" in Safari. It was checked in Chromium and Firefox.
+- Lighter pages on a site with a theme menu. Each page carries the colours of its own code for every syntax theme
+  the menu can reach, in its HTML and again in its script. On the docs site, which offers all 22 presets, that is
+  about 35 KB in each on the page with the most code. The themes a reader has to pick could live in one shared
+  stylesheet, fetched when one is picked; for the docs site it would be an estimated 68 KB, fetched once.
 - Type declarations for `shabd/client`. It ships as TypeScript source today, which a site's own type check cannot
   follow into the generated `virtual:` modules.
 - Keep React Fast Refresh working while editing the theme's own source. A few client modules export both components

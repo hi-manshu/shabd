@@ -17,8 +17,25 @@
 import { z } from 'zod'
 import { BADGE_VARIANTS, normalizeBadge, type Badge, type BadgeVariant } from './badge.js'
 import { REGIONS } from './blocks.js'
+import {
+  CODE_FRAMES,
+  COLOR_TOKENS,
+  CORNERS,
+  DEFAULT_LOOK,
+  DEFAULT_PRESET,
+  HEADING_CASES,
+  OPTIONAL_COLOR_TOKENS,
+  PRESET_NAMES,
+  THEME_PRESETS,
+  type ColorToken,
+  type ModeColor,
+  type OptionalColorToken,
+  type PresetLook,
+  type PresetName,
+} from './presets.js'
 
 export { BADGE_VARIANTS, normalizeBadge, type Badge, type BadgeVariant }
+export { CODE_FRAMES, CORNERS, HEADING_CASES, PRESET_NAMES, type ModeColor, type PresetName }
 
 /* ────────────────────────────── primitives ────────────────────────────── */
 
@@ -50,35 +67,50 @@ const modeColor = z
   .union([color, z.strictObject({ light: color, dark: color })])
   .transform((c) => (typeof c === 'string' ? { light: c, dark: c } : c))
 
-export interface ModeColor {
-  light: string
-  dark: string
-}
-
 /** A page path such as `/guide/install`, or an absolute URL. */
 const linkTarget = z.string().min(1)
 
 /* ───────────────────────────────── site ───────────────────────────────── */
 
+/** The height the header gives a logo that does not ask for one. */
+const DEFAULT_LOGO_HEIGHT = '1.75rem'
+
 const LogoSchema = z
   .union([
     z.string().min(1),
     z.strictObject({
+      /** One image for both colour modes. */
       src: z.string().min(1).optional(),
+      /** The image on a light page, and on a dark one. Give both, or `src`. */
       light: z.string().min(1).optional(),
       dark: z.string().min(1).optional(),
+      /** Text for screen readers. Leave it empty when the site title is shown beside the logo. */
       alt: z.string().optional(),
+      /** Height of the image in the header. The width follows from the image. */
+      height: cssValue('A height').optional(),
+      /** Where the logo and title link to. A page path or a URL. */
+      href: z.string().min(1).optional(),
+      /** Show the logo alone, without the site title beside it. */
+      replacesTitle: z.boolean().optional(),
     }),
   ])
   .transform((logo, ctx) => {
-    if (typeof logo === 'string') return { light: logo, dark: logo, alt: '' }
+    const defaults = { alt: '', height: DEFAULT_LOGO_HEIGHT, href: '/', replacesTitle: false }
+    if (typeof logo === 'string') return { light: logo, dark: logo, ...defaults }
     const light = logo.light ?? logo.src ?? logo.dark
     const dark = logo.dark ?? logo.src ?? logo.light
     if (!light || !dark) {
       ctx.issues.push({ code: 'custom', message: 'A logo needs `src`, or `light` and `dark`', input: logo })
       return z.NEVER
     }
-    return { light, dark, alt: logo.alt ?? '' }
+    return {
+      light,
+      dark,
+      alt: logo.alt ?? defaults.alt,
+      height: logo.height ?? defaults.height,
+      href: logo.href ?? defaults.href,
+      replacesTitle: logo.replacesTitle ?? defaults.replacesTitle,
+    }
   })
 
 const RepoSchema = z
@@ -139,68 +171,219 @@ const SiteSchema = z.strictObject({
 
 export const COLOR_MODES = ['system', 'light', 'dark'] as const
 
+/**
+ * Every colour is optional: `theme.preset` supplies the twelve a page needs,
+ * and what is written here is laid over it.
+ */
 const ColorsSchema = z.strictObject({
   /** Links and interactive text. */
-  accent: modeColor.default({ light: '#2b36a8', dark: '#b3bbff' }),
-  /** Marks: the active page, text selection, the headline bar. */
-  highlight: modeColor.default({ light: '#f6b40e', dark: '#ffc53d' }),
-  background: modeColor.default({ light: '#ffffff', dark: '#13142c' }),
-  surface: modeColor.default({ light: '#f3f4fa', dark: '#1c1e3d' }),
-  text: modeColor.default({ light: '#1b1c3a', dark: '#e8e9f5' }),
-  muted: modeColor.default({ light: '#5a5d7c', dark: '#a3a6c6' }),
-  border: modeColor.default({ light: '#d9dbea', dark: '#2f3260' }),
-  note: modeColor.default({ light: '#2563a8', dark: '#8fbdf5' }),
-  tip: modeColor.default({ light: '#0c7a66', dark: '#6fd6bf' }),
-  success: modeColor.default({ light: '#1a7a3c', dark: '#7ddc9c' }),
-  caution: modeColor.default({ light: '#a8540a', dark: '#f5b267' }),
-  danger: modeColor.default({ light: '#b8243a', dark: '#ff98a6' }),
+  accent: modeColor.optional(),
+  /** Marks: the active page, a highlighted line, the bar on a primary button. */
+  highlight: modeColor.optional(),
+  background: modeColor.optional(),
+  /** Panels that sit on the page: code, cards, the search field. */
+  surface: modeColor.optional(),
+  text: modeColor.optional(),
+  /** Secondary text. */
+  muted: modeColor.optional(),
+  border: modeColor.optional(),
+  note: modeColor.optional(),
+  tip: modeColor.optional(),
+  success: modeColor.optional(),
+  caution: modeColor.optional(),
+  danger: modeColor.optional(),
+
+  /** Links in prose. Defaults to `accent`. */
+  link: modeColor.optional(),
+  /** Page titles and headings. Defaults to `text`. */
+  heading: modeColor.optional(),
+  /** The headline bars that titles, code blocks and cards hang from. Defaults to `text`. */
+  bar: modeColor.optional(),
+  /** Background of a primary button. Defaults to `text`. Its label is drawn in `background`. */
+  button: modeColor.optional(),
+  /** Background of the header. Defaults to `background`. A translucent colour blurs the page behind it. */
+  header: modeColor.optional(),
+  /** Background of the sidebar. Defaults to `background`. A translucent colour blurs what is behind it. */
+  sidebar: modeColor.optional(),
+  /** Background of the content area, the outline beside it and the footer. See-through by default. */
+  main: modeColor.optional(),
+  /**
+   * A picture behind the whole page: any CSS background, such as a gradient.
+   * It shows only where a panel's own colour is translucent. None by default.
+   */
+  backdrop: modeColor.optional(),
+  /** Background of code, inline and in blocks. Defaults to `surface`. */
+  code: modeColor.optional(),
+  /**
+   * Colour of code that the syntax theme leaves uncoloured: plain text,
+   * punctuation in some themes. Defaults to the syntax theme's own foreground.
+   */
+  codeText: modeColor.optional(),
+  /** Background of selected text. Defaults to a tint of `highlight`. */
+  selection: modeColor.optional(),
 })
 
+const fontWeight = z.number().int().min(100).max(900)
+/** A font's width axis, in percent of normal. Fonts without one ignore it. */
+const fontWidth = z.number().min(50).max(200)
+
+/*
+ * Settings marked "from the preset" have no default here. The preset may set
+ * them (`macos` sets most), and Shabd's own defaults fill in what is left.
+ */
 const TypographySchema = z.strictObject({
-  /** Font stack for prose and UI. */
-  sans: cssValue('A font stack').default('"Anek Latin Variable", ui-sans-serif, system-ui, sans-serif'),
-  /** Font stack for code. */
-  mono: cssValue('A font stack').default('"Red Hat Mono Variable", ui-monospace, "SF Mono", Menlo, monospace'),
+  /** Font stack for prose and UI. From the preset; otherwise Anek Latin, then system fonts. */
+  sans: cssValue('A font stack').optional(),
+  /** Font stack for code. From the preset; otherwise Red Hat Mono, then system fonts. */
+  mono: cssValue('A font stack').optional(),
+  /** Font stack for titles and headings. From the preset; otherwise the same as `sans`. */
+  heading: cssValue('A font stack').optional(),
+  /** `uppercase` sets titles and headings in capitals. From the preset; otherwise `none`. */
+  headingCase: z.enum(HEADING_CASES).optional(),
+  /** Extra space between the letters of titles and headings, such as `0.04em`. From the preset; otherwise none. */
+  headingTracking: cssValue('A length').optional(),
   /** Root font size. */
   baseSize: cssValue('A size').default('16px'),
   /** Modular scale ratio. Heading sizes are baseSize × scale^n. */
   scale: z.number().min(1).max(2).default(1.2),
   lineHeight: z.number().min(1).max(3).default(1.65),
+  /** Weight of body text. From the preset; otherwise 400. */
+  weight: fontWeight.optional(),
+  /**
+   * Weight of a second-level heading. Larger headings are a little heavier,
+   * smaller ones a little lighter. From the preset; otherwise 700.
+   */
+  headingWeight: fontWeight.optional(),
+  /** Width of headings, in percent. From the preset; otherwise 112. */
+  headingWidth: fontWidth.optional(),
+  /** Width of the largest titles (the site title, page titles, the hero). From the preset; otherwise 125. */
+  displayWidth: fontWidth.optional(),
 })
 
 const LayoutTokensSchema = z.strictObject({
+  /** Width of the text column on a `doc` page. */
   contentWidth: cssValue('A width').default('46rem'),
+  /** Width of the main column on a `splash` page. */
+  wideWidth: cssValue('A width').default('68rem'),
   sidebarWidth: cssValue('A width').default('17rem'),
   tocWidth: cssValue('A width').default('14rem'),
   headerHeight: cssValue('A height').default('3.75rem'),
 })
 
 const CodeThemeSchema = z.strictObject({
-  /** Shiki theme names. */
-  light: z.string().min(1).default('github-light'),
-  dark: z.string().min(1).default('tokyo-night'),
+  /** Shiki theme names. Default to the pair that goes with the preset. */
+  light: z.string().min(1).optional(),
+  dark: z.string().min(1).optional(),
+  /**
+   * `bar`: a code block hangs from a rule. `window`: it sits in a window, with
+   * a title bar and the three window buttons. From the preset; otherwise `bar`.
+   */
+  frame: z.enum(CODE_FRAMES).optional(),
+  /** Wrap long lines in every code block. A block can opt out with `noWrap`. */
+  wrap: z.boolean().default(false),
+  /** Number the lines of every code block. A block can opt out with `noLineNumbers`. */
+  lineNumbers: z.boolean().default(false),
+  /**
+   * The least contrast a token's colour may have against the code background, as a WCAG ratio.
+   * A colour the syntax theme draws fainter than this is made darker or lighter, keeping its hue,
+   * until it reaches it. 0 leaves the syntax themes exactly as they are.
+   */
+  minContrast: z.number().min(0).max(21).default(4.5),
 })
 
-const ThemeSchema = z.strictObject({
-  colorMode: z
-    .strictObject({
-      /** Mode used on a visitor's first visit. */
-      default: z.enum(COLOR_MODES).default('system'),
-      /** Show the light/dark switch. */
-      toggle: z.boolean().default(true),
-    })
-    .prefault({}),
-  colors: ColorsSchema.prefault({}),
-  typography: TypographySchema.prefault({}),
-  layout: LayoutTokensSchema.prefault({}),
-  radius: cssValue('A radius').default('8px'),
-  code: CodeThemeSchema.prefault({}),
-  /** Your own stylesheets, loaded after the theme. One path or a list. */
-  css: z
-    .union([z.string().min(1), z.array(z.string().min(1))])
-    .default([])
-    .transform((css) => (typeof css === 'string' ? [css] : css)),
-})
+const pickOptionalColors = (colors: Partial<Record<OptionalColorToken, ModeColor>>) =>
+  Object.fromEntries(
+    OPTIONAL_COLOR_TOKENS.flatMap((token) => (colors[token] ? [[token, colors[token]]] : [])),
+  ) as Partial<Record<OptionalColorToken, ModeColor>>
+
+const ThemeSchema = z
+  .strictObject({
+    /** A built-in palette. `colors` and `code` are laid over it. */
+    preset: z.enum(PRESET_NAMES).default(DEFAULT_PRESET),
+    /**
+     * Let readers choose a palette from a menu in the header: `true` for
+     * every preset, or a list of preset names. The choice is kept in their
+     * browser.
+     */
+    picker: z.union([z.boolean(), z.array(z.enum(PRESET_NAMES)).min(1)]).default(false),
+    colorMode: z
+      .strictObject({
+        /** Mode used on a visitor's first visit. */
+        default: z.enum(COLOR_MODES).default('system'),
+        /** Show the light/dark switch. */
+        toggle: z.boolean().default(true),
+      })
+      .prefault({}),
+    colors: ColorsSchema.prefault({}),
+    typography: TypographySchema.prefault({}),
+    layout: LayoutTokensSchema.prefault({}),
+    /** How round corners are. From the preset; otherwise 8px. */
+    radius: cssValue('A radius').optional(),
+    /**
+     * `hang`: flat on top and round underneath, like a letter under its
+     * headline. `round`: round all the way. From the preset; otherwise `hang`.
+     */
+    corners: z.enum(CORNERS).optional(),
+    /** Thickness of the rule above a code block, a card or a callout. From the preset; otherwise 2px. */
+    rule: cssValue('A thickness').optional(),
+    /** Thickness of every other border. From the preset; otherwise 1px. */
+    line: cssValue('A thickness').optional(),
+    /**
+     * A CSS box-shadow for panels and buttons: code blocks, callouts, the
+     * search field. From the preset; otherwise none.
+     */
+    shadow: cssValue('A shadow').optional(),
+    /** Draw the heavy bar above page titles and the hero. From the preset; otherwise true. */
+    bars: z.boolean().optional(),
+    code: CodeThemeSchema.prefault({}),
+    /** Your own stylesheets, loaded after the theme. One path or a list. */
+    css: z
+      .union([z.string().min(1), z.array(z.string().min(1))])
+      .default([])
+      .transform((css) => (typeof css === 'string' ? [css] : css)),
+  })
+  .transform((theme) => {
+    const preset = THEME_PRESETS[theme.preset]
+    // Each setting: the site's own, else the preset's, else Shabd's.
+    const look: PresetLook = preset.look ?? {}
+    const sans = theme.typography.sans ?? look.sans ?? DEFAULT_LOOK.sans
+    const colors = Object.fromEntries(
+      COLOR_TOKENS.map((token) => [token, theme.colors[token] ?? preset.colors[token]]),
+    ) as Record<ColorToken, ModeColor>
+    // The site's own palette is always in the menu, and comes first.
+    const offered = theme.picker === true ? PRESET_NAMES : theme.picker === false ? [] : theme.picker
+    const picker: PresetName[] = offered.length ? [...new Set<PresetName>([theme.preset, ...offered])] : []
+    return {
+      ...theme,
+      picker,
+      colors: { ...colors, ...pickOptionalColors({ ...look.colors, ...pickOptionalColors(theme.colors) }) },
+      typography: {
+        ...theme.typography,
+        sans,
+        mono: theme.typography.mono ?? look.mono ?? DEFAULT_LOOK.mono,
+        // A site that names its own text font gets it for headings too, not the preset's heading font.
+        heading: theme.typography.heading ?? (theme.typography.sans === undefined ? look.heading : undefined) ?? sans,
+        headingCase: theme.typography.headingCase ?? look.headingCase ?? DEFAULT_LOOK.headingCase,
+        headingTracking: theme.typography.headingTracking ?? look.headingTracking ?? DEFAULT_LOOK.headingTracking,
+        weight: theme.typography.weight ?? look.weight ?? DEFAULT_LOOK.weight,
+        headingWeight: theme.typography.headingWeight ?? look.headingWeight ?? DEFAULT_LOOK.headingWeight,
+        headingWidth: theme.typography.headingWidth ?? look.headingWidth ?? DEFAULT_LOOK.headingWidth,
+        displayWidth: theme.typography.displayWidth ?? look.displayWidth ?? DEFAULT_LOOK.displayWidth,
+      },
+      radius: theme.radius ?? look.radius ?? DEFAULT_LOOK.radius,
+      corners: theme.corners ?? look.corners ?? DEFAULT_LOOK.corners,
+      rule: theme.rule ?? look.rule ?? DEFAULT_LOOK.rule,
+      line: theme.line ?? look.line ?? DEFAULT_LOOK.line,
+      shadow: theme.shadow ?? look.shadow ?? DEFAULT_LOOK.shadow,
+      bars: theme.bars ?? look.bars ?? DEFAULT_LOOK.bars,
+      code: {
+        ...theme.code,
+        light: theme.code.light ?? preset.code.light,
+        dark: theme.code.dark ?? preset.code.dark,
+        frame: theme.code.frame ?? look.codeFrame ?? DEFAULT_LOOK.codeFrame,
+      },
+    }
+  })
 
 /* ─────────────────────────────── layouts ──────────────────────────────── */
 

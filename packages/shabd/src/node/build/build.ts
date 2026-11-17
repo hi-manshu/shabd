@@ -8,6 +8,7 @@
  * All three steps share one context, so each page is compiled once (or not at
  * all, if the on-disk cache already holds it).
  */
+import { createHash } from 'node:crypto'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -17,6 +18,7 @@ import { withBase } from '../../shared/paths.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
 import type { RenderedPage } from '../../shared/types.js'
 import { collectProblems, formatProblem } from '../check.js'
+import { themePaletteCss } from '../config/theme-css.js'
 import { createContext, type ShabdContext } from '../context.js'
 import { markdownPath, publicUrl, renderLlmsFull, renderLlmsTxt } from '../llms/llms-txt.js'
 import { pageMarkdown } from '../llms/markdown.js'
@@ -77,6 +79,14 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
     await writeFile(target, contents)
   }
 
+  // The presets in the theme menu are the same on every page. They go in one
+  // file, named after its contents so that it can be cached for good.
+  const paletteCss = themePaletteCss(config.config.theme)
+  const paletteFile = paletteCss
+    ? `_shabd/palettes.${createHash('sha1').update(paletteCss).digest('hex').slice(0, 8)}.css`
+    : undefined
+  if (paletteFile) await write(paletteFile, paletteCss)
+
   const renderRoute = async (routePath: string, sourceFile?: string) => {
     const rendered = await render(routePath)
     return renderDocument({
@@ -87,6 +97,7 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
       body: rendered.html,
       head: assets.headTags(sourceFile),
       scripts: assets.entryScript(),
+      ...(paletteFile ? { paletteStylesheet: withBase(config.config.site.base, `/${paletteFile}`) } : {}),
     })
   }
 

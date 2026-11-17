@@ -8,7 +8,7 @@ export interface CodeMeta {
   title: string | undefined
   /** 1-based line numbers to emphasise. */
   highlight: number[]
-  /** Bare words: `live`, `showLineNumbers`, `wrap`. */
+  /** Bare words: `live`, `showLineNumbers`, `noLineNumbers`, `wrap`, `noWrap`. */
   flags: Set<string>
   /** `key="value"` pairs other than `title`. */
   attrs: Record<string, string>

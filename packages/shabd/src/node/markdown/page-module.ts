@@ -1,10 +1,11 @@
 /**
  * Turns compiler output into the module a route loads.
  *
- * On top of the MDX component (the default export) a page module exports the
- * two things the layout engine needs to render it: validated `frontmatter`
- * and the `toc`. They travel with the content, so when a page hot-updates,
- * its layout, table of contents and body all change in the same frame.
+ * On top of the MDX component (the default export) a page module exports
+ * what the layout engine needs to render it: validated `frontmatter`, the
+ * `toc`, and `codeCss`, the colours of its code. They travel with the
+ * content, so when a page hot-updates, its layout, table of contents, body
+ * and code colours all change in the same frame.
  */
 import type { Frontmatter } from '../../shared/schema.js'
 import { codeFrame, type ShabdError } from '../config/errors.js'
@@ -23,7 +24,8 @@ export function toPageModule(
 ): string {
   let code = compiled.code
   code += `\nexport const frontmatter = ${JSON.stringify(frontmatter)};`
-  code += `\nexport const toc = ${JSON.stringify(compiled.toc)};\n`
+  code += `\nexport const toc = ${JSON.stringify(compiled.toc)};`
+  code += `\nexport const codeCss = ${JSON.stringify(compiled.codeCss)};\n`
 
   if (hotId !== undefined) {
     // The module accepts its own updates and hands the new version to the
@@ -59,5 +61,5 @@ export function toErrorModule(error: ShabdError, displayFile: string, frontmatte
     `export default function PageWithError() {\n` +
     `  return __shabdElement(__ShabdPageError, { issues: __shabdIssues });\n` +
     `}\n`
-  return toPageModule({ code, toc: [], sections: [], links: [], anchors: [] }, frontmatter, hotId)
+  return toPageModule({ code, toc: [], sections: [], links: [], anchors: [], codeCss: '' }, frontmatter, hotId)
 }

@@ -15,7 +15,7 @@ import { FrontmatterSchema, type Frontmatter } from '../../shared/schema.js'
 import type { PageMeta, SiteData } from '../../shared/types.js'
 import { isShabdError, ShabdError, type SourceIssue } from '../config/errors.js'
 import { loadSidebar, type LoadedSidebar, type ResolvedConfig } from '../config/load.js'
-import { themeToCss } from '../config/theme-css.js'
+import { paletteChoices, themeToCss } from '../config/theme-css.js'
 import { leadingHeading, parseFrontmatter } from './frontmatter.js'
 import { resolveSidebar, type ResolvedSidebar } from './sidebar.js'
 
@@ -181,6 +181,7 @@ export class ContentStore {
     return {
       site: config.site,
       colorMode: config.theme.colorMode,
+      palettes: paletteChoices(config.theme),
       defaults: config.defaults,
       features: config.features,
       layouts,

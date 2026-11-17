@@ -37,6 +37,7 @@ import {
   type ViteDevServer,
 } from 'vite'
 import { normalizePath as normalizeRoute, stripBase } from '../../shared/paths.js'
+import { codeBackgrounds } from '../../shared/presets.js'
 import { renderDocument } from '../build/html.js'
 import { isShabdError } from '../config/errors.js'
 import { loadConfig, loadSidebar, type ResolvedConfig } from '../config/load.js'
@@ -277,7 +278,15 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       const same = (a: string, b: string) => normalizePath(a) === normalizePath(b)
 
       if (same(file, config.configFile)) {
-        await reloadConfig(server, context, () => reload(VIRTUAL.data))
+        await reloadConfig(server, context, {
+          data: () => reload(VIRTUAL.data),
+          // Every page the browser has loaded is compiled again and swapped in, as after an edit to it.
+          pages: () => {
+            for (const page of store.pages()) {
+              for (const module of client.moduleGraph.getModulesByFile(normalizePath(page.file)) ?? []) void client.reloadModule(module)
+            }
+          },
+        })
         return []
       }
 
@@ -531,9 +540,16 @@ function logSidebarWarnings(server: ViteDevServer, context: ShabdContext): void 
  *
  * Most edits (tokens, site info, layouts' regions, feature options) only
  * change data the browser already knows how to re-read, so they hot-swap.
- * Edits that change what pages compile to, or which files exist, restart.
+ * An edit to the colours behind code also changes what code compiles to,
+ * because token colours are held to a contrast floor against them: the open
+ * pages are compiled again and swapped in. Other edits that change what
+ * pages compile to, or which files exist, restart.
  */
-async function reloadConfig(server: ViteDevServer, context: ShabdContext, refreshData: () => void): Promise<void> {
+async function reloadConfig(
+  server: ViteDevServer,
+  context: ShabdContext,
+  refresh: { data: () => void; pages: () => void },
+): Promise<void> {
   let next: ResolvedConfig
   try {
     next = await loadConfig(context.config.root)
@@ -544,7 +560,7 @@ async function reloadConfig(server: ViteDevServer, context: ShabdContext, refres
 
   const previous = context.config
   const structural =
-    next.compileFingerprint !== previous.compileFingerprint ||
+    next.structureFingerprint !== previous.structureFingerprint ||
     next.contentDir !== previous.contentDir ||
     next.sidebarFile !== previous.sidebarFile ||
     JSON.stringify([next.components, next.blocks, next.stylesheets, bundledFonts(next), next.config.features.search]) !==
@@ -564,6 +580,10 @@ async function reloadConfig(server: ViteDevServer, context: ShabdContext, refres
 
   context.config = next
   context.store.setConfig(next)
-  refreshData()
+  if (next.compileFingerprint !== previous.compileFingerprint) {
+    context.compiler.recolour(codeBackgrounds(next.config.theme), next.compileFingerprint)
+    refresh.pages()
+  }
+  refresh.data()
   server.config.logger.info(`${pc.magenta('shabd')} ${pc.dim('hot')} shabd.config.yaml`, { timestamp: true })
 }

@@ -4,7 +4,7 @@
  */
 import type { ShabdConfig } from '../../shared/schema.js'
 import { withBase } from '../../shared/paths.js'
-import { colorModeScript, themeToCss } from '../config/theme-css.js'
+import { colorModeScript, themeBaseCss, themeToCss } from '../config/theme-css.js'
 
 export interface DocumentOptions {
   config: ShabdConfig
@@ -20,6 +20,12 @@ export interface DocumentOptions {
   scripts?: string
   /** Extra attributes for inline scripts, e.g. a CSP nonce. */
   scriptAttributes?: string
+  /**
+   * Address of a stylesheet holding the presets from the theme menu. Given
+   * one, the document carries only the site's own tokens and links to it.
+   * Without one, everything is written into the document.
+   */
+  paletteStylesheet?: string
 }
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
@@ -54,8 +60,10 @@ export function renderDocument(options: DocumentOptions): string {
     config.features.llms.enabled &&
       `<link rel="alternate" type="text/plain" title="llms.txt" href="${escapeHtml(withBase(site.base, '/llms.txt'))}">`,
     '<meta name="generator" content="Shabd">',
-    `<script${options.scriptAttributes ?? ''}>${colorModeScript(theme.colorMode.default)}</script>`,
-    `<style id="sb-theme">${themeToCss(theme)}</style>`,
+    `<script${options.scriptAttributes ?? ''}>${colorModeScript(theme)}</script>`,
+    options.paletteStylesheet
+      ? `<style id="sb-theme">${themeBaseCss(theme)}</style>\n    <link rel="stylesheet" href="${escapeHtml(options.paletteStylesheet)}">`
+      : `<style id="sb-theme">${themeToCss(theme)}</style>`,
     options.head,
   ]
     .filter(Boolean)
