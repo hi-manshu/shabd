@@ -105,11 +105,13 @@ async function main(argv) {
     // Pack each workspace once. `shabd` builds itself first (its `prepack` script).
     const tarballs = []
     for (const [index, { directory }] of PACKAGES.entries()) {
-      const packed = run('npm', ['pack', '--json', '--pack-destination', work], { cwd: path.join(root, directory) })
+      // The packed file is found by looking for it. What `npm pack --json` prints differs between npm 10 and 12.
+      const before = new Set(await readdir(work))
+      const packed = run('npm', ['pack', '--pack-destination', work], { cwd: path.join(root, directory) })
       if (packed.status !== 0) throw new Error(`npm pack failed in ${directory}:\n${packed.stderr}`)
-      // The build's own output comes first; the report is the array that starts a line of its own.
-      const [{ filename }] = JSON.parse(packed.stdout.slice(packed.stdout.search(/^\[/m)))
-      tarballs[index] = path.join(work, filename.replace(/^@/, '').replace('/', '-'))
+      const made = (await readdir(work)).filter((file) => file.endsWith('.tgz') && !before.has(file))
+      if (made.length !== 1) throw new Error(`Expected npm pack to leave one file in ${work} for ${directory}, found ${made.length}.`)
+      tarballs[index] = path.join(work, made[0])
     }
 
     // The package under its own name first, then its starter, then the same two under their second names.
@@ -157,9 +159,11 @@ async function main(argv) {
       })
       const ok = published.status === 0
       if (dryRun && ok) {
+        // npm's report, where this npm writes one that can be read.
         const report = `${published.stdout}${published.stderr}`
         const read = (field) => new RegExp(`${field}:\\s*(.+)`).exec(report)?.[1]?.trim()
-        console.log(`  ${read('total files')} files, ${read('package size')} packed, as ${read('name')}`)
+        const facts = [read('total files') && `${read('total files')} files`, read('package size') && `${read('package size')} packed`]
+        console.log(`  ${facts.filter(Boolean).join(', ') || 'packed'}, as ${target.name}`)
       } else if (dryRun) {
         console.error(published.stderr)
       }
