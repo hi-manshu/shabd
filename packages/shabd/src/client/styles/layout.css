@@ -111,6 +111,13 @@
       inset: var(--sb-panel-top, var(--sb-header-height)) 0 0 0;
       z-index: 20;
       block-size: auto;
+      /*
+       * Fill the space between the header and the foot of the window, and scroll inside it. As a column
+       * the sidebar is aligned to the start of its grid cell, and a fixed box that keeps that alignment
+       * is as tall as what is in it: a long sidebar then reached past the window, could not be scrolled,
+       * and was pushed up over the header.
+       */
+      align-self: stretch;
       border: 0;
       visibility: hidden;
       transform: translateY(-0.5rem);
