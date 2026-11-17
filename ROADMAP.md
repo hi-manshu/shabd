@@ -54,7 +54,7 @@ What is left to set up:
 | SQLite search store (FTS5, kept in the browser's private file system) | Built, tested. WebKit under test fell back to memory |
 | `llms.txt`, Markdown copies | Built, tested |
 | MCP: dev route, `shabd preview`, stdio | Built; protocol tested with the official client |
-| MCP on a serverless host | Handler exported; no adapter, not tested on a host |
+| MCP on a host that runs code | `shabd build --adapter` writes a function for Cloudflare Pages, Vercel or Netlify. Each is run in the tests as its host runs it, with code generation from strings forbidden. None has been deployed to its host |
 | Studio: dev-server saving, tab sync, conflicts | Built, tested in three browser engines |
 | Studio: folder saving (File System Access API) | Built, tested in Chromium against real file handles; the system folder picker itself needs a person |
 | Studio: peer editing over WebRTC | Built, tested between two browser sessions on one machine; not across networks |
@@ -153,7 +153,8 @@ Not yet checked:
 
 **MCP**
 
-- Adapters for Cloudflare, Vercel and Netlify, written by `shabd build --adapter <name>`.
+- Deploy each adapter's output to its host once: Cloudflare Pages, Vercel, Netlify. They are written and tested
+  off the hosts.
 - Semantic search behind the endpoint where the host can afford the model.
 
 **Studio**

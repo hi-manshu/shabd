@@ -22,3 +22,4 @@ Every command takes the site folder as an optional argument. It defaults to the 
 | `--host [address]` | `dev`, `preview` | Listen on the network, not only on localhost |
 | `--open` | `dev` | Open the browser when the server starts |
 | `--no-semantic` | `build` | Skip embeddings and build keyword search only |
+| `--adapter <host>` | `build` | Also write the [MCP endpoint](../features/mcp.md#in-production) as a function for `cloudflare`, `vercel` or `netlify` |

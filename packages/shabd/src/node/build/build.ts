@@ -26,10 +26,13 @@ import { DOCS_FILE, SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, type DocsFile } from
 import { SearchService } from '../search/service.js'
 import { serverOutDir, shabd } from '../vite/plugin.js'
 import { escapeHtml, renderDocument } from './html.js'
+import { writeAdapter, type AdapterName } from './adapters.js'
 
 export interface BuildOptions {
   /** Set false to skip embeddings and ship keyword search only. */
   semantic?: boolean
+  /** Also write the MCP endpoint as a function for this host. */
+  adapter?: AdapterName
 }
 
 /** One entry of Vite's build manifest. */
@@ -183,6 +186,12 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
       'sitemap.xml',
       `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`,
     )
+  }
+
+  if (options.adapter) {
+    if (!features.mcp.enabled) throw new Error(`--adapter ${options.adapter} writes the MCP endpoint, and features.mcp is off.`)
+    const files = await writeAdapter(options.adapter, { root: config.root, outDir, base: site.base })
+    step(`MCP endpoint for ${options.adapter}: ${files.map((file) => pc.dim(file)).join(', ')}`)
   }
 
   await compiler.cache.prune()

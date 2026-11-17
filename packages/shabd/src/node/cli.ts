@@ -31,6 +31,8 @@ ${pc.bold('Options')}
   --host [address]  Expose the server on the network
   --open            Open the browser when the server starts
   --no-semantic     Build without embeddings (keyword search only)
+  --adapter <host>  With build: also write the MCP endpoint as a function for
+                    cloudflare, vercel or netlify
   -h, --help        Show this help
   -v, --version     Show the version
 `
@@ -44,6 +46,7 @@ export async function main(argv: string[]): Promise<void> {
       host: { type: 'string' },
       open: { type: 'boolean' },
       'no-semantic': { type: 'boolean' },
+      adapter: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
@@ -77,7 +80,12 @@ export async function main(argv: string[]): Promise<void> {
       }
       case 'build': {
         const { build } = await import('./build/build.js')
-        await build(root, { semantic: !values['no-semantic'] })
+        const { ADAPTERS, isAdapter } = await import('./build/adapters.js')
+        const adapter = values.adapter
+        if (adapter !== undefined && !isAdapter(adapter)) {
+          fail(`--adapter takes one of ${ADAPTERS.join(', ')}. Got "${adapter}".`)
+        }
+        await build(root, { semantic: !values['no-semantic'], ...(adapter ? { adapter } : {}) })
         break
       }
       case 'preview': {
