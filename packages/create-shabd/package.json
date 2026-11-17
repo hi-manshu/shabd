@@ -1,7 +1,7 @@
 {
-  "name": "create-shabd",
+  "name": "@himanshoe/create-shabd",
   "version": "0.1.0",
-  "description": "Starts a Shabd documentation site: npm create shabd my-docs",
+  "description": "Starts a Shabd documentation site: npm create @himanshoe/shabd my-docs",
   "keywords": [
     "shabd",
     "documentation",
@@ -29,5 +29,8 @@
   ],
   "engines": {
     "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

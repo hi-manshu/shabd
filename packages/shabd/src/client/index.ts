@@ -1,7 +1,7 @@
 /**
  * Public API for custom blocks and MDX components.
  *
- *     import { usePage, useSite, Badge } from 'shabd/client'
+ *     import { usePage, useSite, Badge } from '@himanshoe/shabd/client'
  */
 export { usePage, useRouter, type PageView } from './app/router.js'
 export { useSite } from './app/store.js'

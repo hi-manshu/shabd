@@ -139,7 +139,7 @@ blocks:
 ```
 
 ```tsx title="components/Announcement.tsx"
-import { useSite } from 'shabd/client'
+import { useSite } from '@himanshoe/shabd/client'
 
 export default function Announcement({ message }: { message?: string }) {
   const { site } = useSite()

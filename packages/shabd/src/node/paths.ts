@@ -22,6 +22,19 @@ export function resolveFromPackage(specifier: string): string | undefined {
   }
 }
 
+/**
+ * What this package is called where it is installed. It is published under
+ * more than one name, and a site's bundler has to be told about it by the
+ * name the site knows it by.
+ */
+export function packageName(): string {
+  try {
+    return (require(path.join(PACKAGE_ROOT, 'package.json')) as { name: string }).name
+  } catch {
+    return '@himanshoe/shabd'
+  }
+}
+
 export function packageVersion(): string {
   try {
     return (require(path.join(PACKAGE_ROOT, 'package.json')) as { version: string }).version

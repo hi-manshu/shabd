@@ -74,7 +74,7 @@ For a deployed site, the handler is exported for you to mount in a serverless or
 from a `Request` to a `Response`, it keeps no session, and it reads two JSON files that the build writes.
 
 ```ts
-import { createMcpHandler, staticDocsFrom } from 'shabd/mcp'
+import { createMcpHandler, staticDocsFrom } from '@himanshoe/shabd/mcp'
 
 const origin = 'https://docs.example.com'
 const [docs, index] = await Promise.all([

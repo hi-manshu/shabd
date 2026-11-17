@@ -2,7 +2,7 @@
  * Writes JSON Schemas for shabd.config.yaml and sidebar.yaml from the Zod
  * schemas, so editors can validate and autocomplete the YAML:
  *
- *     # yaml-language-server: $schema=./node_modules/shabd/schemas/config.schema.json
+ *     # yaml-language-server: $schema=./node_modules/@himanshoe/shabd/schemas/config.schema.json
  *
  * Runs after `tsc` as part of `npm run build`.
  */

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { collectProblems } from '../../shabd/src/node/check.js'
 import { createContext } from '../../shabd/src/node/context.js'
-import { PEERS, SHABD_RANGE, create, main, titleFromDirectory } from '../src/create.js'
+import { PEERS, SHABD_PACKAGE, SHABD_RANGE, create, main, packageStartedBy, titleFromDirectory } from '../src/create.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const BIN = path.join(here, '..', 'bin', 'create-shabd.js')
@@ -73,6 +73,10 @@ describe('create-shabd', () => {
 
   it('asks the new site for the Shabd in this repository and the packages it needs beside it', async () => {
     const shabd = JSON.parse(await readFile(path.join(here, '../../shabd/package.json'), 'utf8'))
+    // The starter is the starter of the package it is published beside, whatever that is called.
+    expect(SHABD_PACKAGE).toBe(shabd.name)
+    expect(packageStartedBy('@himanshoe/create-shabd')).toBe('@himanshoe/shabd')
+    expect(packageStartedBy('create-shabd-docs')).toBe('shabd-docs')
     expect(SHABD_RANGE).toBe(`^${shabd.version}`)
     for (const [name, range] of Object.entries(PEERS)) expect(shabd.peerDependencies[name], name).toBe(range)
     // Every peer that is not optional is asked for.
@@ -83,8 +87,13 @@ describe('create-shabd', () => {
     await create({ directory, shabd: 'file:../shabd-0.1.0.tgz' })
     const manifest = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'))
     expect(manifest).toMatchObject({ name: 'local', private: true, type: 'module' })
-    expect(manifest.dependencies).toEqual({ ...PEERS, shabd: 'file:../shabd-0.1.0.tgz' })
+    expect(manifest.dependencies).toEqual({ ...PEERS, [SHABD_PACKAGE]: 'file:../shabd-0.1.0.tgz' })
+    // The command is `shabd` under every name the package has.
     expect(manifest.scripts).toEqual({ dev: 'shabd dev', build: 'shabd build', preview: 'shabd preview', check: 'shabd check' })
+    // The editor finds the schema in the package the site installed.
+    expect(await readFile(path.join(directory, 'shabd.config.yaml'), 'utf8')).toContain(
+      `$schema=./node_modules/${SHABD_PACKAGE}/schemas/config.schema.json`,
+    )
   })
 
   it('refuses a directory that is not empty, and with --force keeps what is there', async () => {
@@ -131,7 +140,7 @@ describe('create-shabd', () => {
     errors.length = 0
     expect(await run(path.join(scratch, 'two'), 'forest')).toBe(1)
     expect(errors.join('\n')).toContain('Expected one directory, got 2')
-    expect(errors.join('\n')).toContain('npm create shabd@latest my-docs -- --preset forest')
+    expect(errors.join('\n')).toContain(`npm create ${SHABD_PACKAGE}@latest my-docs -- --preset forest`)
     expect(existsSync(path.join(scratch, 'two'))).toBe(false)
     expect(await run('one', 'two')).toBe(1)
     expect(await run('--nonsense')).toBe(1)

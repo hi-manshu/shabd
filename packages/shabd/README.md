@@ -1,4 +1,4 @@
-# shabd
+# @himanshoe/shabd
 
 Documentation sites configured in YAML, with in-browser search, an MCP endpoint for AI agents, an in-browser editor
 for development, and live code sandboxes.
@@ -6,13 +6,13 @@ for development, and live code sandboxes.
 The starter writes a small site that runs as it is:
 
 ```sh
-npm create shabd@latest my-docs
+npm create @himanshoe/shabd@latest my-docs
 ```
 
 Or add Shabd to a folder by hand:
 
 ```sh
-npm install shabd react react-dom
+npm install @himanshoe/shabd react react-dom
 ```
 
 ```yaml

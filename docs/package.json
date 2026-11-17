@@ -1,5 +1,5 @@
 {
-  "name": "shabd-docs",
+  "name": "shabd-docs-site",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,6 @@
     "@huggingface/transformers": "^4.3.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "shabd": "*"
+    "@himanshoe/shabd": "*"
   }
 }

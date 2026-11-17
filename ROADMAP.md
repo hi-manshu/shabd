@@ -48,26 +48,34 @@ will.
 
 ### 5. Publish to npm
 
-The names `shabd` and `create-shabd` were unclaimed on npm on 16 November 2026. Check again before you rely on that.
+npm refused the name `shabd` on 17 November 2026 as too similar to `sha1` and `sharp`, and the scope `@shabd`
+belongs to another account. So Shabd is published under two names, each with its starter:
+
+| Package | Starter | Start a site with |
+| --- | --- | --- |
+| `@himanshoe/shabd` | `@himanshoe/create-shabd` | `npm create @himanshoe/shabd@latest my-docs` |
+| `shabd-docs` | `create-shabd-docs` | `npm create shabd-docs@latest my-docs` |
+
+`@himanshoe/shabd` is what the package is called in this repository. `shabd-docs` is the same files with the name
+changed wherever it is written; `scripts/release/publish.mjs` makes that copy.
 
 ```sh
 npm login
-npm run build
-npm publish -w shabd --access public
-npm publish -w create-shabd --access public
+npm run release -- --dry-run
+npm run release
 ```
 
-`create-shabd` writes `"shabd": "^0.1.0"` into a new site, so publish `shabd` first. `shabd` builds itself before
-it is packed, so the `npm run build` above is a second look and not a requirement. A published version cannot be
-published again, so read what `npm publish -w shabd --dry-run` lists first.
+The account needs two-factor authentication, and npm asks for it before each package goes out, so run the release
+in a terminal of your own. A version that is already on npm is skipped: run it again after a failure and it picks
+up where it stopped. A published version cannot be published again, so read what the dry run lists first.
 
-After both are out, run `npm create shabd@latest my-docs` in an empty folder outside this repository: that command
-has never been run from the registry, and inside the repository npm would run the local copy. Then take the
-"not on npm yet" wording out of `docs/content/guide/installation.md`, `README.md` and this file.
+After a release, run both `npm create` commands in an empty folder outside this repository: inside it, npm would
+run the local copy. After the first one, take the "not on npm yet" wording out of
+`docs/content/guide/installation.md`, `README.md` and this file.
 
 After the first release, switch to trusted publishing so no token is stored: on npmjs.com, open the package's
 settings, add a trusted publisher for this repository, and publish from a workflow that runs on version tags with
-`id-token: write` permission and `npm publish -w shabd --provenance --access public`.
+`id-token: write` permission and `npm publish -w packages/shabd --provenance --access public`.
 
 ### 6. Add the community files
 

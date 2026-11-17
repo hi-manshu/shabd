@@ -1,14 +1,14 @@
 /**
  * Writes a new Shabd site into a folder.
  *
- *     npm create shabd my-docs
+ *     npm create @himanshoe/shabd my-docs
  *
  * The site is the contents of ../template, copied with two things filled in:
  * the site's title and its theme preset. A package.json is written beside
  * them. Nothing here depends on Shabd itself, so the starter stays a few
  * kilobytes; `shabd check` in the new site is what validates the result.
  */
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,7 +16,17 @@ import { parseArgs } from 'node:util'
 
 const TEMPLATE = fileURLToPath(new URL('../template', import.meta.url))
 
-/** The version of Shabd a new site asks for, unless `--shabd` says otherwise. */
+/**
+ * `@scope/create-x` starts sites that use `@scope/x`, and `create-x` sites that use `x`. Shabd is published
+ * under more than one name, each with its starter, and this is how a starter knows which one it belongs to.
+ */
+export function packageStartedBy(starter) {
+  return starter.replace(/^(@[^/]+\/)?create-/, '$1')
+}
+
+/** The package a new site depends on: the one this starter is published beside. */
+export const SHABD_PACKAGE = packageStartedBy(JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).name)
+/** The version of it a new site asks for, unless `--shabd` says otherwise. */
 export const SHABD_RANGE = '^0.1.0'
 /** What Shabd needs beside it. Kept equal to its peer dependencies by a test. */
 export const PEERS = { react: '^19.3.1', 'react-dom': '^19.3.1' }
@@ -27,15 +37,15 @@ const HARMLESS = new Set(['.git', '.DS_Store'])
 const RENAMED = { _gitignore: '.gitignore' }
 
 const HELP = `Usage: create-shabd [directory] [options]
-       npm create shabd@latest [directory] -- [options]
+       npm create ${SHABD_PACKAGE}@latest [directory] -- [options]
 
 Writes a small Shabd site into the directory (default: my-docs).
 
 Options:
   --title <text>    The site's title (default: taken from the directory name)
   --preset <name>   A built-in theme, such as forest or macos (default: shabd)
-  --shabd <spec>    What to install as "shabd": a version range, or a path or
-                    tarball of a local build (default: ${SHABD_RANGE})
+  --shabd <spec>    What to install as ${SHABD_PACKAGE}: a version range, or a
+                    path or tarball of a local build (default: ${SHABD_RANGE})
   --force           Write into a directory that is not empty. Files that are
                     already there are kept, not replaced.
   -h, --help        Show this help
@@ -91,7 +101,12 @@ export async function create(options) {
   }
 
   // Both go into YAML. A JSON string is also a YAML string, whatever characters it holds.
-  const values = { title: JSON.stringify(title), description: JSON.stringify(`Documentation for ${title}.`), preset }
+  const values = {
+    title: JSON.stringify(title),
+    description: JSON.stringify(`Documentation for ${title}.`),
+    preset,
+    package: SHABD_PACKAGE,
+  }
   const fill = (text) => text.replace(/\{\{(\w+)\}\}/g, (whole, key) => values[key] ?? whole)
 
   const files = new Map()
@@ -107,7 +122,7 @@ export async function create(options) {
         private: true,
         type: 'module',
         scripts: { dev: 'shabd dev', build: 'shabd build', preview: 'shabd preview', check: 'shabd check' },
-        dependencies: { ...PEERS, shabd: options.shabd ?? SHABD_RANGE },
+        dependencies: { ...PEERS, [SHABD_PACKAGE]: options.shabd ?? SHABD_RANGE },
       },
       null,
       2,
@@ -153,10 +168,10 @@ export async function main(argv, print = console.log, printError = console.error
     return 0
   }
   if (parsed.positionals.length > 1) {
-    // `npm create shabd my-docs --preset forest` reaches us as `my-docs forest`: npm keeps the option's name.
+    // `npm create <name> my-docs --preset forest` reaches us as `my-docs forest`: npm keeps the option's name.
     printError(
       `Expected one directory, got ${parsed.positionals.length}: ${parsed.positionals.join(' ')}\n` +
-        `Through npm create, options need "--" before them: npm create shabd@latest my-docs -- --preset forest\n\n${HELP}`,
+        `Through npm create, options need "--" before them: npm create ${SHABD_PACKAGE}@latest my-docs -- --preset forest\n\n${HELP}`,
     )
     return 1
   }

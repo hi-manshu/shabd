@@ -44,7 +44,7 @@ import { loadConfig, loadSidebar, type ResolvedConfig } from '../config/load.js'
 import { compilePage, createContext, type ShabdContext } from '../context.js'
 import { MDX_COMPONENTS_ID } from '../markdown/compile.js'
 import { HMR_RUNTIME_ID, PAGE_ERROR_ID, toErrorModule, toPageModule } from '../markdown/page-module.js'
-import { CLIENT_DIR, CLIENT_ENTRY, PACKAGE_ROOT, resolveFromPackage, SERVER_ENTRY } from '../paths.js'
+import { CLIENT_DIR, CLIENT_ENTRY, PACKAGE_ROOT, packageName, resolveFromPackage, SERVER_ENTRY } from '../paths.js'
 import { devMiddlewares } from './dev-middleware.js'
 
 export interface ShabdPluginOptions {
@@ -138,13 +138,14 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
             'react/jsx-runtime',
             'react/jsx-dev-runtime',
             // Loaded lazily, so Vite would only discover them mid-session and reload the page.
-            ...(config.config.features.sandbox.enabled ? ['shabd > sucrase'] : []),
+            ...(config.config.features.sandbox.enabled ? [`${packageName()} > sucrase`] : []),
             ...(config.config.features.search.semantic && hasPackage(config.root, TRANSFORMERS) ? [TRANSFORMERS] : []),
           ],
           // SQLite finds its .wasm file next to its own module, which pre-bundling would move.
-          exclude: ['shabd', SQLITE],
+          // This package ships its browser code as source, which the site's own build compiles.
+          exclude: [packageName(), SQLITE],
         },
-        ssr: { noExternal: ['shabd', /^@fontsource/] },
+        ssr: { noExternal: [packageName(), /^@fontsource/] },
         // The search worker loads its model lazily, which needs an ES-module
         // worker; and worker bundles get their own plugin list.
         worker: { format: 'es', plugins: () => [workerModules(ctx)] },

@@ -8,14 +8,15 @@
     "docs"
   ],
   "scripts": {
-    "build": "npm run build -w shabd",
-    "dev": "npm run build -w shabd && npm run dev -w docs",
-    "docs:build": "npm run build -w shabd && npm run build -w docs",
+    "build": "npm run build -w packages/shabd",
+    "dev": "npm run build -w packages/shabd && npm run dev -w docs",
+    "docs:build": "npm run build -w packages/shabd && npm run build -w docs",
     "docs:preview": "npm run preview -w docs",
     "test": "vitest run",
-    "typecheck": "npm run typecheck -w shabd",
-    "test:e2e": "npm run build -w shabd && playwright test",
-    "logo": "node scripts/logo/make-logo.mjs"
+    "typecheck": "npm run typecheck -w packages/shabd",
+    "test:e2e": "npm run build -w packages/shabd && playwright test",
+    "logo": "node scripts/logo/make-logo.mjs",
+    "release": "node scripts/release/publish.mjs"
   },
   "engines": {
     "node": ">=22"

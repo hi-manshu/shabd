@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=./node_modules/shabd/schemas/config.schema.json
+# yaml-language-server: $schema=./node_modules/{{package}}/schemas/config.schema.json
 #
 # The whole site is configured here. Only `site.title` is required.
 # Shabd's documentation describes every key, under Configuration.

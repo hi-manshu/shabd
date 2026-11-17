@@ -65,8 +65,8 @@ packed file, because it is not on npm yet:
 
 ```sh
 npm run build
-npm pack -w shabd --pack-destination ..
-node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../shabd-0.1.0.tgz
+npm pack -w packages/shabd --pack-destination ..
+node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../himanshoe-shabd-0.1.0.tgz
 ```
 
 ```sh
@@ -81,7 +81,7 @@ npm run docs:preview # serve docs/dist, including /mcp
 
 ```text
 shabd/
-├── packages/shabd/                 the framework (npm package "shabd")
+├── packages/shabd/                 the framework (npm package "@himanshoe/shabd")
 │   ├── bin/shabd.js                CLI entry
 │   ├── schemas/                    JSON Schemas for editor autocompletion (generated)
 │   ├── src/
@@ -110,7 +110,7 @@ shabd/
 │   │       ├── sandbox/            live code sandboxes
 │   │       └── styles/             the default theme
 │   └── test/                       unit and integration tests
-├── packages/create-shabd/          the starter (npm package "create-shabd")
+├── packages/create-shabd/          the starter (npm package "@himanshoe/create-shabd")
 │   ├── src/create.js               writes a new site; no dependencies
 │   └── template/                   the files it copies, laid out as the site they become
 ├── scripts/logo/                   draws the logo files

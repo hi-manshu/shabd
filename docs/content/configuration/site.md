@@ -44,7 +44,7 @@ To get completion and validation while you type, point your editor's YAML langua
 with Shabd:
 
 ```yaml title="shabd.config.yaml"
-# yaml-language-server: $schema=./node_modules/shabd/schemas/config.schema.json
+# yaml-language-server: $schema=./node_modules/@himanshoe/shabd/schemas/config.schema.json
 ```
 
 ## site

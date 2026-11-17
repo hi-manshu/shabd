@@ -1,7 +1,7 @@
 /**
  * Programmatic API.
  *
- *     import { build, dev, loadConfig } from 'shabd'
+ *     import { build, dev, loadConfig } from '@himanshoe/shabd'
  */
 export { build, type BuildOptions } from './build/build.js'
 export { preview, type PreviewOptions } from './build/preview.js'

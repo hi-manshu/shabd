@@ -7,6 +7,9 @@ import { BUILTIN_BLOCKS, BUILTIN_LAYOUTS } from '../src/shared/blocks.js'
 import { BUILTIN_LAYOUT_DEFINITIONS, resolveLayouts, resolvePageLayout } from '../src/shared/layout.js'
 import { FrontmatterSchema, type FrontmatterInput } from '../src/shared/schema.js'
 import { VERSION } from '../src/shared/version.js'
+import { packageName } from '../src/node/paths.js'
+// @ts-expect-error A plain script: it has no types of its own.
+import { PACKAGES, aliasNote, renamed } from '../../../scripts/release/publish.mjs'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (file: string) => readFileSync(path.join(root, file), 'utf8')
@@ -14,6 +17,30 @@ const read = (file: string) => readFileSync(path.join(root, file), 'utf8')
 describe('package', () => {
   it('reports the version from package.json', () => {
     expect(VERSION).toBe((JSON.parse(read('package.json')) as { version: string }).version)
+  })
+
+  it('knows its own name, and can be given a second one without a trace of the first', () => {
+    const { name } = JSON.parse(read('package.json')) as { name: string }
+    expect(packageName()).toBe(name)
+    expect(name).toBe('@himanshoe/shabd')
+
+    // The release script publishes each package again under a second name, by changing the name in every file.
+    const starter = (JSON.parse(read('../create-shabd/package.json')) as { name: string }).name
+    const names = [
+      [name, PACKAGES[0].alias],
+      [starter, PACKAGES[1].alias],
+    ]
+    expect(names).toEqual([
+      ['@himanshoe/shabd', 'shabd-docs'],
+      ['@himanshoe/create-shabd', 'create-shabd-docs'],
+    ])
+    const text = `import x from '${name}/client' // npm create ${name}@latest runs ${starter}`
+    expect(renamed(text, names)).toBe(`import x from 'shabd-docs/client' // npm create shabd-docs@latest runs create-shabd-docs`)
+    // Nothing in what is published may still carry the first name afterwards.
+    for (const file of ['package.json', 'README.md', 'src/client/virtual.d.ts', '../create-shabd/src/create.js', '../create-shabd/README.md']) {
+      expect(renamed(read(file), names), file).not.toContain('@himanshoe/')
+    }
+    expect(aliasNote('shabd-docs', name)).toContain('https://www.npmjs.com/package/@himanshoe/shabd')
   })
 
   it('builds itself before it is packed, so a publish cannot ship an old build', () => {

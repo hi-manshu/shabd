@@ -11,7 +11,7 @@ npm run dev
 source behave differently while it runs:
 
 - `packages/shabd/src/client` and `src/shared` are served as source. Edits show up in the browser straight away.
-- `packages/shabd/src/node` runs from `dist/`. Run `npm run dev -w shabd` in a second terminal to recompile it on
+- `packages/shabd/src/node` runs from `dist/`. Run `npm run dev -w packages/shabd` in a second terminal to recompile it on
   save, then restart the dev server.
 
 ## Before you open a pull request

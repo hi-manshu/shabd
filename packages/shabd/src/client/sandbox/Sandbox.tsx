@@ -52,7 +52,9 @@ export default function Sandbox({ code: authored, title, group: groupName }: San
         const scope: Record<string, unknown> = { useShared }
         for (const [name, value] of Object.entries(components)) if (/^[A-Z]/.test(name)) scope[name] = value
 
-        compileSnippet(code, scope, { 'shabd/client': { useShared } }).then(
+        // A snippet may import what it uses. `shabd/client` is the short name, good on any site; the other
+        // is what this package is called on npm, for a snippet copied from a component file.
+        compileSnippet(code, scope, { 'shabd/client': { useShared }, '@himanshoe/shabd/client': { useShared } }).then(
           (Example) => {
             if (!current) return
             setBuilt({ Example, version: ++version.current })

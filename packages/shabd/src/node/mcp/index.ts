@@ -1,7 +1,7 @@
 /**
  * Public API for hosting the docs MCP endpoint yourself.
  *
- *     import { createMcpHandler, staticDocsFrom } from 'shabd/mcp'
+ *     import { createMcpHandler, staticDocsFrom } from '@himanshoe/shabd/mcp'
  *
  * Nothing exported here touches the file system or any other Node built-in,
  * so the handler can be deployed to an edge or serverless function. Give it

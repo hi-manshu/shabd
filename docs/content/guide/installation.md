@@ -18,18 +18,18 @@ git clone https://github.com/hi-manshu/shabd.git
 cd shabd
 npm install
 npm run build
-npm pack -w shabd --pack-destination ..
-node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../shabd-0.1.0.tgz
+npm pack -w packages/shabd --pack-destination ..
+node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../himanshoe-shabd-0.1.0.tgz
 cd ../my-docs
 npm install
 npm run dev
 ```
 
-Once `shabd` and `create-shabd` are published, one command is meant to replace the first six lines. It cannot be
-tried before then:
+Once `@himanshoe/shabd` and its starter are published, one command is meant to replace the first six lines. It
+cannot be tried before then:
 
 ```sh
-npm create shabd@latest my-docs
+npm create @himanshoe/shabd@latest my-docs
 ```
 
 | Option | Meaning |
@@ -42,7 +42,7 @@ npm create shabd@latest my-docs
 Through `npm create`, the options need `--` before them, or npm keeps them for itself:
 
 ```sh
-npm create shabd@latest my-docs -- --preset forest
+npm create @himanshoe/shabd@latest my-docs -- --preset forest
 ```
 
 The starter refuses a directory that already has files in it unless you pass `--force`. A `.git` folder does not
@@ -55,11 +55,11 @@ A site needs very little. Make a folder and install Shabd with React:
 ```sh
 mkdir my-docs && cd my-docs
 npm init -y
-npm install shabd react react-dom
+npm install @himanshoe/shabd react react-dom
 ```
 
-Until Shabd is on npm, give the path of the packed file from the steps above in place of the name `shabd`:
-`npm install ../shabd-0.1.0.tgz react react-dom`.
+Until Shabd is on npm, give the path of the packed file from the steps above in place of the name:
+`npm install ../himanshoe-shabd-0.1.0.tgz react react-dom`.
 
 Add the one required file. `site.title` is the only key Shabd insists on.
 
