@@ -36,7 +36,7 @@ import {
   type PluginOption,
   type ViteDevServer,
 } from 'vite'
-import { normalizePath as normalizeRoute, stripBase, withBase } from '../../shared/paths.js'
+import { normalizePath as normalizeRoute, siteHref, stripBase } from '../../shared/paths.js'
 import { codeBackgrounds } from '../../shared/presets.js'
 import { renderDocument } from '../build/html.js'
 import { isShabdError } from '../config/errors.js'
@@ -379,7 +379,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
             const redirect = page ? undefined : config.redirects.find((entry) => entry.from === route)
             if (redirect) {
               res.statusCode = 302
-              res.setHeader('Location', redirect.external ? redirect.to : withBase(site.base, redirect.to))
+              res.setHeader('Location', siteHref(redirect.to, site, (path) => store.byPath(path) !== undefined))
               res.end()
               return
             }

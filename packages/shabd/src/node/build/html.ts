@@ -3,7 +3,7 @@
  * client renders) and by the static build (prerendered body, client hydrates).
  */
 import type { HeadTag, ShabdConfig } from '../../shared/schema.js'
-import { withBase } from '../../shared/paths.js'
+import { siteHref, withBase } from '../../shared/paths.js'
 import { colorModeScript, themeBaseCss, themeToCss } from '../config/theme-css.js'
 
 export interface DocumentOptions {
@@ -66,7 +66,7 @@ export function renderDocument(options: DocumentOptions): string {
   // `system` is resolved in the browser; a fixed default is set here so the
   // page is correct even before (or without) JavaScript.
   const themeAttribute = theme.colorMode.default === 'system' ? '' : ` data-theme="${theme.colorMode.default}"`
-  const canonical = site.url ? new URL(withBase(site.base, options.path), site.url).href : undefined
+  const canonical = site.url ? new URL(siteHref(options.path, site, () => true), site.url).href : undefined
 
   const head = [
     '<meta charset="utf-8">',

@@ -55,6 +55,7 @@ with Shabd:
 | `description` | empty | Default meta description, and the summary in `llms.txt` |
 | `url` | none | The deployed origin, such as `https://docs.example.com`. Needed for canonical URLs, `sitemap.xml` and absolute links in `llms.txt` |
 | `base` | `/` | The path the site is served from, such as `/docs/` |
+| `urls` | `clean` | How a page's address is written: `clean`, `slash` or `html`. See [addresses](#addresses) |
 | `lang` | `en` | The `lang` attribute of every page |
 | `logo` | none | A path to an image, or the [settings below](#logo) |
 | `favicon` | none | A path to an icon in `public/` |
@@ -90,6 +91,30 @@ site:
 | `replacesTitle` | `false` | Show the logo without the site title beside it. The title becomes the image's `alt` unless you set one |
 
 The files go in `public/`. Any format a browser shows as an image works, and an SVG may carry its own animation.
+
+### Addresses
+
+`urls` decides how the address of a page is written, and with it the file a build writes the page to.
+
+| `urls` | Address of `guide/install.md` | File in `dist/` |
+| --- | --- | --- |
+| `clean` | `/guide/install` | `guide/install/index.html` |
+| `slash` | `/guide/install/` | `guide/install/index.html` |
+| `html` | `/guide/install.html` | `guide/install.html` |
+
+Links in pages, the sidebar, canonical addresses, the sitemap and [redirects](#redirects) all follow the setting.
+Your Markdown does not change: you keep linking to pages by their file path. The home page is the folder the site is
+served from in every style.
+
+Which one suits depends on the host:
+
+- `clean` is the default. It needs a host that answers `/guide/install` with the `index.html` in that folder.
+- `slash` is for a host that first redirects `/guide/install` to `/guide/install/`. GitHub Pages does. With `clean`
+  a reader arriving from another site makes that extra stop there, and the canonical address of each page is one
+  that redirects.
+- `html` is for a host that serves a file under its exact name and nothing else.
+
+`shabd dev` answers all three forms of an address whatever the setting, and so does navigation inside the site.
 
 ### Head tags
 

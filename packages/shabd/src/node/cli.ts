@@ -82,7 +82,8 @@ export async function main(argv: string[]): Promise<void> {
       }
       case 'preview': {
         const { preview } = await import('./build/preview.js')
-        await preview(root, { port, host })
+        const server = await preview(root, { port, host })
+        server.printUrls()
         break
       }
       case 'check': {

@@ -8,7 +8,7 @@
  * Both are generated from the same sidebar the reader sees, so the order an
  * agent reads in is the order the author intended.
  */
-import { withBase } from '../../shared/paths.js'
+import { siteHref, withBase } from '../../shared/paths.js'
 import type { SidebarNode, SidebarPage } from '../../shared/types.js'
 import type { ShabdContext } from '../context.js'
 import type { PageRecord } from '../content/store.js'
@@ -24,6 +24,13 @@ export function publicUrl(context: ShabdContext, sitePath: string): string {
   const { url, base } = context.config.config.site
   const pathname = withBase(base, sitePath)
   return url ? new URL(pathname, url).href : pathname
+}
+
+/** A page's own address, written the way `site.urls` writes pages. Absolute when `site.url` is set. */
+export function pageAddress(context: ShabdContext, routePath: string): string {
+  const { site } = context.config.config
+  const pathname = siteHref(routePath, site, () => true)
+  return site.url ? new URL(pathname, site.url).href : pathname
 }
 
 interface Section {
@@ -98,7 +105,7 @@ export function renderLlmsFull(context: ShabdContext): string {
 
   const out = [`# ${site.title}`, site.description ? `> ${site.description}` : '']
   for (const page of ordered) {
-    out.push(`---\n\nSource: ${publicUrl(context, page.path)}\n\n${pageMarkdown(page).trim()}`)
+    out.push(`---\n\nSource: ${pageAddress(context, page.path)}\n\n${pageMarkdown(page).trim()}`)
   }
   return `${out.filter(Boolean).join('\n\n')}\n`
 }

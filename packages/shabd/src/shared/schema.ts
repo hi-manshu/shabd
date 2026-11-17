@@ -17,6 +17,7 @@
 import { z } from 'zod'
 import { BADGE_VARIANTS, normalizeBadge, type Badge, type BadgeVariant } from './badge.js'
 import { REGIONS } from './blocks.js'
+import { URL_STYLES } from './paths.js'
 import {
   CODE_FRAMES,
   COLOR_TOKENS,
@@ -205,6 +206,12 @@ const SiteSchema = z.strictObject({
     .string()
     .default('/')
     .transform((b) => `/${b.replace(/^\/+|\/+$/g, '')}/`.replace(/\/{2,}/g, '/')),
+  /**
+   * How a page's address is written. `clean`: `/guide/install`. `slash`:
+   * `/guide/install/`. `html`: `/guide/install.html`, written as a file of
+   * that name. Which one suits depends on the host.
+   */
+  urls: z.enum(URL_STYLES).default('clean'),
   lang: z.string().min(2).default('en'),
   logo: LogoSchema.optional(),
   favicon: z.string().optional(),

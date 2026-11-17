@@ -22,6 +22,15 @@
           "default": "/",
           "type": "string"
         },
+        "urls": {
+          "default": "clean",
+          "type": "string",
+          "enum": [
+            "clean",
+            "slash",
+            "html"
+          ]
+        },
         "lang": {
           "default": "en",
           "type": "string",

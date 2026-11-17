@@ -1,13 +1,16 @@
 import type { ComponentProps } from 'react'
-import { isExternal, withBase } from '../../shared/paths.js'
+import { isExternal, siteHref } from '../../shared/paths.js'
 import { useSite } from '../app/store.js'
 
 const WEB_LINK = /^(?:https?:)?\/\//i
 
-/** Turn a route path into an href under the site's base path. */
+/**
+ * Turn a path inside the site into an href: the site's base goes in front,
+ * and a path that is a page is written the way `site.urls` writes pages.
+ */
 export function useHref(): (path: string) => string {
-  const base = useSite().site.base
-  return (path) => withBase(base, path)
+  const { site, pages } = useSite()
+  return (path) => siteHref(path, site, (route) => Object.hasOwn(pages, route))
 }
 
 /**

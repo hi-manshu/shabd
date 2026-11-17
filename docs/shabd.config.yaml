@@ -10,6 +10,8 @@ site:
   # Used for canonical URLs, the sitemap, llms.txt and MCP.
   url: https://hi-manshu.github.io
   base: /shabd/
+  # GitHub Pages redirects /guide/installation to /guide/installation/, so addresses are written that way to begin with.
+  urls: slash
   lang: en
   logo:
     light: /logo-light.svg

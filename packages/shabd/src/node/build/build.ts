@@ -15,13 +15,13 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import pc from 'picocolors'
 import { build as viteBuild } from 'vite'
-import { withBase } from '../../shared/paths.js'
+import { pageFile, siteHref, withBase } from '../../shared/paths.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
 import type { RenderedPage } from '../../shared/types.js'
 import { collectProblems, formatProblem } from '../check.js'
 import { themePaletteCss } from '../config/theme-css.js'
 import { createContext, type ShabdContext } from '../context.js'
-import { markdownPath, publicUrl, renderLlmsFull, renderLlmsTxt } from '../llms/llms-txt.js'
+import { markdownPath, pageAddress, publicUrl, renderLlmsFull, renderLlmsTxt } from '../llms/llms-txt.js'
 import { pageMarkdown } from '../llms/markdown.js'
 import { DOCS_FILE, SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, type DocsFile } from '../mcp/source.js'
 import { SearchService } from '../search/service.js'
@@ -105,8 +105,8 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
     })
   }
 
-  /** The file a static host serves for a route: `/guide/install` is `guide/install/index.html`. */
-  const routeFile = (routePath: string) => (routePath === '/' ? 'index.html' : `${routePath.slice(1)}/index.html`)
+  /** The file a static host serves for a route. Which file that is follows from `site.urls`. */
+  const routeFile = (routePath: string) => pageFile(routePath, config.config.site.urls)
 
   for (const page of pages) {
     const html = await renderRoute(page.path, page.file)
@@ -124,7 +124,7 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   // the redirect over it is reported with the other problems.
   const redirects = config.redirects.filter((redirect) => !store.byPath(redirect.from))
   for (const redirect of redirects) {
-    const target = redirect.external ? redirect.to : withBase(config.config.site.base, redirect.to)
+    const target = siteHref(redirect.to, config.config.site, (route) => store.byPath(route) !== undefined)
     await write(routeFile(redirect.from), renderRedirect(config.config, target))
   }
   if (redirects.length) step(`${redirects.length} ${redirects.length === 1 ? 'redirect' : 'redirects'}`)
@@ -199,7 +199,7 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   const listed = site.noindex ? [] : pages.filter((page) => !page.frontmatter.noindex)
   const hasSitemap = site.url !== undefined && listed.length > 0
   if (hasSitemap) {
-    await write('sitemap.xml', renderSitemap(listed.map((page) => ({ loc: publicUrl(context, page.path) }))))
+    await write('sitemap.xml', renderSitemap(listed.map((page) => ({ loc: pageAddress(context, page.path) }))))
   }
 
   // A robots.txt in public/ is the site's own, and was copied into dist/ with the other files there.
