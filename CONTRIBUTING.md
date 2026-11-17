@@ -65,6 +65,43 @@ changed.
 The site in `docs/` is the documentation and the test bed. A feature is not finished until a page there uses it.
 Describe what Shabd does today, and say so plainly when something is untested or has a limit.
 
+## Releasing
+
+Shabd is on npm under two names, each with its starter, so a release is four packages: `@himanshoe/shabd`,
+`@himanshoe/create-shabd`, `shabd-docs` and `create-shabd-docs`. `scripts/release/publish.mjs` publishes them from
+one source, and skips a version that is already on npm.
+
+**From GitHub.** Actions → Release → Run workflow, with the version, such as `0.1.1`. Tick "dry run" to try it:
+every step runs, and nothing is committed, tagged or published. Only the repository's owner can run it. The
+workflow sets the version everywhere it is written, runs the checks, commits and tags the version, and publishes.
+
+npm has to be told once that this workflow may publish. On npmjs.com, for each of the four packages: **Settings →
+Trusted Publisher → GitHub Actions**, with
+
+| Field | Value |
+| --- | --- |
+| Organization or user | `hi-manshu` |
+| Repository | `shabd` |
+| Workflow filename | `release.yml` |
+| Allowed actions | allow `npm publish` |
+
+npm drops a trusted publisher that has not published within two days of being added, so add them when a release is
+due. Until they are there, the workflow's publish step fails and nothing goes out.
+
+**From your machine.** No setup, but npm asks for your second factor:
+
+```sh
+node scripts/release/set-version.mjs 0.1.1
+npm test
+git commit -am "Release 0.1.1" && git tag v0.1.1 && git push origin main v0.1.1
+npm run release
+```
+
+`npm run release -- --dry-run` prepares the four packages and publishes nothing.
+
+After a release, run both `npm create` commands in an empty folder outside this repository: inside it, npm would
+run the local copy.
+
 ## Repository layout
 
 ```text

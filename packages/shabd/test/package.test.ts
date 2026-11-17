@@ -10,6 +10,8 @@ import { VERSION } from '../src/shared/version.js'
 import { packageName } from '../src/node/paths.js'
 // @ts-expect-error A plain script: it has no types of its own.
 import { PACKAGES, aliasNote, renamed } from '../../../scripts/release/publish.mjs'
+// @ts-expect-error A plain script: it has no types of its own.
+import { PLACES, isBefore, plan } from '../../../scripts/release/set-version.mjs'
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..')
 const read = (file: string) => readFileSync(path.join(root, file), 'utf8')
@@ -41,6 +43,35 @@ describe('package', () => {
       expect(renamed(read(file), names), file).not.toContain('@himanshoe/')
     }
     expect(aliasNote('shabd-docs', name)).toContain('https://www.npmjs.com/package/@himanshoe/shabd')
+  })
+
+  it('can be given its next version in every place that holds one', async () => {
+    const { version } = JSON.parse(read('package.json')) as { version: string }
+    const [major, minor, patch] = version.split('.').map(Number) as [number, number, number]
+    const next = `${major}.${minor}.${patch + 1}`
+
+    const { current, changes } = (await plan(next)) as { current: string; changes: { file: string; before: string; after: string }[] }
+    expect(current).toBe(version)
+    expect(changes.map((change) => change.file)).toEqual(PLACES.map(([file]: [string]) => file))
+    for (const { file, before, after } of changes) {
+      expect(after, file).not.toBe(before)
+      expect(after, file).toContain(next)
+      // Nothing but the version moves: the same number of lines, and the old version gone from where it was.
+      expect(after.split('\n').length, file).toBe(before.split('\n').length)
+    }
+    expect(JSON.parse(changes.find((change) => change.file === 'packages/create-shabd/package.json')!.after).version).toBe(next)
+    expect(changes.find((change) => change.file === 'packages/create-shabd/src/create.js')!.after).toContain(`SHABD_RANGE = '^${next}'`)
+
+    // The version that is already set changes nothing, so a release can be run a second time.
+    const again = (await plan(version)) as { changes: { file: string; before: string; after: string }[] }
+    for (const { file, before, after } of again.changes) expect(after, file).toBe(before)
+
+    await expect(plan('1.0')).rejects.toThrow(/not a version/)
+    await expect(plan('v1.0.0')).rejects.toThrow(/not a version/)
+    await expect(plan('0.0.9')).rejects.toThrow(/comes before/)
+    expect(isBefore('0.1.0', '0.1.1')).toBe(true)
+    expect(isBefore('0.10.0', '0.9.9')).toBe(false)
+    expect(isBefore('1.0.0', '1.0.0')).toBe(false)
   })
 
   it('builds itself before it is packed, so a publish cannot ship an old build', () => {

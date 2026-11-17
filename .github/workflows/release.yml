@@ -1,0 +1,72 @@
+# Publishes a new version of Shabd to npm.
+#
+# It is started by hand, with the version to release: Actions → Release →
+# Run workflow. Only the repository's owner can run it. A run that anyone
+# else starts does nothing.
+#
+# It sets the version, runs the checks, commits and tags the version, and
+# publishes the four packages (scripts/release/publish.mjs says which).
+# GitHub itself tells npm who is publishing: each package on npmjs.com names
+# this workflow as a trusted publisher, so no token is stored anywhere.
+# CONTRIBUTING.md, under "Releasing", has what to set up on npmjs.com first.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, such as 0.1.1
+        required: true
+        type: string
+      dry_run:
+        description: Try it out. Runs every step, but commits, tags and publishes nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # the commit that sets the version, and its tag
+  id-token: write # npm trusted publishing
+
+# One release at a time, and never cut one short.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or newer, which is newer than the npm that comes with Node 22.
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - run: node scripts/release/set-version.mjs "$VERSION"
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm test
+      - run: node packages/shabd/bin/shabd.js check docs
+
+      # Run again after a release stopped half way, there is nothing new to commit and the tag is there already.
+      - name: Commit and tag the version
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR_ID+$GITHUB_ACTOR@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Release $VERSION"
+          git push origin HEAD:main
+          if [ -z "$(git ls-remote --tags origin "v$VERSION")" ]; then
+            git tag "v$VERSION"
+            git push origin "v$VERSION"
+          fi
+
+      - name: Publish
+        run: node scripts/release/publish.mjs ${{ inputs.dry_run && '--dry-run' || '' }}

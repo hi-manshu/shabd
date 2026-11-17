@@ -19,6 +19,10 @@
  * Run it in a terminal of your own: npm asks for the account's second factor
  * before a package goes out. A version that is already on npm is skipped, so
  * running it again after something went wrong picks up where it stopped.
+ *
+ * The Release workflow on GitHub runs it too (.github/workflows/release.yml).
+ * There nobody is logged in: each package on npmjs.com names that workflow
+ * as a trusted publisher.
  */
 import { spawnSync } from 'node:child_process'
 import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -83,9 +87,14 @@ async function main(argv) {
   if (!dryRun) {
     const dirty = run('git', ['status', '--porcelain']).stdout.trim()
     if (dirty) throw new Error(`The working tree has changes that are not committed. Publish what a commit holds:\n${dirty}`)
-    const who = run('npm', ['whoami'])
-    if (who.status !== 0) throw new Error('Not logged in to npm. Run `npm login` first.')
-    console.log(`Publishing as ${who.stdout.trim()}.\n`)
+    // In the release workflow nobody is logged in: npm takes GitHub's word for which workflow is publishing.
+    if (process.env.GITHUB_ACTIONS) {
+      console.log('Publishing from GitHub Actions, as a trusted publisher.\n')
+    } else {
+      const who = run('npm', ['whoami'])
+      if (who.status !== 0) throw new Error('Not logged in to npm. Run `npm login` first.')
+      console.log(`Publishing as ${who.stdout.trim()}.\n`)
+    }
   }
 
   const work = out ? path.resolve(out) : await mkdtemp(path.join(tmpdir(), 'shabd-release-'))
