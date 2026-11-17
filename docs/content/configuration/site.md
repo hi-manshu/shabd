@@ -276,6 +276,7 @@ Mistakes are reported in three places:
 | `remarkPlugins` | none | Plugins that work on the Markdown of a page |
 | `rehypePlugins` | none | Plugins that work on the HTML made from it |
 | `math` | `false` | Typeset [maths](../guide/writing/markdown.md#maths) written between dollar signs |
+| `mermaid` | `false` | Draw `mermaid` fences as [diagrams](../guide/writing/markdown.md#diagrams) |
 
 Shabd's Markdown pipeline is [remark](https://github.com/remarkjs/remark) and
 [rehype](https://github.com/rehypejs/rehype), and their plugins can be added to it by name. A plugin is a package

@@ -33,6 +33,7 @@ export async function createContext(root: string, options: { dev: boolean }): Pr
     wrap: theme.code.wrap,
     lineNumbers: theme.code.lineNumbers,
     sandbox: config.config.features.sandbox.enabled,
+    mermaid: config.config.markdown.mermaid,
     // A plugin that was edited or upgraded compiles pages differently from the one before it.
     fingerprint: plugins.fingerprint ? `${config.compileFingerprint}:${plugins.fingerprint}` : config.compileFingerprint,
     cacheDir: path.join(config.cacheDir, 'pages'),

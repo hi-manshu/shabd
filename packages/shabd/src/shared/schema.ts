@@ -667,6 +667,8 @@ const MarkdownSchema = z.strictObject({
   rehypePlugins: z.array(PluginRefSchema).default([]),
   /** Typeset maths written between dollar signs. Needs `remark-math` and `rehype-katex` installed. */
   math: z.boolean().default(false),
+  /** Draw ```` ```mermaid ```` fences as diagrams, in the reader's browser. Needs `mermaid` installed. */
+  mermaid: z.boolean().default(false),
 })
 
 /* ──────────────────────────────── variables ───────────────────────────── */

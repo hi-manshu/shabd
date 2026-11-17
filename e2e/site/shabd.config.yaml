@@ -35,6 +35,9 @@ features:
   studio: { sync: peers }
   feed: true
 
+markdown:
+  mermaid: true
+
 redirects:
   /guide/start: /guide/intro
   /old-setup: /guide/setup#second-step

@@ -1694,6 +1694,10 @@
         "math": {
           "default": false,
           "type": "boolean"
+        },
+        "mermaid": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false

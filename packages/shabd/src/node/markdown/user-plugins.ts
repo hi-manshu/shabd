@@ -118,5 +118,19 @@ export async function loadUserPlugins(config: ResolvedConfig): Promise<UserPlugi
     stamps.push(math.stamp, katex.stamp)
   }
 
+  // Mermaid runs in the browser, so there is nothing to load here. But a site that asks for diagrams
+  // and cannot draw them should hear of it now, not from a reader.
+  if (markdown.mermaid && !hasMermaid(config.root)) {
+    const at = ['markdown', 'mermaid']
+    throw new ShabdError(config.configFile, [
+      { path: at, message: 'Diagrams need the mermaid package. Install it in the site: npm install mermaid', ...config.locate(at) },
+    ])
+  }
+
   return { remark, rehype, rehypeBeforeCode, fingerprint: stamps.join('|') }
+}
+
+/** Is Mermaid installed where the site, or Shabd itself, can load it? */
+export function hasMermaid(root: string): boolean {
+  return resolvePlugin(root, 'mermaid') !== undefined
 }

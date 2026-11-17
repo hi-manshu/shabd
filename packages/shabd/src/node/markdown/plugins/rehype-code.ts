@@ -41,6 +41,8 @@ export interface CodeOptions {
   lineNumbers?: boolean
   /** Turn ```` ```tsx live ```` fences into <Sandbox> components. */
   sandbox: boolean
+  /** Turn ```` ```mermaid ```` fences into <Mermaid> components, which draw the diagram in the browser. */
+  mermaid?: boolean
 }
 
 const PLAIN_LANGUAGES = new Set(['', 'text', 'txt', 'plain', 'plaintext'])
@@ -280,6 +282,11 @@ export function rehypeCode(highlighter: CodeHighlighter) {
         const live = highlighter.options.sandbox && block.meta.flags.has('live') && SANDBOX_LANGUAGES.has(block.lang)
         if (live) {
           block.parent.children[block.index] = sandboxElement(block)
+          return
+        }
+        if (highlighter.options.mermaid && block.lang === 'mermaid') {
+          // A diagram, resolved from the MDX component map like a sandbox. It carries its source, and is drawn in the browser.
+          block.parent.children[block.index] = { type: 'element', tagName: 'Mermaid', properties: { code: block.code }, children: [] }
           return
         }
         const pre = await highlighter.highlight(block)

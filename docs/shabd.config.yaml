@@ -93,9 +93,11 @@ features:
   feed: true # rss.xml: the pages newest first, by the day each was last changed
   socialImages: true # a picture for each page, shown where it is shared; needs @resvg/resvg-js
 
-# Maths between dollar signs, typeset when the site is built. Needs remark-math and rehype-katex.
+# Maths between dollar signs, typeset when the site is built (needs remark-math and rehype-katex),
+# and ```mermaid fences drawn as diagrams in the reader's browser (needs mermaid).
 markdown:
   math: true
+  mermaid: true
 
 # Values a page uses by name. The installation page says which Node.js is needed with {{node}}.
 vars:

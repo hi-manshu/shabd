@@ -69,6 +69,27 @@ function Sandbox(props: { code: string; lang?: string; title?: string; group?: s
   )
 }
 
+// Mermaid is large, so it loads only on pages that have a diagram.
+const LazyMermaid = lazy(() => import('../mermaid/Mermaid.js'))
+
+function Mermaid(props: { code: string }) {
+  const hydrated = useHydrated()
+  const source = (
+    <figure className="sb-mermaid" data-pending="">
+      <pre className="sb-mermaid-source">
+        <code>{props.code}</code>
+      </pre>
+    </figure>
+  )
+  // A diagram is drawn in the browser. The prerendered page carries its source, for the reason a sandbox does.
+  if (!hydrated) return source
+  return (
+    <Suspense fallback={source}>
+      <LazyMermaid {...props} />
+    </Suspense>
+  )
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const components: Record<string, ComponentType<any>> = {
   h1: heading(1),
@@ -83,6 +104,7 @@ export const components: Record<string, ComponentType<any>> = {
   img: Image,
   Callout,
   Sandbox,
+  Mermaid,
   Badge,
   Card,
   CardGrid,

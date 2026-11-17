@@ -88,6 +88,57 @@ test.describe('tabs that follow each other', () => {
   })
 })
 
+test.describe('diagrams', () => {
+  const DIAGRAM = `${BUILT}/play/diagram`
+
+  test('a mermaid fence is drawn in the site\'s colours, and drawn again when they change', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' })
+    await open(page, DIAGRAM)
+    const diagram = page.locator('.sb-mermaid').first()
+    const drawing = diagram.locator('svg')
+    await expect(drawing).toBeVisible({ timeout: 20_000 })
+    await expect(drawing).toContainText('Markdown pages')
+    await expect(drawing).toContainText('shabd build')
+    // Once drawn, the source is gone from the page.
+    await expect(diagram.locator('.sb-mermaid-source')).toHaveCount(0)
+
+    // A node is filled with the theme's surface colour, whichever mode that is.
+    const surface = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--sb-surface').trim().toLowerCase())
+    const nodeFill = () =>
+      diagram
+        .locator('svg .node rect, svg .node polygon')
+        .first()
+        .evaluate((shape) => getComputedStyle(shape).fill)
+    const asRgb = (hex: string) => `rgb(${[1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16)).join(', ')})`
+    const light = await surface()
+    expect(await nodeFill()).toBe(asRgb(light))
+
+    await page.locator('.sb-theme-toggle').click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    const dark = await surface()
+    expect(dark).not.toBe(light)
+    await expect.poll(nodeFill).toBe(asRgb(dark))
+  })
+
+  test('a diagram that cannot be read keeps its source on the page and says what is wrong', async ({ page }) => {
+    await open(page, DIAGRAM)
+    const broken = page.locator('.sb-mermaid').nth(1)
+    await expect(broken.locator('.sb-mermaid-problem')).toBeVisible({ timeout: 20_000 })
+    await expect(broken.locator('.sb-mermaid-source')).toContainText('this is not --> a diagram')
+    await expect(broken.locator('svg')).toHaveCount(0)
+    // Mermaid leaves a picture of its error at the end of the page. It is cleared away.
+    await expect(page.locator('body > [id^="dsb-mermaid"], body > svg')).toHaveCount(0)
+  })
+
+  test('without JavaScript the page shows the source of the diagram', async ({ browser }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false })
+    const page = await context.newPage()
+    await page.goto(DIAGRAM)
+    await expect(page.locator('.sb-mermaid-source').first()).toContainText('flowchart LR')
+    await context.close()
+  })
+})
+
 test.describe('code that changed', () => {
   test('added and removed lines carry a sign and a bar, and nothing behind their text', async ({ page }) => {
     await open(page, PAGE)

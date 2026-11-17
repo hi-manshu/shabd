@@ -45,7 +45,7 @@ import { substituteVars } from '../content/vars.js'
 import { compilePage, createContext, type ShabdContext } from '../context.js'
 import { MDX_COMPONENTS_ID } from '../markdown/compile.js'
 import { HMR_RUNTIME_ID, PAGE_ERROR_ID, toErrorModule, toPageModule } from '../markdown/page-module.js'
-import { mathStylesheet } from '../markdown/user-plugins.js'
+import { hasMermaid, mathStylesheet } from '../markdown/user-plugins.js'
 import { CLIENT_DIR, CLIENT_ENTRY, PACKAGE_ROOT, packageName, resolveFromPackage, SERVER_ENTRY } from '../paths.js'
 import { devMiddlewares } from './dev-middleware.js'
 
@@ -64,6 +64,7 @@ const VIRTUAL = {
   fonts: 'virtual:shabd/fonts',
   styles: 'virtual:shabd/user-styles',
   math: 'virtual:shabd/math-styles',
+  mermaid: 'virtual:shabd/mermaid',
   embedder: 'virtual:shabd/embedder',
   sqlite: 'virtual:shabd/sqlite',
 } as const
@@ -121,6 +122,10 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
             emptyOutDir: true,
             manifest: true,
             rolldownOptions: { input: { app: CLIENT_ENTRY } },
+            // Mermaid comes in pieces, one per kind of diagram, and a reader's browser fetches the pieces a
+            // diagram needs. Two of them are large, and Vite would warn about each on every build of a
+            // site that draws diagrams, with advice that does not apply: they are already loaded on demand.
+            ...(config.config.markdown.mermaid ? { chunkSizeWarningLimit: 2000 } : {}),
           }
 
       return {
@@ -142,6 +147,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
             'react/jsx-dev-runtime',
             // Loaded lazily, so Vite would only discover them mid-session and reload the page.
             ...(config.config.features.sandbox.enabled ? [`${packageName()} > sucrase`] : []),
+            ...(config.config.markdown.mermaid && hasMermaid(config.root) ? ['mermaid'] : []),
             ...(config.config.features.search.semantic && hasPackage(config.root, TRANSFORMERS) ? [TRANSFORMERS] : []),
           ],
           // SQLite finds its .wasm file next to its own module, which pre-bundling would move.
@@ -210,6 +216,12 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
           const stylesheet = config.config.markdown.math ? mathStylesheet(config.root) : undefined
           return stylesheet ? `import ${importPath(stylesheet)}\n` : ''
         }
+
+        case VIRTUAL.mermaid:
+          // Mermaid for a site that draws diagrams and has it installed; nothing for any other.
+          return config.config.markdown.mermaid && hasMermaid(config.root)
+            ? `export { default } from 'mermaid'\n`
+            : `export default undefined\n`
 
         case VIRTUAL.embedder:
           return embedderModule(config)

@@ -27,6 +27,17 @@ declare module 'virtual:shabd/user-styles' {}
 
 declare module 'virtual:shabd/math-styles' {}
 
+declare module 'virtual:shabd/mermaid' {
+  /** The slice of Mermaid that Shabd uses. Undefined unless `markdown.mermaid` is on and the package is installed. */
+  const mermaid:
+    | {
+        initialize(config: Record<string, unknown>): void
+        render(id: string, definition: string): Promise<{ svg: string }>
+      }
+    | undefined
+  export default mermaid
+}
+
 declare module 'virtual:shabd/embedder' {
   /** False when semantic search is off or @huggingface/transformers is not installed. */
   export const available: boolean

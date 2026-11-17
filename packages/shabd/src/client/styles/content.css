@@ -514,6 +514,45 @@
     margin-block-start: 1rem;
   }
 
+  /* ───────────── diagrams ───────────── */
+
+  .sb-mermaid {
+    margin-block: 1.6em;
+    margin-inline: 0;
+    overflow-x: auto;
+    text-align: center;
+  }
+
+  .sb-mermaid > svg {
+    max-inline-size: 100%;
+    block-size: auto;
+  }
+
+  /* Until the diagram is drawn, and where it cannot be, its source stands in for it. */
+  .sb-mermaid-source {
+    margin: 0;
+    padding: 0.85rem 0.95rem;
+    border: var(--sb-line) solid var(--sb-border);
+    border-block-start: var(--sb-rule) solid var(--sb-bar);
+    border-radius: var(--sb-hang);
+    background: var(--sb-code);
+    font-size: 0.86rem;
+    line-height: 1.65;
+    text-align: start;
+    overflow-x: auto;
+  }
+
+  .sb-mermaid-problem {
+    margin: 0.5rem 0 0;
+    padding: 0.6rem 1rem;
+    color: var(--sb-danger);
+    background: color-mix(in oklab, var(--sb-danger) 7%, transparent);
+    font-size: 0.78rem;
+    text-align: start;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
   /* ───────────── maths ───────────── */
 
   /* A formula too wide for the column scrolls in its own box, as a wide table does, and the page stays put. */

@@ -126,6 +126,47 @@ things too: a template in a code sample, an expression in MDX. A name that is ne
 To keep a code sample as it is written, add `noVars` after its language. To write the braces themselves in prose,
 put a backslash before each one.
 
+## Diagrams
+
+With `markdown.mermaid` on, a fenced block with the language `mermaid` is drawn as a diagram by
+[Mermaid](https://mermaid.js.org).
+
+````md
+```mermaid
+flowchart LR
+  yaml[shabd.config.yaml] --> build{shabd build}
+  pages[Markdown pages] --> build
+  build --> site[Static site]
+```
+````
+
+```mermaid
+flowchart LR
+  yaml[shabd.config.yaml] --> build{shabd build}
+  pages[Markdown pages] --> build
+  build --> site[Static site]
+```
+
+It needs one package, and the switch:
+
+```sh
+npm install mermaid
+```
+
+```yaml title="shabd.config.yaml"
+markdown:
+  mermaid: true
+```
+
+- A diagram is drawn in the reader's browser, not when the site is built: Mermaid has to measure text to lay a
+  diagram out. The page carries the diagram's source, which is what a reader without JavaScript sees, and what
+  search, `llms.txt` and the Markdown copy hold.
+- It takes the colours of the site's theme, and is drawn again when the reader changes colour mode or palette.
+- Mermaid is large. It is split into pieces, and only a page with a diagram fetches any. This page, with its one
+  flowchart, fetched 2.3 MB more script than a page of this site without a diagram: about 660 KB once compressed.
+- A diagram Mermaid cannot read is shown as its source with the message Mermaid gives. That happens in the browser,
+  so `shabd check` does not catch it.
+
 ## Maths
 
 With `markdown.math` on, text between dollar signs is typeset as maths: one pair for maths in a line of text, two

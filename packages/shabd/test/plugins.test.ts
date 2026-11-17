@@ -104,6 +104,24 @@ markdown:
   })
 })
 
+describe('diagrams', () => {
+  const DIAGRAM = '# Home\n\n```mermaid\nflowchart LR\n  a --> b\n```\n'
+
+  it('hand a mermaid fence to the component that draws it, with the source of the diagram', async () => {
+    const { html, compiled } = await page({ 'shabd.config.yaml': 'site:\n  title: Docs\nmarkdown:\n  mermaid: true\n', 'content/index.md': DIAGRAM })
+    expect(html).toContain('<div data-mermaid="">flowchart LR\n  a --&gt; b</div>')
+    expect(html).not.toContain('data-lang="mermaid"')
+    // The source is what search and agents get: there is no drawing until a browser makes one.
+    expect(compiled.sections.map((section) => section.text).join(' ')).toContain('flowchart LR')
+  })
+
+  it('are ordinary code on a site that has not asked for them', async () => {
+    const { html } = await page({ 'shabd.config.yaml': 'site:\n  title: Docs\n', 'content/index.md': DIAGRAM })
+    expect(html).toContain('data-lang="mermaid"')
+    expect(html).not.toContain('data-mermaid')
+  })
+})
+
 describe('maths', () => {
   const CONFIG = 'site:\n  title: Docs\nmarkdown:\n  math: true\n'
 
