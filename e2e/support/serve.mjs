@@ -5,6 +5,8 @@
  *     node e2e/support/serve.mjs dev      dev server on :4411
  *     node e2e/support/serve.mjs preview  static build, then preview on :4412
  *
+ * The ports are the defaults; see ports.mjs.
+ *
  * The copies live inside the repository (e2e/.work) so that `react` and
  * `shabd/client` resolve from the repository's node_modules.
  */
@@ -12,10 +14,10 @@ import { cp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build, dev, preview } from '../../packages/shabd/dist/node/index.js'
+import { PORTS as ports } from './ports.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const mode = process.argv[2]
-const ports = { dev: 4411, preview: 4412 }
 if (!(mode in ports)) throw new Error(`usage: serve.mjs <${Object.keys(ports).join('|')}>`)
 
 const root = path.join(here, '..', '.work', mode)

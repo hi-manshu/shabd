@@ -3,13 +3,14 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { PORTS } from './ports.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 
 /** `shabd dev` on a copy of the fixture that tests may edit. */
-export const DEV = 'http://localhost:4411'
+export const DEV = `http://localhost:${PORTS.dev}`
 /** `shabd preview` of a production build of the fixture. */
-export const BUILT = 'http://localhost:4412'
+export const BUILT = `http://localhost:${PORTS.preview}`
 
 const DEV_ROOT = path.join(here, '..', '.work', 'dev')
 
