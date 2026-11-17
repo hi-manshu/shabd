@@ -47,6 +47,7 @@ import { compilePage, createContext, type ShabdContext } from '../context.js'
 import { MDX_COMPONENTS_ID } from '../markdown/compile.js'
 import { HMR_RUNTIME_ID, PAGE_ERROR_ID, toErrorModule, toPageModule } from '../markdown/page-module.js'
 import { CLIENT_DIR, CLIENT_ENTRY, PACKAGE_ROOT, packageName, resolveFromPackage, SERVER_ENTRY } from '../paths.js'
+import { keepBase } from './dev-html.js'
 import { devMiddlewares } from './dev-middleware.js'
 
 export interface ShabdPluginOptions {
@@ -410,7 +411,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
     },
   }
 
-  return [core, react()]
+  return [core, react(), ...keepBase(() => ctx().config.config.site.base)]
 }
 
 /* ───────────────────────────── helpers ───────────────────────────── */
