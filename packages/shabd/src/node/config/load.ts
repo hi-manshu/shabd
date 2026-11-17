@@ -17,6 +17,7 @@ import { resolveLayouts } from '../../shared/layout.js'
 import { isExternal, normalizePath } from '../../shared/paths.js'
 import { ConfigSchema, SidebarSchema, type ShabdConfig, type SidebarInput } from '../../shared/schema.js'
 import type { ResolvedLayout } from '../../shared/types.js'
+import { flattenVars } from '../content/vars.js'
 import { ShabdError, type SourceIssue } from './errors.js'
 import { locateIssues, parseYamlWithSchema } from './yaml.js'
 
@@ -59,6 +60,8 @@ export interface ResolvedConfig {
   socialFonts: string[]
   /** `redirects:` with chains followed to their end. */
   redirects: Redirect[]
+  /** `vars:` as one flat table of text: a nested value is `group.name`. */
+  vars: Record<string, string>
   /** Where a key of the config is written, for problems found after it has loaded. */
   locate(path: (string | number)[]): { line: number; column: number } | undefined
   /** Changes whenever a setting that affects compiled pages changes. Part of every cache key. */
@@ -160,10 +163,13 @@ export function resolveConfig(root: string, configFile: string, source: string):
   }
 
   const contentDir = path.resolve(root, config.content.dir)
+  const vars = flattenVars(config.vars)
   const digest = (value: unknown) => createHash('sha1').update(JSON.stringify(value)).digest('hex').slice(0, 12)
   const structureFingerprint = digest([
     PIPELINE_VERSION,
     config.site.base,
+    // A page is read with its variables filled in, so another value is another page.
+    vars,
     config.theme.code,
     // The presets in the theme menu decide which other syntax themes every code block is coloured in.
     codeThemePlan(config.theme).themes,
@@ -188,6 +194,7 @@ export function resolveConfig(root: string, configFile: string, source: string):
     stylesheets,
     socialFonts,
     redirects,
+    vars,
     locate: (path) => yaml.locate(path, 'key'),
     compileFingerprint,
     structureFingerprint,

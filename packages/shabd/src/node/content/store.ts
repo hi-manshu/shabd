@@ -18,6 +18,7 @@ import { loadSidebar, type LoadedSidebar, type ResolvedConfig } from '../config/
 import { paletteChoices, themeToCss } from '../config/theme-css.js'
 import { leadingHeading, parseFrontmatter } from './frontmatter.js'
 import { formatDay, lastCommitDates } from './git.js'
+import { substituteVars, type VariableNote } from './vars.js'
 import { resolveSidebar, type ResolvedSidebar } from './sidebar.js'
 
 export interface PageRecord {
@@ -30,9 +31,12 @@ export interface PageRecord {
   path: string
   isIndex: boolean
   format: 'md' | 'mdx'
+  /** The text of the file, with the site's variables filled in. Everything made from the page is made from this. */
   source: string
-  /** Hash of `source`; the key for every per-page cache. */
+  /** Hash of the file as it is on disk; the key for every per-page cache. */
   hash: string
+  /** Names in the page that look like a mistyped variable, for `shabd check`. */
+  notes: VariableNote[]
   frontmatter: Frontmatter
   /** The source without its frontmatter block. */
   body: string
@@ -264,7 +268,8 @@ export class ContentStore {
     }
   }
 
-  #read(id: string, file: string, source: string, hash: string, previous?: PageRecord): PageRecord {
+  #read(id: string, file: string, text: string, hash: string, previous?: PageRecord): PageRecord {
+    const { text: source, notes } = substituteVars(text, this.config.vars)
     const format = id.toLowerCase().endsWith('.mdx') ? 'mdx' : 'md'
     const slug = fileToSlug(id)
     const fileName = id.slice(id.lastIndexOf('/') + 1).replace(/\.mdx?$/i, '')
@@ -281,7 +286,7 @@ export class ContentStore {
       // A page that was valid a moment ago keeps the title, layout and sidebar
       // entry it had: a half-typed line should not rearrange the navigation.
       if (previous) {
-        return { ...previous, source, hash, error }
+        return { ...previous, source, hash, notes, error }
       }
       frontmatter = FrontmatterSchema.parse({})
     }
@@ -300,6 +305,7 @@ export class ContentStore {
       format,
       source,
       hash,
+      notes,
       frontmatter,
       body,
       title: frontmatter.title ?? heading ?? fallback,

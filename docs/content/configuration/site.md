@@ -269,6 +269,20 @@ Mistakes are reported in three places:
 - They also warn about a link in your content that points at an address that has moved, so that you can link to
   the new one.
 
+## vars
+
+Values that pages use by name. A page writes the name between two pairs of braces, and
+[Markdown: variables](../guide/writing/markdown.md#variables) says where that works.
+
+```yaml title="shabd.config.yaml"
+vars:
+  version: 2.1.0
+  product:
+    name: Acme # used as product.name
+```
+
+A value is text, a number, or `true` or `false`. A name is made of letters, digits, `-` and `_`.
+
 ## components and blocks
 
 Both map a name to a file. `components` are available in every `.mdx` page; `blocks` can be placed in

@@ -38,6 +38,10 @@ export async function collectProblems(context: ShabdContext): Promise<CheckResul
   const anchors = new Map<string, Set<string>>()
   const links: { file: string; target: string }[] = []
   for (const page of store.pages()) {
+    // A name in braces that is nearly a variable was most likely meant to be one.
+    for (const note of page.notes) {
+      problems.push({ level: 'warning', file: relative(page.file), line: note.line, message: note.message })
+    }
     try {
       const compiled = await compilePage(context, page)
       anchors.set(page.path, new Set(compiled.anchors))

@@ -1618,10 +1618,43 @@
         "type": "string",
         "pattern": "^(?:\\/(?!\\/)\\S*|https?:\\/\\/\\S+)$"
       }
+    },
+    "vars": {
+      "default": {},
+      "allOf": [
+        {
+          "$ref": "#/definitions/__schema0"
+        }
+      ]
     }
   },
   "required": [
     "site"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "definitions": {
+    "__schema0": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "$ref": "#/definitions/__schema0"
+          }
+        ]
+      }
+    }
+  }
 }

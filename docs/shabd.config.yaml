@@ -93,6 +93,10 @@ features:
   feed: true # rss.xml: the pages newest first, by the day each was last changed
   socialImages: true # a picture for each page, shown where it is shared; needs @resvg/resvg-js
 
+# Values a page uses by name. The installation page says which Node.js is needed with {{node}}.
+vars:
+  node: 22
+
 # Components every .mdx file can use without importing them.
 components:
   Counter: ./components/Counter.tsx

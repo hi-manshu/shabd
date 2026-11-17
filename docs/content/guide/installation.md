@@ -3,7 +3,7 @@ title: Installation
 description: Create a site, run the dev server and build for production.
 ---
 
-Shabd needs Node.js 22 or newer.
+Shabd needs Node.js {{node}} or newer.
 
 ## Create a site
 

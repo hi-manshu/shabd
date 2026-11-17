@@ -644,6 +644,19 @@ const redirectTarget = z
     error: 'A redirect leads to a path on this site, such as /new-page, or to an address that starts with https://',
   })
 
+/* ──────────────────────────────── variables ───────────────────────────── */
+
+export type VarsInput = { [name: string]: string | number | boolean | VarsInput }
+
+const varName = z
+  .string()
+  .regex(/^[A-Za-z_][A-Za-z0-9_-]*$/, { error: 'A variable name is letters, digits, "-" and "_", and does not start with a digit' })
+
+/** Values a page uses by name, as `{{name}}`. A group of values is written `{{group.name}}`. */
+const VarsSchema: z.ZodType<VarsInput> = z.lazy(() =>
+  z.record(varName, z.union([z.string(), z.number(), z.boolean(), VarsSchema])),
+)
+
 /* ───────────────────────────── shabd.config.yaml ───────────────────────── */
 
 const componentName = z
@@ -667,6 +680,8 @@ export const ConfigSchema = z.strictObject({
   blocks: z.record(blockName, z.string().min(1)).default({}),
   /** Addresses that have moved. Old path → new path, or a full address. */
   redirects: z.record(redirectSource, redirectTarget).default({}),
+  /** Values every page can use by name: `{{version}}`. */
+  vars: VarsSchema.default({}),
 })
 
 export type ShabdConfigInput = z.input<typeof ConfigSchema>

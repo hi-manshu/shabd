@@ -41,6 +41,7 @@ import { codeBackgrounds } from '../../shared/presets.js'
 import { renderDocument } from '../build/html.js'
 import { isShabdError } from '../config/errors.js'
 import { loadConfig, loadSidebar, type ResolvedConfig } from '../config/load.js'
+import { substituteVars } from '../content/vars.js'
 import { compilePage, createContext, type ShabdContext } from '../context.js'
 import { MDX_COMPONENTS_ID } from '../markdown/compile.js'
 import { HMR_RUNTIME_ID, PAGE_ERROR_ID, toErrorModule, toPageModule } from '../markdown/page-module.js'
@@ -228,7 +229,9 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
         if (page?.error) throw page.error
         compiled = await context.compiler.compile({
           file,
-          source: code,
+          // A page as the store read it, with the site's variables filled in. A partial that a page
+          // imports is not in the store, and has them filled in here.
+          source: page ? page.source : substituteVars(code, context.config.vars).text,
           format: file.toLowerCase().endsWith('.mdx') ? 'mdx' : 'md',
           id: page?.id,
           routePath: page?.path,
