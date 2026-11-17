@@ -7,9 +7,8 @@ on:
 
 jobs:
   test:
-    # Shabd has only been run on macOS so far, so Linux is the platform worth checking here.
-    # Add macos-latest and windows-latest as a matrix once this passes; macOS minutes cost ten
-    # times as much on a private repository.
+    # Shabd is developed on macOS, so Linux is the platform worth checking here.
+    # Add macos-latest and windows-latest as a matrix once this passes.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,7 +24,7 @@ jobs:
       - run: node packages/shabd/bin/shabd.js check docs
       - run: node packages/shabd/bin/shabd.js build docs --no-semantic
 
-  # The browser tests have only been run on macOS. This job is the first attempt on Linux.
+  # The browser tests, in Chromium, Firefox and WebKit as Playwright builds them for Linux.
   browsers:
     runs-on: ubuntu-latest
     steps:
@@ -41,9 +40,12 @@ jobs:
       - run: npx playwright test
         env:
           SHABD_E2E_STORE: sqlite
+      # What a failed test saw: a trace of the page for each one. The folder's name starts with a dot,
+      # which the action leaves out unless told otherwise.
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: playwright-traces
           path: e2e/.results
+          include-hidden-files: true
 

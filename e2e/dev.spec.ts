@@ -86,8 +86,9 @@ test.describe('hot updates', () => {
     await expect(overlay.locator('.file')).toContainText('shabd.config.yaml:4:3')
 
     // Vite reloads the page when the first update it receives follows an error, so no in-place check here.
+    // A reload takes its time on a busy machine: allow for it.
     await site.edit('shabd.config.yaml', (text) => text.replace('descripton: A site', 'description: A site'))
-    await expect(overlay).not.toBeAttached()
+    await expect(overlay).not.toBeAttached({ timeout: 15_000 })
     await expect(page.locator('h1.sb-page-title')).toHaveText('Introduction')
   })
 
@@ -243,6 +244,33 @@ test.describe('studio', () => {
   test('two editors connect peer to peer and share a draft', async ({ page, browser, site }) => {
     await site.track('content/guide/setup.md')
     const host = page
+    // Not every browser build can open a peer connection on every machine: WebKit as built for Linux
+    // cannot. Where two connections on one page cannot reach each other, two editors cannot either.
+    await host.goto(`${DEV}/guide/setup`)
+    const canConnect = await host.evaluate(async () => {
+      if (typeof RTCPeerConnection !== 'function') return false
+      const [first, second] = [new RTCPeerConnection(), new RTCPeerConnection()]
+      try {
+        first.onicecandidate = (event) => void (event.candidate && second.addIceCandidate(event.candidate))
+        second.onicecandidate = (event) => void (event.candidate && first.addIceCandidate(event.candidate))
+        const channel = first.createDataChannel('probe')
+        const opened = new Promise<boolean>((resolve) => {
+          channel.onopen = () => resolve(true)
+          setTimeout(() => resolve(false), 8000)
+        })
+        await first.setLocalDescription(await first.createOffer())
+        await second.setRemoteDescription(first.localDescription!)
+        await second.setLocalDescription(await second.createAnswer())
+        await first.setRemoteDescription(second.localDescription!)
+        return await opened
+      } catch {
+        return false
+      } finally {
+        first.close()
+        second.close()
+      }
+    })
+    test.skip(!canConnect, 'this browser cannot open a peer connection on this machine')
     const guestContext = await browser.newContext()
     const guest = await guestContext.newPage()
 

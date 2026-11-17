@@ -9,6 +9,18 @@
 <strong>Documentation sites configured in YAML.</strong>
 </p>
 
+<p align="center">
+  <a href="https://hi-manshu.github.io/shabd/">Documentation</a> ·
+  <a href="https://www.npmjs.com/package/@himanshoe/shabd">npm</a> ·
+  <a href="./ROADMAP.md">Roadmap</a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/@himanshoe/shabd"><img src="https://img.shields.io/npm/v/@himanshoe/shabd?label=npm" alt="Version on npm"/></a>
+  <img src="https://img.shields.io/node/v/@himanshoe/shabd" alt="Node.js version needed"/>
+  <a href="./LICENSE"><img src="https://img.shields.io/npm/l/@himanshoe/shabd" alt="MIT licence"/></a>
+</p>
+
 Shabd (शब्द, "word") builds a documentation site from a folder of Markdown and two YAML files.
 
 ```text
@@ -21,32 +33,20 @@ my-docs/
 The YAML is the whole configuration surface. The header, the sidebar, the theme and the layout of each page are
 described there, not in components.
 
-> [!NOTE]
-> Shabd is at 0.1.0 and has not been published to npm. Configuration keys may change before 1.0.
+<p align="center">
+  <a href="https://hi-manshu.github.io/shabd/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="img/readme/home-dark.png"/>
+      <img src="img/readme/home-light.png" alt="The home page of Shabd's documentation" width="820"/>
+    </picture>
+  </a>
+</p>
 
-## What is in it
+<p align="center">
+<em>Shabd's own documentation is a Shabd site. <a href="https://hi-manshu.github.io/shabd/">Open it</a>, and try the theme menu in its header.</em>
+</p>
 
-- **Layouts as data.** A layout is a table of regions (`header`, `sidebar`, `main`, …) and the blocks in each. A page
-  picks one with `layout:` in its frontmatter. Editing a layout, or adding one, is a YAML change.
-- **Themes as tokens.** Twenty-three built-in presets, each with a light and a dark mode, and an optional menu that
-  lets readers switch between them; code blocks follow in each preset's own syntax colours, adjusted where a
-  colour would be hard to read. Every colour, font, width and corner is a token in YAML.
-- **A sidebar that fills itself in.** `sidebar.yaml` is used as written. Any content folder it does not mention is
-  appended, sorted alphabetically.
-- **Errors that point at the YAML.** Config, sidebar and frontmatter problems are reported with file, line, column and,
-  for typos, the key you probably meant.
-- **A Markdown and MDX pipeline** built on remark and rehype: heading anchors, GitHub-style callouts, code highlighted
-  at build time with Shiki, and components available in MDX without imports.
-- **Search in the browser.** Keyword search, plus optional semantic search: pages are embedded at build time with
-  Transformers.js, and a Web Worker embeds the query on the reader's device. For large sites the index can be a
-  SQLite database, searched with FTS5 and kept in the browser's private file system.
-- **Output for AI agents.** `llms.txt`, `llms-full.txt`, a Markdown copy of every page, and an MCP endpoint with
-  `search_docs`, `read_page` and `list_pages`.
-- **Studio.** In `shabd dev`, edit the page you are looking at. Saves go to the file on disk through the File System
-  Access API or the dev server, and the page beside the editor hot-updates.
-- **Live sandboxes.** A `tsx live` code fence runs on the page, next to its source and a panel of its state.
-
-## Try it
+## Start a site
 
 You need Node.js 22 or newer.
 
@@ -57,10 +57,92 @@ npm install
 npm run dev
 ```
 
+The starter writes a small site that runs as it is. The dev server prints its address; edit a file and the page
+updates without a reload. `npm run build` writes the static site to `dist/`, which any static host can serve.
+
 npm would not take the name `shabd`, so the same package is also published as `shabd-docs`, with
 `npm create shabd-docs@latest my-docs`. The command is `shabd` under both. Pick one name and stay with it.
 
-To work on Shabd itself:
+> [!NOTE]
+> Shabd is at 0.1.0. Configuration keys may change before 1.0.
+
+## What is in it
+
+- **[Layouts as data](https://hi-manshu.github.io/shabd/configuration/layouts).** A layout is a table of regions (`header`, `sidebar`, `main`, …)
+  and the blocks in each. A page picks one with `layout:` in its frontmatter. Editing a layout, or adding one, is a
+  YAML change.
+- **[Themes as tokens](https://hi-manshu.github.io/shabd/configuration/theme).** Twenty-three built-in presets, each with a light and a dark
+  mode, and an optional menu that lets readers switch between them. Every colour, font, width and corner is a
+  token in YAML.
+- **[A sidebar that fills itself in](https://hi-manshu.github.io/shabd/configuration/sidebar).** `sidebar.yaml` is used as written. Any content
+  folder it does not mention is appended, sorted alphabetically.
+- **Errors that point at the YAML.** Config, sidebar and frontmatter problems are reported with file, line, column
+  and, for typos, the key you probably meant.
+- **[A Markdown and MDX pipeline](https://hi-manshu.github.io/shabd/guide/writing/markdown)** built on remark and rehype: heading anchors,
+  GitHub-style callouts, code highlighted at build time with Shiki, and components available in MDX without
+  imports.
+- **[Search in the browser](https://hi-manshu.github.io/shabd/features/search).** Keyword search, plus optional semantic search: pages are
+  embedded at build time with Transformers.js, and a Web Worker embeds the query on the reader's device. For large
+  sites the index can be a SQLite database, searched with FTS5 and kept in the browser's private file system.
+- **[Output for AI agents](https://hi-manshu.github.io/shabd/features/mcp).** `llms.txt`, `llms-full.txt`, a Markdown copy of every page, and an
+  MCP endpoint with `search_docs`, `read_page` and `list_pages`.
+- **[Studio](https://hi-manshu.github.io/shabd/features/studio).** In `shabd dev`, edit the page you are looking at. Saves go to the file on disk
+  through the File System Access API or the dev server, and the page beside the editor hot-updates.
+- **[Live sandboxes](https://hi-manshu.github.io/shabd/features/sandbox).** A `tsx live` code fence runs on the page, next to its source and a
+  panel of its state.
+
+## Themes
+
+```yaml
+theme:
+  preset: macos   # or xp, blueprint, newsprint, forest, paper, …
+  picker: true    # a menu in the header, so readers can choose for themselves
+```
+
+Ten of the presets are themes: they change fonts, corners and how code is framed as well as colour. The other
+thirteen are palettes. Code follows the preset in that preset's own syntax colours, and a syntax colour that would
+be hard to read on the code background is moved until its contrast is 4.5:1.
+
+<p align="center">
+  <a href="https://hi-manshu.github.io/shabd/configuration/theme">
+    <img src="img/readme/themes.jpg" alt="The ten themes and two of the palettes, each on the same page" width="820"/>
+  </a>
+</p>
+
+## What has been checked
+
+On one machine (macOS 26, Node 22.16), with the docs site and a small test site in this repository:
+
+- 226 unit and integration tests pass. They cover config and sidebar validation, the sidebar resolver, the Markdown
+  pipeline, layout resolution, the theme presets and their contrast, search ranking, both search stores, the
+  content store, the starter, and the MCP endpoint driven by the official MCP client.
+- 116 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
+  JavaScript, hydration, navigation, every layout, the sidebar, search, the theme menu, text contrast on every
+  theme's rendered page, sandboxes, hot updates of pages and YAML, the Studio including conflicts and its folder
+  backend, and two editors connecting peer to peer. Sixteen more are skipped where an engine lacks what they need.
+- The search tests also pass with the index held in SQLite, and semantic search with the real embedding model
+  finds a section by meaning in all three engines on both stores.
+- Version 0.1.0 was installed from npm into an empty folder under both names. Each site passed `shabd check`,
+  built and was served.
+- The 18-page docs site builds in about 2 seconds with embeddings, and in about 1 second when they are cached.
+- A saved edit to a page reached the DOM in a median of 42 ms (10 saves, 35 to 49 ms after the first, which took
+  116 ms). That was measured in Chromium for the first commit, and not again since.
+
+On GitHub's Linux machines the unit tests pass. Two browser tests fail there: the error overlay clearing after a
+mistake in the YAML is fixed, and two editors connecting peer to peer.
+
+Not yet checked:
+
+- Chrome, Firefox and Safari as people install them, and Windows.
+- The system folder picker in the Studio. Its code runs in the tests against real file handles, but the picker
+  itself needs a person.
+- Peer editing between two machines on different networks.
+- The MCP handler on a serverless or edge host.
+- Sites with thousands of real pages.
+
+See [ROADMAP.md](./ROADMAP.md) for what comes next.
+
+## Work on Shabd
 
 ```sh
 git clone https://github.com/hi-manshu/shabd.git
@@ -69,16 +151,8 @@ npm install
 npm run dev
 ```
 
-`npm run dev` builds the package and starts the dev server for `docs/`, which is Shabd's own documentation written
-with Shabd. Edit anything in `docs/` and watch it update.
-
-To try your changes in a site of your own, pack Shabd and run the starter from the clone. Packing builds the
-package first:
-
-```sh
-npm pack -w packages/shabd --pack-destination ..
-node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../himanshoe-shabd-0.1.0.tgz
-```
+`npm run dev` builds the package and starts the dev server for `docs/`, the documentation site. Edit anything in
+`docs/` and watch it update.
 
 ```sh
 npm test             # unit and integration tests
@@ -88,7 +162,18 @@ npm run docs:build   # static site in docs/dist
 npm run docs:preview # serve docs/dist, including /mcp
 ```
 
-## Repository layout
+To try your changes in a site of your own, pack Shabd and run the starter from the clone. Packing builds the
+package first:
+
+```sh
+npm pack -w packages/shabd --pack-destination ..
+node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../himanshoe-shabd-0.1.0.tgz
+```
+
+[CONTRIBUTING.md](./CONTRIBUTING.md) has more.
+
+<details>
+<summary>Repository layout</summary>
 
 ```text
 shabd/
@@ -134,7 +219,10 @@ shabd/
     └── styles/
 ```
 
-## How a page is made
+</details>
+
+<details>
+<summary>How a page is made</summary>
 
 ```text
 shabd.config.yaml ─┐
@@ -150,33 +238,7 @@ content/**/*.md ───┘                          │           virtual:shab
 In development each arrow is incremental: a saved page recompiles alone, and a YAML change replaces data in the
 running page. In a build the same modules are bundled, every route is prerendered to HTML, and the page hydrates.
 
-## What has been checked
-
-On one machine (macOS 26, Node 22.16), with the docs site and a small test site in this repository:
-
-- 101 unit and integration tests pass. They cover config and sidebar validation, the sidebar resolver, the Markdown
-  pipeline, layout resolution, search ranking, both search stores, the content store, and the MCP endpoint driven by
-  the official MCP client.
-- 107 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
-  JavaScript, hydration, navigation, every layout, the sidebar, search, sandboxes, hot updates of pages and YAML, the
-  Studio including conflicts and its folder backend, and two editors connecting peer to peer.
-- The same suite passes with the search index held in SQLite, and semantic search with the real embedding model
-  found a section by meaning in all three engines on both stores.
-- A saved edit to a page reached the DOM in a median of 42 ms (10 saves, 35 to 49 ms after the first, which took
-  116 ms), measured in Chromium.
-- The 18-page docs site builds in about 2 seconds with embeddings, and in about 1 second when they are cached.
-- The package was packed, installed into an empty project, and built a site there.
-
-Not yet checked:
-
-- Chrome, Firefox and Safari as people install them, and any operating system other than macOS.
-- The system folder picker in the Studio. Its code runs in the tests against real file handles, but the picker
-  itself needs a person.
-- Peer editing between two machines on different networks.
-- The MCP handler on a serverless or edge host.
-- Sites with thousands of real pages.
-
-See [ROADMAP.md](./ROADMAP.md) for what comes next and how to put the project on GitHub.
+</details>
 
 ## The logo
 
@@ -193,4 +255,4 @@ after changing it, run `npm run logo`.
 
 ## License
 
-MIT
+[MIT](./LICENSE)

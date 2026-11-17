@@ -23,7 +23,20 @@ export default defineConfig({
   use: { trace: 'retain-on-failure' },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    {
+      name: 'firefox',
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: {
+          firefoxUserPrefs: {
+            // The Studio's two editors find each other by address. Firefox hides a machine's addresses
+            // behind names that only resolve on a network with mDNS, which a CI machine does not have.
+            'media.peerconnection.ice.obfuscate_host_addresses': false,
+            'media.peerconnection.ice.loopback': true,
+          },
+        },
+      },
+    },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
   ],
   webServer: [
