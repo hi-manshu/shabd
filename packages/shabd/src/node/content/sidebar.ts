@@ -64,14 +64,21 @@ interface SortableEntry {
   isIndex: boolean
 }
 
-export function resolveSidebar(
-  input: SidebarInput,
-  pages: SidebarPageInfo[],
-  options: { lang?: string } = {},
-): ResolvedSidebar {
+export interface ResolveOptions {
+  lang?: string
+  /**
+   * The pages this sidebar answers for, on a site with more than one. Its
+   * entries may name any page, but only folders that hold pages of its own
+   * are added to it unasked, and only its own pages are reported as left out.
+   */
+  owns?: (page: SidebarPageInfo) => boolean
+}
+
+export function resolveSidebar(input: SidebarInput, pages: SidebarPageInfo[], options: ResolveOptions = {}): ResolvedSidebar {
   const collator = new Intl.Collator(options.lang ?? 'en', { numeric: true, sensitivity: 'base' })
   const warnings: SidebarWarning[] = []
   const bySlug = new Map(pages.map((page) => [page.slug, page]))
+  const owns = options.owns ?? (() => true)
 
   /* ── index the content tree by directory ── */
 
@@ -253,6 +260,8 @@ export function resolveSidebar(
       .filter((dir) => dir !== '' && !isCovered(dir))
       // Keep only the top of each unmentioned subtree; its children nest inside it.
       .filter((dir) => parentDir(dir) === '' || isCovered(parentDir(dir)))
+      // On a site with several sidebars, a folder goes to the sidebar its pages belong to.
+      .filter((dir) => directories.get(dir)!.pages.some(owns) || hasOwnedPagesBelow(dir))
       .sort(collator.compare)
 
     for (const dir of uncovered) {
@@ -271,9 +280,94 @@ export function resolveSidebar(
   }
 
   const unlisted = pages
-    .filter((page) => page.slug !== '' && !listed.has(page.slug) && !page.sidebar.exclude)
+    .filter((page) => owns(page) && page.slug !== '' && !listed.has(page.slug) && !page.sidebar.exclude)
     .map((page) => page.slug)
     .sort(collator.compare)
 
   return { sidebar, warnings, unlisted }
+
+  function hasOwnedPagesBelow(dir: string): boolean {
+    return pages.some((page) => owns(page) && page.slug.startsWith(`${dir}/`))
+  }
+}
+
+/* ─────────────────────────── more than one sidebar ───────────────────── */
+
+/** One part of the site and its sidebar. */
+export interface SidebarSection {
+  /** The route the part starts at, without a slash at the end: `/guide`. */
+  prefix: string
+  sidebar: SidebarNode[]
+}
+
+export interface ResolvedSidebars {
+  /** The sidebar of pages that are in no section. On a site with one sidebar, the sidebar. */
+  sidebar: SidebarNode[]
+  /** The parts of the site that have a sidebar of their own, longest path first. Empty on a site with one. */
+  sections: SidebarSection[]
+  /** Every sidebar's entries, in the order the file has them: the reading order of the whole site. */
+  all: SidebarNode[]
+  warnings: SidebarWarning[]
+  unlisted: string[]
+}
+
+/** Is a route in the part of the site that starts at `prefix`? */
+export function inSection(path: string, prefix: string): boolean {
+  return prefix === '' || prefix === '/' || path === prefix || path.startsWith(`${prefix}/`)
+}
+
+/**
+ * sidebar.yaml as a list is one sidebar. As a map it is several, each for
+ * the part of the site its key names. A page belongs to the longest key it
+ * is under, and `/` stands for every page that is under no other key. With
+ * no `/`, those pages get a sidebar made from their folders, as a site with
+ * no sidebar.yaml does.
+ */
+export function resolveSidebars(
+  input: SidebarInput | Record<string, SidebarInput>,
+  pages: SidebarPageInfo[],
+  options: { lang?: string } = {},
+): ResolvedSidebars {
+  if (Array.isArray(input)) {
+    const one = resolveSidebar(input, pages, options)
+    return { sidebar: one.sidebar, sections: [], all: one.sidebar, warnings: one.warnings, unlisted: one.unlisted }
+  }
+
+  const keys = Object.keys(input)
+  const prefixOf = (key: string) => (key.length > 1 ? key.replace(/\/+$/, '') : key)
+  // The longest first, so that /guide/advanced is asked before /guide.
+  const prefixes = keys.map(prefixOf).filter((prefix) => prefix !== '/').sort((a, b) => b.length - a.length)
+  const sectionOf = (page: SidebarPageInfo) => prefixes.find((prefix) => inSection(page.path, prefix)) ?? '/'
+
+  const warnings: SidebarWarning[] = []
+  const unlisted: string[] = []
+  const sections: SidebarSection[] = []
+  const all: SidebarNode[] = []
+  let fallback: SidebarNode[] | undefined
+
+  for (const key of keys) {
+    const prefix = prefixOf(key)
+    const resolved = resolveSidebar(input[key]!, pages, { ...options, owns: (page) => sectionOf(page) === prefix })
+    // A warning says where in the file it is about, and the file now has the key above the list.
+    warnings.push(...resolved.warnings.map((warning) => ({ ...warning, path: [key, ...(warning.path ?? [])] })))
+    unlisted.push(...resolved.unlisted)
+    all.push(...resolved.sidebar)
+    if (prefix === '/') fallback = resolved.sidebar
+    else {
+      sections.push({ prefix, sidebar: resolved.sidebar })
+      if (!pages.some((page) => inSection(page.path, prefix))) {
+        warnings.push({ message: `No page is under ${prefix}, so this sidebar is never shown`, path: [key] })
+      }
+    }
+  }
+
+  if (!fallback) {
+    // The pages that no sidebar answers for get one made from their folders.
+    const rest = resolveSidebar([], pages.filter((page) => sectionOf(page) === '/'), options)
+    fallback = rest.sidebar
+    all.push(...rest.sidebar)
+  }
+
+  sections.sort((a, b) => b.prefix.length - a.prefix.length)
+  return { sidebar: fallback, sections, all, warnings, unlisted }
 }

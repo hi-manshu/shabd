@@ -101,7 +101,14 @@ export interface SiteData {
   defaults: ShabdConfig['defaults']
   features: ShabdConfig['features']
   layouts: Record<string, ResolvedLayout>
+  /** The sidebar. On a site with several, the one for pages that are in none of `sidebars`. */
   sidebar: SidebarNode[]
+  /**
+   * Parts of the site that have a sidebar of their own, longest path first,
+   * so that the first one a page is under is its own. Left out on a site
+   * with one sidebar.
+   */
+  sidebars?: { prefix: string; sidebar: SidebarNode[] }[]
   /** Keyed by route path. */
   pages: Record<string, PageMeta>
   /** Content directory relative to the site root, used to build edit links. */

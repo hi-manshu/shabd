@@ -861,6 +861,27 @@ export const SidebarSchema = z.array(
 )
 export type SidebarInput = SidebarEntryInput[]
 
+/**
+ * sidebar.yaml is one sidebar, written as a list, or several, written as a
+ * map from the part of the site each belongs to:
+ *
+ *   /guide/:
+ *     - guide/introduction
+ *   /reference/:
+ *     - reference/cli
+ *
+ * A page gets the sidebar of the longest path it is under. `/` is the
+ * sidebar of every page that is under none of the others.
+ */
+export const SidebarsSchema = z.union([
+  SidebarSchema,
+  z.record(
+    z.string().regex(/^\/\S*$/, { error: 'A sidebar is named by the part of the site it belongs to, such as /guide/' }),
+    SidebarSchema,
+  ),
+])
+export type SidebarsInput = SidebarInput | Record<string, SidebarInput>
+
 /* ─────────────────────────────── frontmatter ──────────────────────────── */
 
 const HeroSchema = z.strictObject({

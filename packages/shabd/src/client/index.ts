@@ -4,6 +4,7 @@
  *     import { usePage, useSite, Badge } from '@himanshoe/shabd/client'
  */
 export { usePage, useRouter, type PageView } from './app/router.js'
+export { useSidebar } from './app/sidebar.js'
 export { useSite } from './app/store.js'
 export { Icon, type IconName } from './app/icons.js'
 export { Badge } from './ui/Badge.js'

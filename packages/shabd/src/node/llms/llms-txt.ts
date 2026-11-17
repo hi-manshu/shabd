@@ -67,7 +67,7 @@ export function renderLlmsTxt(context: ShabdContext): string {
     out.push(`The complete documentation in one file: ${publicUrl(context, '/llms-full.txt')}`)
   }
 
-  for (const section of toSections(context.store.sidebar.sidebar)) {
+  for (const section of toSections(context.store.sidebar.all)) {
     const lines = section.pages.flatMap((entry) => {
       const page = byPath.get(entry.path)
       return page ? [line(page, entry.label)] : []
@@ -89,7 +89,7 @@ export function renderLlmsFull(context: ShabdContext): string {
   // Sidebar order first, then anything the sidebar does not list.
   const ordered: PageRecord[] = []
   const seen = new Set<string>()
-  for (const section of toSections(context.store.sidebar.sidebar)) {
+  for (const section of toSections(context.store.sidebar.all)) {
     for (const entry of section.pages) {
       const page = byPath.get(entry.path)
       if (page && !seen.has(page.path)) {

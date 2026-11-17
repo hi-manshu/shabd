@@ -19,7 +19,7 @@ import { paletteChoices, themeToCss } from '../config/theme-css.js'
 import { leadingHeading, parseFrontmatter } from './frontmatter.js'
 import { formatDay, lastCommitDates } from './git.js'
 import { substituteVars, type VariableNote } from './vars.js'
-import { resolveSidebar, type ResolvedSidebar } from './sidebar.js'
+import { resolveSidebars, type ResolvedSidebars } from './sidebar.js'
 
 export interface PageRecord {
   /** Content-relative POSIX path, e.g. `guide/install.mdx`. Stable identity of a page. */
@@ -86,7 +86,7 @@ export class ContentStore {
   readonly options: StoreOptions
   #pages = new Map<string, PageRecord>()
   #sidebarSource: LoadedSidebar
-  #sidebar: ResolvedSidebar | undefined
+  #sidebar: ResolvedSidebars | undefined
   #revision = 0
   /** File → the day of its last commit. Empty unless `defaults.lastUpdated` is on. */
   #commitDays = new Map<string, string>()
@@ -165,8 +165,9 @@ export class ContentStore {
     return toPosix(path.relative(this.config.contentDir, file))
   }
 
-  get sidebar(): ResolvedSidebar {
-    this.#sidebar ??= resolveSidebar(
+  /** The site's sidebar, or its sidebars: the one for pages in no section, and one for each section. */
+  get sidebar(): ResolvedSidebars {
+    this.#sidebar ??= resolveSidebars(
       this.#sidebarSource.input,
       this.pages().map((page) => ({
         slug: page.slug,
@@ -204,6 +205,7 @@ export class ContentStore {
       features: config.features,
       layouts,
       sidebar: this.sidebar.sidebar,
+      ...(this.sidebar.sections.length ? { sidebars: this.sidebar.sections } : {}),
       pages,
       contentDir: config.content.dir,
       ...(options.dev ? { themeCss: themeToCss(config.theme) } : {}),

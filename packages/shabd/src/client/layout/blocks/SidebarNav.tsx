@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { SidebarGroup, SidebarNode } from '../../../shared/types.js'
 import { Icon } from '../../app/icons.js'
 import { usePage } from '../../app/router.js'
-import { useSite } from '../../app/store.js'
+import { useSidebar } from '../../app/sidebar.js'
 import { Badge } from '../../ui/Badge.js'
 import { useHref } from '../../ui/Link.js'
 
@@ -17,7 +17,7 @@ const keyOf = (node: SidebarNode, index: number) =>
 
 /** The sidebar tree resolved from sidebar.yaml and the content folder. */
 export function SidebarNav() {
-  const { sidebar } = useSite()
+  const sidebar = useSidebar()
   const { path } = usePage()
   const root = useRef<HTMLDivElement>(null)
 

@@ -15,7 +15,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { resolveLayouts } from '../../shared/layout.js'
 import { isExternal, normalizePath } from '../../shared/paths.js'
-import { ConfigSchema, SidebarSchema, type ShabdConfig, type SidebarInput } from '../../shared/schema.js'
+import { ConfigSchema, SidebarsSchema, type ShabdConfig, type SidebarsInput } from '../../shared/schema.js'
 import type { ResolvedLayout } from '../../shared/types.js'
 import { flattenVars } from '../content/vars.js'
 import { ShabdError, type SourceIssue } from './errors.js'
@@ -253,7 +253,8 @@ function resolveRedirects(
 }
 
 export interface LoadedSidebar {
-  input: SidebarInput
+  /** One sidebar, as a list, or several, keyed by the part of the site each belongs to. */
+  input: SidebarsInput
   /** Map a sidebar.yaml data path to a source issue with line and column. */
   locate(issues: { path: (string | number)[]; message: string }[]): SourceIssue[]
   source: string | undefined
@@ -269,6 +270,6 @@ export async function loadSidebar(config: Pick<ResolvedConfig, 'sidebarFile'>): 
 }
 
 export function parseSidebar(file: string, source: string): LoadedSidebar {
-  const { value, yaml } = parseYamlWithSchema(file, source, SidebarSchema, { emptyValue: [] })
+  const { value, yaml } = parseYamlWithSchema(file, source, SidebarsSchema, { emptyValue: [] })
   return { input: value, locate: (issues) => locateIssues(issues, yaml), source }
 }

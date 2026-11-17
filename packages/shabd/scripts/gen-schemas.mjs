@@ -10,14 +10,15 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
-import { ConfigSchema, SidebarSchema } from '../dist/shared/schema.js'
+import { ConfigSchema, SidebarsSchema } from '../dist/shared/schema.js'
 
 const outDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'schemas')
 await mkdir(outDir, { recursive: true })
 
 const schemas = {
   'config.schema.json': { schema: ConfigSchema, title: 'Shabd site configuration (shabd.config.yaml)' },
-  'sidebar.schema.json': { schema: SidebarSchema, title: 'Shabd sidebar (sidebar.yaml)' },
+  // One sidebar as a list, or several as a map: the file may be either.
+  'sidebar.schema.json': { schema: SidebarsSchema, title: 'Shabd sidebar (sidebar.yaml)' },
 }
 
 for (const [file, { schema, title }] of Object.entries(schemas)) {
