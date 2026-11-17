@@ -1,0 +1,8 @@
+# Text is stored and checked out with LF on every system. Without this, Git on Windows writes CRLF, and
+# files that are compared byte for byte (the lockfile, Markdown fixtures, snapshots) differ there.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.woff2 binary
+*.tgz binary
