@@ -32,6 +32,8 @@ import {
   normalizePath,
   searchForWorkspaceRoot,
   type BuildOptions,
+  type DevEnvironment,
+  type EnvironmentModuleNode,
   type Plugin,
   type PluginOption,
   type ViteDevServer,
@@ -79,6 +81,17 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
   /** Pages with a hot update in flight: when the change was seen and how long compiling took. */
   const hotFiles = new Map<string, { at: number; compileMs?: number }>()
   let contentWatcher: FSWatcher | undefined
+  /**
+   * The page list and the site data are sent to the browser again whenever
+   * they change, and two answers can arrive there in either order. Each says
+   * when it was made, so that an older one never replaces a newer one
+   * (client/app/store.ts). A build has one answer, and it says 0.
+   */
+  let lastRevision = 0
+  const revisionOf = (dev: boolean) => {
+    if (dev) lastRevision = Math.max(Date.now(), lastRevision + 1)
+    return `export const revision = ${dev ? lastRevision : 0}\n`
+  }
 
   const ctx = (): ShabdContext => {
     if (!context) throw new Error('shabd: plugin used before its config hook ran')
@@ -167,11 +180,11 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
 
       switch (id.slice(1)) {
         case VIRTUAL.data:
-          return `export default ${JSON.stringify(store.siteData({ dev }))}\n`
+          return `export default ${JSON.stringify(store.siteData({ dev }))}\n${revisionOf(dev)}`
 
         case VIRTUAL.routes: {
           const routes = store.pages().map((page) => `  ${JSON.stringify(page.path)}: () => import(${importPath(page.file)}),`)
-          return `export const routes = {\n${routes.join('\n')}\n}\n`
+          return `export const routes = {\n${routes.join('\n')}\n}\n${revisionOf(dev)}`
         }
 
         case VIRTUAL.components: {
@@ -274,7 +287,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       const client = server.environments.client
       const reload = (id: string) => {
         const module = client.moduleGraph.getModuleById(resolved(id))
-        if (module) void client.reloadModule(module)
+        if (module) resend(client, module)
       }
       const same = (a: string, b: string) => normalizePath(a) === normalizePath(b)
 
@@ -284,7 +297,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
           // Every page the browser has loaded is compiled again and swapped in, as after an edit to it.
           pages: () => {
             for (const page of store.pages()) {
-              for (const module of client.moduleGraph.getModulesByFile(normalizePath(page.file)) ?? []) void client.reloadModule(module)
+              for (const module of client.moduleGraph.getModulesByFile(normalizePath(page.file)) ?? []) resend(client, module)
             }
           },
         })
@@ -507,6 +520,21 @@ function hasPackage(root: string, name: string): boolean {
   } catch {
     return resolveFromPackage(name) !== undefined
   }
+}
+
+/**
+ * Send the browser a module again, made from what it is made from now.
+ *
+ * `reloadModule` alone is not enough. A request for the module that was under
+ * way when the update was sent has read the old state, and Vite keeps its
+ * result and gives it to every later request: after a page was renamed, the
+ * browser could be left with the list of pages from before the rename, until
+ * something else changed. Vite does drop such a result for a module it was
+ * told had changed, which is what it does itself for a file that was saved.
+ */
+function resend(environment: DevEnvironment, module: EnvironmentModuleNode): void {
+  environment.moduleGraph.invalidateModule(module)
+  void environment.reloadModule(module)
 }
 
 function reportError(server: ViteDevServer, error: unknown): void {

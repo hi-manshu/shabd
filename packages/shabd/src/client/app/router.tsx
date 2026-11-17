@@ -259,7 +259,12 @@ export function RouterProvider({ initial, children }: { initial: LoadedPage; chi
   useEffect(
     () =>
       routeStore.subscribe(() => {
-        void loadPage(pathRef.current).then((next) => setPage(next))
+        // The answer is for the address that was current when it was asked for. If the reader has moved on
+        // by the time it comes (the Studio renames a page and goes to its new address), it is dropped.
+        const asked = pathRef.current
+        void loadPage(asked).then((next) => {
+          if (pathRef.current === asked) setPage(next)
+        })
       }),
     [],
   )

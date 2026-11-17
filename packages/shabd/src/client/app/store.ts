@@ -6,8 +6,8 @@
  * YAML or adding a page replaces data in place instead of reloading the tab.
  */
 import { useSyncExternalStore } from 'react'
-import initialData from 'virtual:shabd/data'
-import { routes as initialRoutes } from 'virtual:shabd/routes'
+import initialData, { revision as dataRevision } from 'virtual:shabd/data'
+import { routes as initialRoutes, revision as routesRevision } from 'virtual:shabd/routes'
 import type { SiteData } from '../../shared/types.js'
 import type { PageModule } from './types.js'
 
@@ -60,10 +60,19 @@ if (import.meta.hot) {
     if (css !== undefined && style && style.textContent !== css) style.textContent = css
   })
 
+  // Two updates sent one after the other are two requests, answered in whichever order they finish.
+  // The dev server numbers what it sends, and an answer older than the one in use is dropped.
+  const newest = { data: dataRevision, routes: routesRevision }
+  const isNewer = (of: keyof typeof newest, revision: unknown): boolean => {
+    if (typeof revision !== 'number' || revision < newest[of]) return false
+    newest[of] = revision
+    return true
+  }
+
   import.meta.hot.accept('virtual:shabd/data', (next) => {
-    if (next) siteStore.set(next.default as SiteData)
+    if (next && isNewer('data', next.revision)) siteStore.set(next.default as SiteData)
   })
   import.meta.hot.accept('virtual:shabd/routes', (next) => {
-    if (next) routeStore.set(next.routes as RouteTable)
+    if (next && isNewer('routes', next.revision)) routeStore.set(next.routes as RouteTable)
   })
 }
