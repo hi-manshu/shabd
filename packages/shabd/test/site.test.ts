@@ -136,7 +136,7 @@ redirects:
     })
     const { problems } = await collectProblems(await createContext(dir, { dev: false }))
     expect(problems.map(({ level, file, line, message }) => `${level} ${file}:${line ?? ''} ${message}`)).toEqual([
-      'warning content/guide/install.md: Link to /guide/old, which has moved to /guide/install#steps. Link there instead.',
+      'warning content/guide/install.md:5 Link to /guide/old, which has moved to /guide/install#steps. Link there instead.',
       'error shabd.config.yaml:5 Redirect from /guide/setup: a page has that address, so the redirect is never used. Remove one of them.',
       'error shabd.config.yaml:6 Redirect from /gone leads to /nowhere, where there is no page',
       'error shabd.config.yaml:7 Redirect from /lost leads to /guide/install, which has no heading "#no-such-heading"',

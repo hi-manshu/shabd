@@ -8,6 +8,11 @@
 import type { VFile } from 'vfile'
 import type { PageSection, TocEntry } from '../../shared/types.js'
 
+/** Something in a page, and the line it is written on when that is known. */
+export interface Located {
+  line?: number
+}
+
 export interface PageData {
   /* inputs */
   /** Lift a leading `# heading` out of the body and report it as the title. */
@@ -23,6 +28,12 @@ export interface PageData {
   sections: PageSection[]
   /** Internal links found in the page, as route paths (with `#hash` when present). */
   links: string[]
+  /** The line each of `links` is written on, in the same order. Zero where it is not known. */
+  linkLines: number[]
+  /** Links to other sites, for `shabd check --external`. */
+  external: ({ url: string } & Located)[]
+  /** Pictures with no alternative text. */
+  unlabelled: ({ src: string } & Located)[]
   /** The colours of the page's code tokens, as a stylesheet. Empty when the page has no highlighted code. */
   codeCss: string
   /** Every heading id on the page, for checking `#fragment` links that point here. */
@@ -32,7 +43,18 @@ export interface PageData {
 const KEY = 'shabd'
 
 export function initPageData(file: VFile, input: Pick<PageData, 'liftTitle' | 'routePath' | 'id'>): PageData {
-  const data: PageData = { ...input, title: undefined, toc: [], sections: [], links: [], anchors: [], codeCss: '' }
+  const data: PageData = {
+    ...input,
+    title: undefined,
+    toc: [],
+    sections: [],
+    links: [],
+    linkLines: [],
+    external: [],
+    unlabelled: [],
+    anchors: [],
+    codeCss: '',
+  }
   file.data[KEY] = data
   return data
 }

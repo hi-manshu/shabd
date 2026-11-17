@@ -1,15 +1,27 @@
 /**
  * `shabd check`: everything that can be wrong with a site, found without
  * building it. The build runs the same checks and reports them as warnings.
+ *
+ * What is plainly wrong is always an error: a link to a page that is not
+ * there, a redirect that leads nowhere. What is a matter of the site's own
+ * standards (a picture with no alternative text, a page with no
+ * description, a link to another site that does not answer) is as serious
+ * as `check:` in the config says, and can be switched off.
  */
 import path from 'node:path'
 import pc from 'picocolors'
+import type { CheckLevel } from '../shared/schema.js'
+import { checkExternalLinks, type ExternalOptions } from './check-external.js'
 import { isShabdError, type ShabdError } from './config/errors.js'
 import { redirectRoute } from './config/load.js'
 import { compilePage, createContext, type ShabdContext } from './context.js'
 
+export type ProblemLevel = Exclude<CheckLevel, 'off'>
+
 export interface Problem {
-  level: 'error' | 'warning' | 'note'
+  level: ProblemLevel
+  /** Which check found it: `link`, `redirect`, `sidebar`, `variable`, `alt-text`, `description`, `external-link`. */
+  rule: string
   /** File the problem is in, relative to the site root. */
   file: string
   line?: number | undefined
@@ -22,30 +34,61 @@ export interface CheckResult {
   detailed: ShabdError[]
 }
 
+export interface CheckOptions {
+  /** Ask the links that leave the site whether they answer, whatever `check.externalLinks` says. */
+  external?: boolean
+  /** How the links that leave the site are asked. For tests. */
+  network?: ExternalOptions
+}
+
 /** Compile every page and collect problems with content, navigation and links. */
-export async function collectProblems(context: ShabdContext): Promise<CheckResult> {
+export async function collectProblems(context: ShabdContext, options: CheckOptions = {}): Promise<CheckResult> {
   const { config, store } = context
+  const rules = config.config.check
   const relative = (file: string) => path.relative(config.root, file)
   const problems: Problem[] = []
   const detailed: ShabdError[] = []
+  const at = (line: number | undefined) => (line ? { line } : {})
 
   const sidebarFile = relative(config.sidebarFile)
   for (const warning of store.sidebarWarnings()) {
-    problems.push({ level: 'warning', file: sidebarFile, line: warning.line, message: warning.message })
+    problems.push({ level: 'warning', rule: 'sidebar', file: sidebarFile, line: warning.line, message: warning.message })
   }
 
   // Compile everything first: links can only be checked against the full set of pages and anchors.
   const anchors = new Map<string, Set<string>>()
-  const links: { file: string; target: string }[] = []
+  const links: { file: string; target: string; line?: number }[] = []
+  const external: { file: string; url: string; line?: number }[] = []
   for (const page of store.pages()) {
+    const file = relative(page.file)
     // A name in braces that is nearly a variable was most likely meant to be one.
     for (const note of page.notes) {
-      problems.push({ level: 'warning', file: relative(page.file), line: note.line, message: note.message })
+      problems.push({ level: 'warning', rule: 'variable', file, line: note.line, message: note.message })
+    }
+    if (rules.descriptions !== 'off' && !page.description && !page.error) {
+      problems.push({
+        level: rules.descriptions,
+        rule: 'description',
+        file,
+        message: 'This page has no description. Search results, llms.txt and links shared to other sites show one where there is one.',
+      })
     }
     try {
       const compiled = await compilePage(context, page)
       anchors.set(page.path, new Set(compiled.anchors))
-      for (const target of compiled.links) links.push({ file: relative(page.file), target })
+      compiled.links.forEach((target, index) => links.push({ file, target, ...at(compiled.linkLines[index]) }))
+      for (const link of compiled.external) external.push({ file, ...link })
+      if (rules.altText !== 'off') {
+        for (const image of compiled.unlabelled) {
+          problems.push({
+            level: rules.altText,
+            rule: 'alt-text',
+            file,
+            ...at(image.line),
+            message: `The picture ${image.src} has no alternative text, so it says nothing to a reader who cannot see it. Write it between the square brackets.`,
+          })
+        }
+      }
     } catch (error) {
       if (!isShabdError(error)) throw error
       detailed.push(error)
@@ -56,53 +99,64 @@ export async function collectProblems(context: ShabdContext): Promise<CheckResul
 
   const moved = new Map(config.redirects.map((redirect) => [redirect.from, redirect]))
 
-  for (const { file, target } of links) {
+  for (const { file, target, line } of links) {
     const [route = '', fragment] = target.split('#')
     const known = anchors.get(route)
     const redirect = moved.get(route)
+    const problem = (level: ProblemLevel, message: string) => problems.push({ level, rule: 'link', file, ...at(line), message })
     if (!known && redirect) {
       // The link works, by way of the redirect. It is still worth saying: the reader makes a stop they need not.
-      problems.push({ level: 'warning', file, message: `Link to ${route}, which has moved to ${redirect.to}. Link there instead.` })
+      problem('warning', `Link to ${route}, which has moved to ${redirect.to}. Link there instead.`)
     } else if (!known) {
-      problems.push({ level: 'error', file, message: `Broken link: no page at ${route}` })
+      problem('error', `Broken link: no page at ${route}`)
     } else if (fragment && known.size > 0 && !known.has(decodeURIComponent(fragment))) {
-      problems.push({ level: 'error', file, message: `Broken link: ${route} has no heading "#${fragment}"` })
+      problem('error', `Broken link: ${route} has no heading "#${fragment}"`)
     }
   }
 
   const configFile = relative(config.configFile)
   for (const redirect of config.redirects) {
     const line = config.locate(['redirects', redirect.key])?.line
+    const problem = (message: string) => problems.push({ level: 'error', rule: 'redirect', file: configFile, line, message })
     if (anchors.has(redirect.from)) {
-      problems.push({
-        level: 'error',
-        file: configFile,
-        line,
-        message: `Redirect from ${redirect.from}: a page has that address, so the redirect is never used. Remove one of them.`,
-      })
+      problem(`Redirect from ${redirect.from}: a page has that address, so the redirect is never used. Remove one of them.`)
     }
     if (redirect.external) continue
     const route = redirectRoute(redirect.to)
     const fragment = redirect.to.split('#')[1]
     const known = anchors.get(route)
     if (!known) {
-      problems.push({ level: 'error', file: configFile, line, message: `Redirect from ${redirect.from} leads to ${route}, where there is no page` })
+      problem(`Redirect from ${redirect.from} leads to ${route}, where there is no page`)
     } else if (fragment && known.size > 0 && !known.has(decodeURIComponent(fragment))) {
-      problems.push({
-        level: 'error',
-        file: configFile,
-        line,
-        message: `Redirect from ${redirect.from} leads to ${route}, which has no heading "#${fragment}"`,
-      })
+      problem(`Redirect from ${redirect.from} leads to ${route}, which has no heading "#${fragment}"`)
     }
   }
 
   for (const slug of store.sidebar.unlisted) {
     problems.push({
       level: 'note',
+      rule: 'sidebar',
       file: sidebarFile,
       message: `/${slug} is published but not in the sidebar. Add it, or set \`sidebar: { exclude: true }\` in its frontmatter.`,
     })
+  }
+
+  // Asked for on the command line, a link that does not answer is a warning even on a site that has the rule off.
+  const externalLevel: CheckLevel = rules.externalLinks === 'off' && options.external ? 'warning' : rules.externalLinks
+  if (externalLevel !== 'off' && external.length > 0) {
+    const verdicts = await checkExternalLinks(
+      external.map((link) => link.url),
+      options.network,
+    )
+    for (const { file, url, line } of external) {
+      const verdict = verdicts.get(url)
+      if (verdict?.state === 'broken') {
+        problems.push({ level: externalLevel, rule: 'external-link', file, ...at(line), message: `${url} ${verdict.detail}` })
+      } else if (verdict?.state === 'unknown') {
+        // Nothing is known about what a reader would get, so nothing is held against the page.
+        problems.push({ level: 'note', rule: 'external-link', file, ...at(line), message: `${url} ${verdict.detail}, so it could not be checked` })
+      }
+    }
   }
 
   return { problems, detailed }
@@ -115,23 +169,76 @@ export function formatProblem(problem: Problem): string {
   return `  ${LABEL[problem.level]}  ${pc.cyan(where)}  ${problem.message}`
 }
 
+/** How the result is printed: for a person, for a program, or for GitHub to draw beside the lines of a pull request. */
+export const CHECK_FORMATS = ['text', 'json', 'github'] as const
+export type CheckFormat = (typeof CHECK_FORMATS)[number]
+
+/** Page errors (invalid frontmatter, MDX that does not parse) as problems, one for each issue. */
+function fromDetailed(error: ShabdError, root: string): Problem[] {
+  return error.issues.map((issue) => ({
+    level: 'error' as const,
+    rule: 'page',
+    file: path.relative(root, error.file),
+    ...(issue.line !== undefined ? { line: issue.line } : {}),
+    message: issue.message,
+  }))
+}
+
+/** What `--format json` prints. */
+export interface CheckReport {
+  pages: number
+  errors: number
+  warnings: number
+  notes: number
+  problems: Problem[]
+}
+
+export function toReport(pages: number, result: CheckResult, root: string): CheckReport {
+  const problems = [...result.detailed.flatMap((error) => fromDetailed(error, root)), ...result.problems]
+  const count = (level: ProblemLevel) => problems.filter((problem) => problem.level === level).length
+  return { pages, errors: count('error'), warnings: count('warning'), notes: count('note'), problems }
+}
+
+/**
+ * A problem as a GitHub Actions workflow command, which GitHub shows beside
+ * the line in a pull request. Paths are given from the folder the command
+ * runs in, which in a workflow is the root of the repository.
+ */
+export function githubAnnotation(problem: Problem, root: string, cwd = process.cwd()): string {
+  const command = problem.level === 'note' ? 'notice' : problem.level
+  // In a property a comma or a colon would end it early, and in the message a newline would.
+  const property = (text: string) => text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A').replace(/:/g, '%3A').replace(/,/g, '%2C')
+  const message = problem.message.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
+  const file = path.relative(cwd, path.join(root, problem.file)).split(path.sep).join('/')
+  const line = problem.line !== undefined ? `,line=${problem.line}` : ''
+  return `::${command} file=${property(file)}${line},title=${property(`shabd check: ${problem.rule}`)}::${message}`
+}
+
 /** Returns true when the site has no errors. */
-export async function check(root: string): Promise<boolean> {
+export async function check(root: string, options: CheckOptions & { format?: CheckFormat } = {}): Promise<boolean> {
   const context = await createContext(root, { dev: false })
-  const { problems, detailed } = await collectProblems(context)
+  const result = await collectProblems(context, options)
   await context.compiler.cache.flush()
+  const report = toReport(context.store.pages().length, result, context.config.root)
 
-  for (const error of detailed) console.error(`\n${error.pretty(context.config.root)}`)
-  if (problems.length) console.log(`\n${problems.map(formatProblem).join('\n')}`)
+  if (options.format === 'json') {
+    // Nothing but the report, so that a program can read standard output as it is.
+    console.log(JSON.stringify(report, null, 2))
+    return report.errors === 0
+  }
 
-  const errors = detailed.length + problems.filter((problem) => problem.level === 'error').length
-  const warnings = problems.filter((problem) => problem.level === 'warning').length
-  const count = context.store.pages().length
-  const pages = `${count} ${count === 1 ? 'page' : 'pages'}`
+  if (options.format === 'github') {
+    for (const problem of report.problems) console.log(githubAnnotation(problem, context.config.root))
+  } else {
+    for (const error of result.detailed) console.error(`\n${error.pretty(context.config.root)}`)
+    if (result.problems.length) console.log(`\n${result.problems.map(formatProblem).join('\n')}`)
+  }
+
+  const pages = `${report.pages} ${report.pages === 1 ? 'page' : 'pages'}`
   console.log(
-    errors || warnings
-      ? `\n${pc.bold(`${pages} checked:`)} ${errors} ${errors === 1 ? 'error' : 'errors'}, ${warnings} ${warnings === 1 ? 'warning' : 'warnings'}\n`
+    report.errors || report.warnings
+      ? `\n${pc.bold(`${pages} checked:`)} ${report.errors} ${report.errors === 1 ? 'error' : 'errors'}, ${report.warnings} ${report.warnings === 1 ? 'warning' : 'warnings'}\n`
       : `\n${pc.green('✓')} ${pages} checked, no problems found\n`,
   )
-  return errors === 0
+  return report.errors === 0
 }

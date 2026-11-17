@@ -644,6 +644,26 @@ const redirectTarget = z
     error: 'A redirect leads to a path on this site, such as /new-page, or to an address that starts with https://',
   })
 
+/* ───────────────────────────────── check ──────────────────────────────── */
+
+/** How `shabd check` treats what a rule finds. Only `error` makes the check fail. */
+export const CHECK_LEVELS = ['off', 'note', 'warning', 'error'] as const
+export type CheckLevel = (typeof CHECK_LEVELS)[number]
+
+/**
+ * The rules of `shabd check` that are a matter of the site's own standards.
+ * What is plainly wrong (a link to a page that is not there) is always an
+ * error and is not listed here.
+ */
+const CheckSchema = z.strictObject({
+  /** A picture with no alternative text, which says nothing to a reader who cannot see it. */
+  altText: z.enum(CHECK_LEVELS).default('warning'),
+  /** A page with no description. Search results, llms.txt and shared links show one where there is one. */
+  descriptions: z.enum(CHECK_LEVELS).default('off'),
+  /** A link to another site that does not answer. It needs the network and takes time: `--external` asks for it once. */
+  externalLinks: z.enum(CHECK_LEVELS).default('off'),
+})
+
 /* ──────────────────────────────── markdown ────────────────────────────── */
 
 export interface PluginRef {
@@ -711,6 +731,8 @@ export const ConfigSchema = z.strictObject({
   vars: VarsSchema.default({}),
   /** How Markdown is read: the site's own plugins, and maths. */
   markdown: MarkdownSchema.prefault({}),
+  /** How strict `shabd check` is about what is a matter of taste. */
+  check: CheckSchema.prefault({}),
 })
 
 export type ShabdConfigInput = z.input<typeof ConfigSchema>

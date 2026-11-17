@@ -65,5 +65,6 @@ export function toErrorModule(error: ShabdError, displayFile: string, frontmatte
     `export default function PageWithError() {\n` +
     `  return __shabdElement(__ShabdPageError, { issues: __shabdIssues });\n` +
     `}\n`
-  return toPageModule({ code, toc: [], sections: [], links: [], anchors: [], codeCss: '' }, frontmatter, hotId)
+  const nothing = { toc: [], sections: [], links: [], linkLines: [], external: [], unlabelled: [], anchors: [], codeCss: '' }
+  return toPageModule({ code, ...nothing }, frontmatter, hotId)
 }

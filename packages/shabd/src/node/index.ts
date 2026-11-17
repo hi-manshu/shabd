@@ -5,7 +5,7 @@
  */
 export { build, type BuildOptions } from './build/build.js'
 export { preview, type PreviewOptions } from './build/preview.js'
-export { check, collectProblems, type Problem } from './check.js'
+export { check, collectProblems, type CheckOptions, type CheckReport, type Problem } from './check.js'
 export { isShabdError, ShabdError, type SourceIssue } from './config/errors.js'
 export { loadConfig, loadSidebar, type ResolvedConfig } from './config/load.js'
 export { themeToCss } from './config/theme-css.js'

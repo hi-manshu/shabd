@@ -31,6 +31,8 @@ ${pc.bold('Options')}
   --host [address]  Expose the server on the network
   --open            Open the browser when the server starts
   --no-semantic     Build without embeddings (keyword search only)
+  --external        check: also ask links to other sites whether they answer
+  --format <name>   check: text ${pc.dim('(default)')}, json, or github for annotations in a pull request
   -h, --help        Show this help
   -v, --version     Show the version
 `
@@ -44,6 +46,8 @@ export async function main(argv: string[]): Promise<void> {
       host: { type: 'string' },
       open: { type: 'boolean' },
       'no-semantic': { type: 'boolean' },
+      external: { type: 'boolean' },
+      format: { type: 'string' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
@@ -87,8 +91,12 @@ export async function main(argv: string[]): Promise<void> {
         break
       }
       case 'check': {
-        const { check } = await import('./check.js')
-        const ok = await check(root)
+        const { check, CHECK_FORMATS } = await import('./check.js')
+        const format = values.format ?? 'text'
+        if (!(CHECK_FORMATS as readonly string[]).includes(format)) {
+          fail(`--format must be one of ${CHECK_FORMATS.join(', ')}, got "${format}"`)
+        }
+        const ok = await check(root, { external: values.external === true, format: format as (typeof CHECK_FORMATS)[number] })
         if (!ok) process.exitCode = 1
         break
       }

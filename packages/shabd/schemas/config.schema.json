@@ -1701,6 +1701,43 @@
         }
       },
       "additionalProperties": false
+    },
+    "check": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "altText": {
+          "default": "warning",
+          "type": "string",
+          "enum": [
+            "off",
+            "note",
+            "warning",
+            "error"
+          ]
+        },
+        "descriptions": {
+          "default": "off",
+          "type": "string",
+          "enum": [
+            "off",
+            "note",
+            "warning",
+            "error"
+          ]
+        },
+        "externalLinks": {
+          "default": "off",
+          "type": "string",
+          "enum": [
+            "off",
+            "note",
+            "warning",
+            "error"
+          ]
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [

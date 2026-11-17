@@ -28,7 +28,7 @@ import { VFile } from 'vfile'
 import type { PageSection, TocEntry } from '../../shared/types.js'
 import { ShabdError } from '../config/errors.js'
 import { cacheKey, SlotCache } from './cache.js'
-import { initPageData } from './page-data.js'
+import { initPageData, type PageData } from './page-data.js'
 import { CodeHighlighter, rehypeCode, type CodeOptions } from './plugins/rehype-code.js'
 import { rehypeHeadings } from './plugins/rehype-headings.js'
 import { rehypeLinks } from './plugins/rehype-links.js'
@@ -72,6 +72,11 @@ export interface CompiledPage {
   sections: PageSection[]
   /** Route paths this page links to. */
   links: string[]
+  /** The line each of `links` is written on, in the same order. Zero where it is not known. */
+  linkLines: number[]
+  /** Links to other sites, and pictures with no alternative text: what `shabd check` asks about. */
+  external: PageData['external']
+  unlabelled: PageData['unlabelled']
   /** Heading ids on this page. */
   anchors: string[]
   /** The colours of the page's code tokens, as a stylesheet. The page module exports it. */
@@ -167,6 +172,9 @@ export class MarkdownCompiler {
       toc: data.toc,
       sections: data.sections,
       links: data.links,
+      linkLines: data.linkLines,
+      external: data.external,
+      unlabelled: data.unlabelled,
       anchors: data.anchors,
       codeCss: data.codeCss,
     }

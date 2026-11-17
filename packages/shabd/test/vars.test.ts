@@ -91,7 +91,7 @@ describe('variables', () => {
     })
     const { problems } = await collectProblems(await createContext(dir, { dev: false }))
     expect(problems).toEqual([
-      { level: 'warning', file: 'content/index.md', line: 3, message: '{{versoin}} is not a variable. Did you mean {{version}}?' },
+      { level: 'warning', rule: 'variable', file: 'content/index.md', line: 3, message: '{{versoin}} is not a variable. Did you mean {{version}}?' },
     ])
   })
 })

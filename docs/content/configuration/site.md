@@ -317,6 +317,25 @@ vars:
 
 A value is text, a number, or `true` or `false`. A name is made of letters, digits, `-` and `_`.
 
+## check
+
+How seriously [`shabd check`](../reference/cli.md#what-check-looks-for) takes what is a matter of a site's own
+standards. Each rule is `off`, `note`, `warning` or `error`, and only an `error` makes the check fail.
+
+| Key | Default | What it finds |
+| --- | --- | --- |
+| `altText` | `warning` | A picture with no alternative text |
+| `descriptions` | `off` | A page with no description |
+| `externalLinks` | `off` | A link to another site that does not answer. `shabd check --external` asks for it once |
+
+```yaml title="shabd.config.yaml"
+check:
+  altText: error
+  descriptions: warning
+```
+
+What is plainly wrong, such as a link to a page that does not exist, is always an error and has no switch.
+
 ## components and blocks
 
 Both map a name to a file. `components` are available in every `.mdx` page; `blocks` can be placed in
