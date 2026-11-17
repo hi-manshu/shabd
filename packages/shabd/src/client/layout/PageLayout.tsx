@@ -19,7 +19,7 @@
  * Changing what a page looks like is therefore a frontmatter or YAML edit,
  * and a new layout needs no new component.
  */
-import { Component, type ComponentType, type ReactNode } from 'react'
+import { Component, useLayoutEffect, useRef, type ComponentType, type ReactNode, type RefObject } from 'react'
 import { REGIONS, type RegionName } from '../../shared/blocks.js'
 import type { BlockRef } from '../../shared/schema.js'
 import { usePage } from '../app/router.js'
@@ -41,12 +41,38 @@ const REGION_LABEL: Partial<Record<RegionName, string>> = {
   aside: 'On this page',
 }
 
+/**
+ * On a narrow screen the sidebar is a panel that starts where the header
+ * ends. The header is not always at the top of the window: a banner above it
+ * holds it down until the page is scrolled. So while the panel is open it is
+ * told where the header ends, in `--sb-panel-top`. The value is left in place
+ * when the panel closes, so that it does not jump as it fades.
+ */
+function usePanelTop(shell: RefObject<HTMLDivElement | null>, open: boolean) {
+  useLayoutEffect(() => {
+    const element = shell.current
+    const header = element?.querySelector('.sb-region-header')
+    if (!open || !element || !header) return undefined
+    const place = () => element.style.setProperty('--sb-panel-top', `${Math.max(0, header.getBoundingClientRect().bottom)}px`)
+    place()
+    window.addEventListener('scroll', place, { passive: true })
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('scroll', place)
+      window.removeEventListener('resize', place)
+    }
+  }, [shell, open])
+}
+
 export function PageLayout() {
   const { layout, path } = usePage()
   const { sidebarOpen } = useUi()
+  const shell = useRef<HTMLDivElement>(null)
+  usePanelTop(shell, sidebarOpen)
 
   return (
     <div
+      ref={shell}
       className="sb-shell"
       data-layout={layout.name}
       data-width={layout.width}

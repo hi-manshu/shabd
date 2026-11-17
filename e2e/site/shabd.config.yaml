@@ -22,6 +22,11 @@ layouts:
     width: wide
     regions:
       aside: []
+  # A banner above the header, which holds the header down until the page is scrolled.
+  announced:
+    extends: doc
+    regions:
+      banner: [notice]
 
 features:
   search: { semantic: false }
@@ -29,3 +34,6 @@ features:
 
 components:
   Counter: ./components/Counter.tsx
+
+blocks:
+  notice: ./components/Notice.tsx

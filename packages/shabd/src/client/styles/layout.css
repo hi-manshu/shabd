@@ -107,7 +107,8 @@
   @media (max-width: 59.99rem) {
     .sb-region-sidebar {
       position: fixed;
-      inset: var(--sb-header-height) 0 0 0;
+      /* Where the header ends. PageLayout measures it while the panel is open: a banner can hold the header down. */
+      inset: var(--sb-panel-top, var(--sb-header-height)) 0 0 0;
       z-index: 20;
       block-size: auto;
       border: 0;

@@ -329,6 +329,37 @@ test.describe('narrow screens', () => {
     const overflows = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)
     expect(overflows).toBe(false)
   })
+
+  test('the panel starts where the header ends, also when a banner holds the header down', async ({ page }) => {
+    await open(page, `${BUILT}/guide/hosting`)
+    const header = page.locator('.sb-region-header')
+    const sidebar = page.locator('.sb-region-sidebar')
+    const bottomOfHeader = async () => Math.round(await header.evaluate((element) => element.getBoundingClientRect().bottom))
+    const topOfPanel = () => sidebar.evaluate((element) => Math.round(element.getBoundingClientRect().top))
+    const height = Math.round((await header.boundingBox())!.height)
+
+    // At the top of the page the banner is above the header.
+    expect(await bottomOfHeader()).toBeGreaterThan(height + 20)
+    await page.getByRole('button', { name: 'Open navigation' }).click()
+    await expect(sidebar).toBeVisible()
+    await expect.poll(topOfPanel).toBe(await bottomOfHeader())
+    // None of the panel is under the header, so its first link can be pressed.
+    await sidebar.getByRole('link', { name: 'Introduction' }).click()
+    await expect(page).toHaveURL(`${BUILT}/guide/intro`)
+
+    // Scrolled past the banner, the header is at the top of the window and the panel follows it there.
+    await open(page, `${BUILT}/guide/hosting`)
+    // The page is a short one: give it room to scroll.
+    await page.addStyleTag({ content: 'body { padding-block-end: 1200px }' })
+    await page.evaluate(() => window.scrollTo(0, 400))
+    await expect.poll(bottomOfHeader).toBe(height)
+    // Pressed as a finger presses it. Playwright's own click first scrolls its target into view, and for a
+    // button in a header that sticks to the top of the window, some engines scroll the page back for that.
+    await page.locator('.sb-menu-toggle').evaluate((button: HTMLElement) => button.click())
+    await expect(sidebar).toBeVisible()
+    await expect.poll(topOfPanel).toBe(height)
+    expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(400)
+  })
 })
 
 test.describe('for agents', () => {

@@ -1,6 +1,7 @@
 ---
 title: Going live
 description: Publish the built site.
+layout: announced
 ---
 
 ## Hosting
