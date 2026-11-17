@@ -215,6 +215,11 @@ const SiteSchema = z.strictObject({
   lang: z.string().min(2).default('en'),
   logo: LogoSchema.optional(),
   favicon: z.string().optional(),
+  /**
+   * The picture other sites show when a page is shared: a path in `public/`
+   * or a full address. A page can name its own with `image` in frontmatter.
+   */
+  image: z.string().min(1).optional(),
   repo: RepoSchema.optional(),
   social: SocialSchema.default([]),
   /** Links shown in the header. */
@@ -592,6 +597,18 @@ const FeedFeatureSchema = z.strictObject({
   limit: z.int().min(1).max(500).default(20),
 })
 
+const SocialImagesFeatureSchema = z.strictObject({
+  enabled: z.boolean().default(false),
+  /**
+   * The font files the pictures are set in: TrueType or OpenType, a regular
+   * and a bold face. Left out, a font of the machine that builds is used.
+   */
+  font: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
+    .default([])
+    .transform((font) => (typeof font === 'string' ? [font] : font)),
+})
+
 const FeaturesSchema = z.strictObject({
   search: feature(SearchFeatureSchema, true),
   mcp: feature(McpFeatureSchema, true),
@@ -600,6 +617,8 @@ const FeaturesSchema = z.strictObject({
   sandbox: feature(SandboxFeatureSchema, true),
   /** rss.xml: the pages that have a day, newest first. Needs `site.url`. */
   feed: feature(FeedFeatureSchema, false),
+  /** A picture for each page, shown where the page is shared. Needs `site.url` and `@resvg/resvg-js`. */
+  socialImages: feature(SocialImagesFeatureSchema, false),
 })
 
 /* ──────────────────────────────── content ─────────────────────────────── */
@@ -826,6 +845,8 @@ export const FrontmatterSchema = z.looseObject({
   lastUpdated: z.union([z.literal(false), day]).optional(),
   /** The day this page was published, as `2026-11-17`. The feed lists the page under it. */
   date: day.optional(),
+  /** The picture other sites show when this page is shared: a path in `public/` or a full address. */
+  image: z.string().min(1).optional(),
 })
 
 export type FrontmatterInput = z.input<typeof FrontmatterSchema>

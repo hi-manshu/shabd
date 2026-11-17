@@ -35,6 +35,7 @@ The page starts here.
 | `editLink` | `false` | Hide "Edit this page" |
 | `pagination` | `false` | Hide previous and next links |
 | `lastUpdated` | a day, or `false` | The day shown as [last updated](./site.md#when-a-page-was-last-changed), such as `2026-11-17`, in place of the one Git has. `false` shows none |
+| `image` | a path or an address | The [picture](../features/social-images.md) other sites show when the page is shared |
 | `hero` | options | Content for the `splash` layout |
 | `api` | options | Content for the `api` layout |
 

@@ -59,6 +59,7 @@ with Shabd:
 | `lang` | `en` | The `lang` attribute of every page |
 | `logo` | none | A path to an image, or the [settings below](#logo) |
 | `favicon` | none | A path to an icon in `public/` |
+| `image` | none | The picture shown where a page is shared: see [social pictures](../features/social-images.md) |
 | `repo` | none | A repository URL, or `{ url, branch, dir }`. Enables "Edit this page" |
 | `social` | none | `{ github: https://… }`, or a list of `{ icon, href, label }` |
 | `nav` | none | Header links: a list of `{ label, link, badge }` |
@@ -229,6 +230,7 @@ Each feature takes `true`, `false`, or an object of options.
 | `studio` | `enabled`, `sync` (`off`, `tabs` or `peers`) | on, syncing between tabs |
 | `sandbox` | `enabled` | on |
 | `feed` | `enabled`, `title`, `directory`, `limit` | off |
+| `socialImages` | `enabled`, `font` | off |
 
 ```yaml
 features:
@@ -237,7 +239,8 @@ features:
 ```
 
 Each feature has its own page: [Search](../features/search.md), [MCP and llms.txt](../features/mcp.md),
-[Studio](../features/studio.md), [Live sandboxes](../features/sandbox.mdx) and [Feed](../features/feed.md).
+[Studio](../features/studio.md), [Live sandboxes](../features/sandbox.mdx), [Feed](../features/feed.md) and
+[Social pictures](../features/social-images.md).
 
 ## redirects
 

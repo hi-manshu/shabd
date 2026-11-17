@@ -91,6 +91,7 @@ features:
   studio: true # in-browser editor, dev server only
   sandbox: true # ```tsx live code fences
   feed: true # rss.xml: the pages newest first, by the day each was last changed
+  socialImages: true # a picture for each page, shown where it is shared; needs @resvg/resvg-js
 
 # Components every .mdx file can use without importing them.
 components:

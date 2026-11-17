@@ -14,6 +14,8 @@ export interface DocumentOptions {
   path: string
   /** Ask search engines not to list this page. A site that is `noindex` asks for every page. */
   noindex?: boolean | undefined
+  /** The picture to show when this page is shared, in place of the site's: a path inside the site, or a full address. */
+  image?: string | undefined
   /** Prerendered app markup. */
   body?: string
   /** Extra tags for <head>: stylesheets, module preloads. */
@@ -53,6 +55,17 @@ export function renderHeadTag(tag: HeadTag, base: string): string {
   return tag.tag === 'meta' || tag.tag === 'link' ? opening : `${opening}${tag.content ?? ''}</${tag.tag}>`
 }
 
+/**
+ * The full address of the picture shown when a page is shared. The sites
+ * that show it fetch it from outside, so a path inside the site is only of
+ * use once it is known where the site is deployed.
+ */
+export function socialImage(site: ShabdConfig['site'], image: string | undefined): string | undefined {
+  if (!image) return undefined
+  if (/^https?:\/\//i.test(image)) return image
+  return site.url ? new URL(withBase(site.base, image), site.url).href : undefined
+}
+
 export function pageTitle(config: ShabdConfig, title: string): string {
   return title && title !== config.site.title ? `${title} | ${config.site.title}` : config.site.title
 }
@@ -67,6 +80,7 @@ export function renderDocument(options: DocumentOptions): string {
   // page is correct even before (or without) JavaScript.
   const themeAttribute = theme.colorMode.default === 'system' ? '' : ` data-theme="${theme.colorMode.default}"`
   const canonical = site.url ? new URL(siteHref(options.path, site, () => true), site.url).href : undefined
+  const image = socialImage(site, options.image ?? site.image)
 
   const head = [
     '<meta charset="utf-8">',
@@ -77,6 +91,10 @@ export function renderDocument(options: DocumentOptions): string {
     `<meta property="og:title" content="${escapeHtml(title)}">`,
     description && `<meta property="og:description" content="${escapeHtml(description)}">`,
     '<meta property="og:type" content="article">',
+    `<meta property="og:site_name" content="${escapeHtml(site.title)}">`,
+    image && `<meta property="og:image" content="${escapeHtml(image)}">`,
+    // With a picture, a link to the page is shown as a large card; without one, as a line of text.
+    `<meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}">`,
     canonical && `<link rel="canonical" href="${escapeHtml(canonical)}">`,
     canonical && `<meta property="og:url" content="${escapeHtml(canonical)}">`,
     site.favicon && `<link rel="icon" href="${escapeHtml(withBase(site.base, site.favicon))}">`,

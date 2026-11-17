@@ -28,6 +28,8 @@ export interface BuiltSite {
   has(file: string): boolean
   /** What the build printed, without colours. */
   output: string
+  /** Build the same folder again, as it is now, and give back what that build printed. */
+  rebuild(): Promise<string>
 }
 
 /**
@@ -48,14 +50,19 @@ export function temporaryBuilds(): (files: Record<string, string>, options?: Bui
       await writeFile(path.join(dir, name), contents)
     }
 
-    const printed: string[] = []
-    const log = vi.spyOn(console, 'log').mockImplementation((...parts: unknown[]) => {
-      printed.push(parts.join(' '))
-    })
-    try {
-      await build(dir, { semantic: false, ...options })
-    } finally {
-      log.mockRestore()
+    /** Run the build with its output caught, and give the output back without colours. */
+    const run = async (): Promise<string> => {
+      const printed: string[] = []
+      const log = vi.spyOn(console, 'log').mockImplementation((...parts: unknown[]) => {
+        printed.push(parts.join(' '))
+      })
+      try {
+        await build(dir, { semantic: false, ...options })
+      } finally {
+        log.mockRestore()
+      }
+      // eslint-disable-next-line no-control-regex
+      return printed.join('\n').replace(/\u001b\[[0-9;]*m/g, '')
     }
 
     const dist = path.join(dir, 'dist')
@@ -63,8 +70,8 @@ export function temporaryBuilds(): (files: Record<string, string>, options?: Bui
       dir,
       read: (file) => readFile(path.join(dist, file), 'utf8'),
       has: (file) => existsSync(path.join(dist, file)),
-      // eslint-disable-next-line no-control-regex
-      output: printed.join('\n').replace(/\u001b\[[0-9;]*m/g, ''),
+      output: await run(),
+      rebuild: run,
     }
   }
 }

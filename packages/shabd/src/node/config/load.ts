@@ -55,6 +55,8 @@ export interface ResolvedConfig {
   blocks: Record<string, string>
   /** Absolute paths of the site's own stylesheets (`theme.css`). */
   stylesheets: string[]
+  /** Absolute paths of the font files social pictures are set in. Empty: a font of this machine is looked for. */
+  socialFonts: string[]
   /** `redirects:` with chains followed to their end. */
   redirects: Redirect[]
   /** Where a key of the config is written, for problems found after it has loaded. */
@@ -136,6 +138,23 @@ export function resolveConfig(root: string, configFile: string, source: string):
     })
   }
 
+  if (config.features.socialImages.enabled && !config.site.url) {
+    issues.push({
+      path: ['features', 'socialImages'],
+      message: 'Social pictures need `site.url`: the sites that show a picture fetch it by its full address',
+    })
+  }
+  const socialFonts = config.features.socialImages.font.map((file, index) => {
+    const absolute = path.resolve(root, file)
+    const at = ['features', 'socialImages', 'font', index]
+    if (!/\.(?:ttf|otf|ttc)$/i.test(file)) {
+      issues.push({ path: at, message: `${file} is not a font that can be used here. Name a .ttf, .otf or .ttc file; web fonts (.woff2) cannot be read` })
+    } else if (!existsSync(absolute)) {
+      issues.push({ path: at, message: `File not found: ${file} (looked in ${absolute})` })
+    }
+    return absolute
+  })
+
   if (issues.length > 0) {
     throw new ShabdError(configFile, locateIssues(issues, yaml), source)
   }
@@ -167,6 +186,7 @@ export function resolveConfig(root: string, configFile: string, source: string):
     components,
     blocks,
     stylesheets,
+    socialFonts,
     redirects,
     locate: (path) => yaml.locate(path, 'key'),
     compileFingerprint,

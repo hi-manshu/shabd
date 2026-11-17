@@ -25,6 +25,7 @@ import { markdownPath, pageAddress, publicUrl, renderLlmsFull, renderLlmsTxt } f
 import { pageMarkdown } from '../llms/markdown.js'
 import { DOCS_FILE, SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, type DocsFile } from '../mcp/source.js'
 import { SearchService } from '../search/service.js'
+import { generateSocialImages } from '../social/index.js'
 import { serverOutDir, shabd } from '../vite/plugin.js'
 import { FEED_FILE, feedEntries, renderFeed } from './feed.js'
 import { escapeHtml, renderDocument, renderRedirect } from './html.js'
@@ -70,6 +71,22 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   await viteBuild({ ...viteOptions, plugins: [shabd({ context })] })
   step(`browser bundle ${pc.dim(seconds(performance.now() - phase))}`)
 
+  const write = async (file: string, contents: string | Uint8Array) => {
+    const target = path.join(outDir, file)
+    await mkdir(path.dirname(target), { recursive: true })
+    await writeFile(target, contents)
+  }
+
+  // The picture for each page, before the pages are written: each page names its own in its head.
+  let pictures = new Map<string, string>()
+  if (config.config.features.socialImages.enabled) {
+    phase = performance.now()
+    const social = await generateSocialImages(context, write)
+    pictures = social.images
+    if (social.reason) console.log(pc.yellow(`    features.socialImages is on, but ${social.reason}.`))
+    else step(`${pictures.size} social pictures, ${social.drawn} newly drawn ${pc.dim(seconds(performance.now() - phase))}`)
+  }
+
   phase = performance.now()
   await viteBuild({ ...viteOptions, plugins: [shabd({ context })], build: { ssr: true } })
   const serverDir = serverOutDir(config)
@@ -78,12 +95,6 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   }
   const manifest = JSON.parse(await readFile(path.join(outDir, '.vite', 'manifest.json'), 'utf8')) as Manifest
   const assets = new AssetResolver(manifest, context)
-
-  const write = async (file: string, contents: string | Uint8Array) => {
-    const target = path.join(outDir, file)
-    await mkdir(path.dirname(target), { recursive: true })
-    await writeFile(target, contents)
-  }
 
   // The presets in the theme menu are the same on every page. They go in one
   // file, named after its contents so that it can be cached for good.
@@ -102,6 +113,8 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
       path: routePath,
       // The page for an address that does not exist is not one to list either.
       noindex: sourceFile === undefined || store.byPath(routePath)?.frontmatter.noindex,
+      // A page's own picture, then the one drawn for it. With neither, the document falls back to the site's.
+      image: store.byPath(routePath)?.frontmatter.image ?? pictures.get(routePath),
       body: rendered.html,
       head: assets.headTags(sourceFile),
       scripts: assets.entryScript(),

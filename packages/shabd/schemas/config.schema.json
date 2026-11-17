@@ -80,6 +80,10 @@
         "favicon": {
           "type": "string"
         },
+        "image": {
+          "type": "string",
+          "minLength": 1
+        },
         "repo": {
           "anyOf": [
             {
@@ -1536,6 +1540,40 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 500
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "socialImages": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "font": {
+                  "default": [],
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  ]
                 }
               },
               "additionalProperties": false

@@ -395,6 +395,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
                 description: page?.description ?? '',
                 path: route,
                 noindex: !page || page.frontmatter.noindex,
+                image: page?.frontmatter.image,
                 scripts: `<script type="module" src="${entry}"></script>`,
               }),
             )

@@ -42,6 +42,7 @@
     - file: features/sandbox
       badge: { text: Beta, variant: caution }
     - features/feed
+    - features/social-images
 
 - link: https://github.com/hi-manshu/shabd
   label: GitHub
