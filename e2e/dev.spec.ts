@@ -1,4 +1,5 @@
 /** The dev server: files change on disk and the page on screen follows, without loading again. */
+import { existsSync } from 'node:fs'
 import type { Page } from '@playwright/test'
 import { DEV, expect, markPage, open, regions, test } from './support/fixtures.js'
 
@@ -153,6 +154,167 @@ test.describe('studio', () => {
     await expect(page.locator('.sb-studio-footer')).toContainText(/Saved\. The page updated \d+ ms later\./)
     expect(await site.read('content/guide/setup.md')).toContain('Install the other thing.')
     expect(await stillThere()).toBe(true)
+  })
+
+  test('the editor shows its Markdown in colour, with the colours under the letters', async ({ page, site }) => {
+    await site.track('content/guide/setup.md')
+    const editor = await openStudio(page, '/guide/setup')
+    const colours = page.locator('.sb-studio-colours')
+
+    // Lines that wrap, a tab, spaces at the end of a line, a word wider than the panel and an empty last
+    // line: the places where a text area and a copy of its text could come apart.
+    const source = [
+      '---',
+      'title: Setting up',
+      '---',
+      '',
+      '# Setting up',
+      '',
+      `A paragraph long enough to wrap in a panel this narrow, with **strong words**, \`code\`, a [link](./intro.md) and ${'more '.repeat(40)}text.`,
+      '',
+      '- one',
+      '\t- two, after a tab',
+      '- three   ',
+      '',
+      '```ts',
+      'const answer = 42 // not *emphasis*',
+      '```',
+      '',
+      'averyveryverylongwordwithoutanyspaces'.repeat(6),
+      '',
+      '',
+    ].join('\n')
+    await editor.fill(source)
+
+    // The coloured layer holds the same text, line for line.
+    expect(await colours.locator('.sb-studio-line').evaluateAll((lines) => lines.map((line) => line.textContent))).toEqual(source.split('\n'))
+    await expect(colours.locator('.sbs-heading')).toHaveText(' Setting up')
+    await expect(colours.locator('.sbs-key')).toHaveText('title')
+    await expect(colours.locator('.sbs-strong')).toHaveText('strong words')
+    await expect(colours.locator('.sbs-link')).toHaveText('./intro.md')
+    await expect(colours.locator('.sbs-code').first()).toHaveText('code')
+    // Nothing in a code block is Markdown.
+    await expect(colours.locator('.sbs-em')).toHaveCount(0)
+
+    // Both layers break their lines at the same places: left to its own height, the text area is as tall as the copy.
+    const sizes = await page.evaluate(() => {
+      const area = document.querySelector<HTMLTextAreaElement>('.sb-studio-editor')!
+      const layer = document.querySelector<HTMLElement>('.sb-studio-colours')!
+      const filled = area.offsetHeight
+      area.style.blockSize = '0px'
+      const own = area.scrollHeight
+      area.style.blockSize = ''
+      return { own, filled, layer: layer.offsetHeight, widths: [area.clientWidth, layer.clientWidth] }
+    })
+    expect(sizes.own).toBe(sizes.layer)
+    expect(sizes.filled).toBe(sizes.layer)
+    expect(sizes.widths[0]).toBe(sizes.widths[1])
+    expect(sizes.layer).toBeGreaterThan(600)
+
+    // The letters on screen are the copy's. The text area's own are not drawn a second time.
+    const inks = await page.evaluate(() => ({
+      area: getComputedStyle(document.querySelector('.sb-studio-editor')!).color,
+      text: getComputedStyle(document.querySelector('.sb-studio-colours')!).color,
+      heading: getComputedStyle(document.querySelector('.sbs-heading')!).color,
+    }))
+    expect(inks.area).toMatch(/^rgba\(0, 0, 0, 0\)$|^transparent$/)
+    expect(inks.heading).not.toBe(inks.text)
+    // Let the save finish: one that lands after the test would undo the tidying up.
+    await expect(page.locator('.sb-studio-footer')).toContainText('Saved.')
+  })
+
+  test('a page shorter than the panel can be clicked anywhere below its text', async ({ page, site }) => {
+    await site.track('content/guide/setup.md')
+    const editor = await openStudio(page, '/guide/setup')
+    await editor.fill('# Short\n')
+    const box = (await page.locator('.sb-studio-code').boundingBox())!
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height - 20)
+    await expect(editor).toBeFocused()
+    await expect(page.locator('.sb-studio-footer')).toContainText('Saved.')
+  })
+
+  test('Tab, Enter and the shortcuts edit as in a code editor, and undo takes them back', async ({ page, site, browserName }) => {
+    await site.track('content/guide/setup.md')
+    const editor = await openStudio(page, '/guide/setup')
+    const caretAtEnd = () => editor.evaluate((area: HTMLTextAreaElement) => area.setSelectionRange(area.value.length, area.value.length))
+    const select = (text: string) =>
+      editor.evaluate((area: HTMLTextAreaElement, part) => {
+        const at = area.value.indexOf(part)
+        area.setSelectionRange(at, at + part.length)
+      }, text)
+
+    // Enter goes on with a list, and ends it on an empty item.
+    await editor.fill('- one')
+    await caretAtEnd()
+    await editor.press('Enter')
+    await expect(editor).toHaveValue('- one\n- ')
+    await page.keyboard.type('two')
+    await editor.press('Enter')
+    await editor.press('Enter')
+    await expect(editor).toHaveValue('- one\n- two\n')
+    await page.keyboard.type('3. three')
+    await editor.press('Enter')
+    await expect(editor).toHaveValue('- one\n- two\n3. three\n4. ')
+
+    // Tab types two spaces, and stays in the editor.
+    await page.keyboard.type('x')
+    await editor.press('Tab')
+    await expect(editor).toHaveValue('- one\n- two\n3. three\n4. x  ')
+    await expect(editor).toBeFocused()
+
+    // With lines selected, Tab moves them in and Shift+Tab moves them out.
+    await editor.fill('one\ntwo\n\nthree')
+    await editor.press('ControlOrMeta+a')
+    await editor.press('Tab')
+    await expect(editor).toHaveValue('  one\n  two\n\n  three')
+    await editor.press('Shift+Tab')
+    await expect(editor).toHaveValue('one\ntwo\n\nthree')
+
+    // Bold and italic wrap the selection. What is typed this way is saved like any other typing.
+    await select('two')
+    await editor.press('ControlOrMeta+b')
+    await expect(editor).toHaveValue('one\n**two**\n\nthree')
+    const footer = page.locator('.sb-studio-footer')
+    await expect(footer).toContainText('Saved.')
+    expect(await site.read('content/guide/setup.md')).toBe('one\n**two**\n\nthree')
+
+    // The browser's own undo takes such an edit back.
+    await select('three')
+    await editor.press('ControlOrMeta+i')
+    await expect(editor).toHaveValue('one\n**two**\n\n_three_')
+    await editor.press('ControlOrMeta+z')
+    // How much one undo takes back is the browser's choice. WebKit, as the tests drive it, takes back all
+    // that was typed since the page was opened, in any text area. The other two take back the last edit.
+    if (browserName === 'webkit') await expect(editor).not.toHaveValue(/_three_/)
+    else await expect(editor).toHaveValue('one\n**two**\n\nthree')
+
+    // The keyboard can still leave: Escape, then Tab.
+    await editor.press('Escape')
+    await editor.press('Tab')
+    await expect(editor).not.toBeFocused()
+
+    // Text that was typed and taken back before it was written leaves nothing unsaved.
+    await expect(footer).toContainText(/Saved\.|Changes are saved as you type\./)
+  })
+
+  test('keeps the caret in view while typing at the end of a long page', async ({ page, site }) => {
+    await site.track('content/guide/setup.md')
+    const editor = await openStudio(page, '/guide/setup')
+    await editor.fill(Array.from({ length: 150 }, (_, index) => `Line ${index + 1}`).join('\n'))
+    const box = page.locator('.sb-studio-code')
+    const below = () => box.evaluate((element) => Math.round(element.scrollHeight - element.scrollTop - element.clientHeight))
+    await box.evaluate((element) => (element.scrollTop = 0))
+    expect(await below()).toBeGreaterThan(1000)
+
+    await editor.evaluate((area: HTMLTextAreaElement) => {
+      area.focus({ preventScroll: true })
+      area.setSelectionRange(area.value.length, area.value.length)
+    })
+    await page.keyboard.type('!')
+    await expect(editor).toHaveValue(/Line 150!$/)
+    // The line that was typed in is on screen: the panel has scrolled to its end.
+    await expect.poll(below).toBeLessThan(30)
+    await expect(page.locator('.sb-studio-footer')).toContainText('Saved.')
   })
 
   test('follows the file when it changes on disk and nothing is unsaved', async ({ page, site }) => {
@@ -311,6 +473,81 @@ test.describe('studio', () => {
     await guestContext.close()
   })
 
+  test('creates a page, renames it with its sidebar entry, and deletes it', async ({ page, site }) => {
+    await site.track('sidebar.yaml')
+    await site.track('content/guide/notes.md')
+    await site.track('content/guide/field-notes.md')
+    await openStudio(page, '/guide/setup')
+    const stillThere = await markPage(page)
+    const actions = page.locator('.sb-studio-pages')
+
+    // A path that is taken, and one outside the content folder, are refused with the reason.
+    await actions.getByRole('button', { name: 'New page' }).click()
+    await expect(actions.getByRole('textbox')).toHaveValue('guide/new-page.md')
+    await actions.getByRole('textbox').fill('guide/setup.md')
+    await actions.getByRole('button', { name: 'Create' }).click()
+    await expect(actions.getByRole('alert')).toContainText('guide/setup.md exists already')
+    await actions.getByRole('textbox').fill('../outside.md')
+    await actions.getByRole('button', { name: 'Create' }).click()
+    await expect(actions.getByRole('alert')).toContainText('inside the content folder')
+
+    // A new page is a file with a title, and the Studio moves to it.
+    await actions.getByRole('textbox').fill('guide/notes.md')
+    await actions.getByRole('button', { name: 'Create' }).click()
+    await expect(page).toHaveURL(`${DEV}/guide/notes`)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Notes')
+    await expect(page.locator('.sb-studio-file strong')).toHaveText('content/guide/notes.md')
+    await expect(page.locator('.sb-studio-editor')).toHaveValue(/Write the page here/)
+    expect(await site.read('content/guide/notes.md')).toBe('---\ntitle: "Notes"\n---\n\nWrite the page here.\n')
+
+    // Once the sidebar file lists the page, a rename keeps that entry pointing at it.
+    await site.edit('sidebar.yaml', (text) => text.replace('    - guide/intro\n', '    - guide/intro\n    - guide/notes\n'))
+    const sidebar = page.locator('.sb-region-sidebar')
+    await expect(sidebar.locator('.sb-nav-link').nth(1)).toHaveText('Notes')
+    await actions.getByRole('button', { name: 'Rename' }).click()
+    await expect(actions.getByRole('textbox')).toHaveValue('guide/notes.md')
+    await actions.getByRole('textbox').fill('guide/field-notes.md')
+    await actions.getByRole('button', { name: 'Rename' }).click()
+    await expect(page).toHaveURL(`${DEV}/guide/field-notes`)
+    await expect(actions).toContainText('Now content/guide/field-notes.md. sidebar.yaml follows.')
+    expect(await site.read('sidebar.yaml')).toContain('    - guide/intro\n    - guide/field-notes\n')
+    expect(existsSync(site.path('content/guide/notes.md'))).toBe(false)
+    expect(await site.read('content/guide/field-notes.md')).toContain('Write the page here.')
+    await expect(sidebar.locator('.sb-nav-link').nth(1)).toHaveText('Notes')
+    await expect(page.locator('.sb-studio-file strong')).toHaveText('content/guide/field-notes.md')
+
+    // Deleting removes the file and its sidebar entry, and leaves the reader on the home page.
+    await actions.getByRole('button', { name: 'Delete' }).click()
+    await expect(actions).toContainText('Delete content/guide/field-notes.md?')
+    await actions.getByRole('button', { name: 'Delete the page' }).click()
+    await expect(page).toHaveURL(`${DEV}/`)
+    await expect(actions).toContainText('Its entry is out of sidebar.yaml.')
+    expect(existsSync(site.path('content/guide/field-notes.md'))).toBe(false)
+    expect(await site.read('sidebar.yaml')).not.toContain('field-notes')
+    expect(await stillThere()).toBe(true)
+  })
+
+  test('says when the sidebar file still lists a page that was deleted', async ({ request, site }) => {
+    await site.track('sidebar.yaml')
+    await site.track('content/play/lonely.md')
+    const { token } = (await (await request.get(`${DEV}/_shabd/studio/session`)).json()) as { token: string }
+    const pages = (method: 'post' | 'delete', data: Record<string, string>) =>
+      request[method](`${DEV}/_shabd/studio/page`, { headers: { 'x-shabd-studio': token }, data })
+
+    expect((await pages('post', { id: 'play/lonely.md' })).status()).toBe(201)
+    // The only entry of its list: without it, the category would have nothing in it. That is not the Studio's to decide.
+    await site.edit('sidebar.yaml', (text) =>
+      text.replace('- link: https://example.com\n', '- category: Alone\n  items:\n    - play/lonely\n- link: https://example.com\n'),
+    )
+    const listed = await site.read('sidebar.yaml')
+
+    const gone = await pages('delete', { id: 'play/lonely.md' })
+    expect(gone.status()).toBe(200)
+    expect(await gone.json()).toEqual({ id: 'play/lonely.md', sidebar: 'mentions' })
+    expect(existsSync(site.path('content/play/lonely.md'))).toBe(false)
+    expect(await site.read('sidebar.yaml')).toBe(listed)
+  })
+
   test('the write endpoint refuses other websites and requests without its token', async ({ request, site }) => {
     const before = await site.read('content/guide/setup.md')
     const write = (headers: Record<string, string>) =>
@@ -338,6 +575,21 @@ test.describe('studio', () => {
     })
     expect(outside.status()).toBe(400)
     expect(await site.read('content/guide/setup.md')).toBe(before)
+
+    // The same holds for creating, renaming and deleting pages.
+    const pages = (method: 'post' | 'patch' | 'delete', data: Record<string, string>, headers: Record<string, string> = { 'x-shabd-studio': token }) =>
+      request[method](`${DEV}/_shabd/studio/page`, { headers, data })
+    expect((await pages('post', { id: 'guide/sneaky.md' }, {})).status()).toBe(403)
+    expect((await pages('delete', { id: 'guide/setup.md' }, { 'x-shabd-studio': token, origin: 'https://elsewhere.example' })).status()).toBe(403)
+    for (const id of ['../outside.md', '/tmp/outside.md', 'guide/../../outside.md', '_private/x.md', 'guide/x.txt']) {
+      expect((await pages('post', { id })).status(), id).toBe(400)
+      expect((await pages('patch', { id: 'guide/setup.md', to: id })).status(), id).toBe(400)
+    }
+    expect((await pages('patch', { id: 'guide/setup.md', to: 'guide/intro.md' })).status()).toBe(409)
+    expect((await pages('delete', { id: '../shabd.config.yaml' })).status()).toBe(404)
+    expect(existsSync(site.path('outside.md'))).toBe(false)
+    expect(await site.read('content/guide/setup.md')).toBe(before)
+    expect(existsSync(site.path('shabd.config.yaml'))).toBe(true)
   })
 })
 

@@ -227,25 +227,164 @@
     background: var(--sb-surface);
   }
 
-  .sb-studio-editor {
-    flex: 1;
-    min-block-size: 0;
-    padding: 1rem;
-    border: 0;
-    outline: 0;
-    resize: none;
+  /* New page, rename and delete: a strip of buttons, or the form one of them opened. */
+  .sb-studio-pages {
+    padding: 0.5rem 1rem 0.55rem;
+    border-block-end: var(--sb-line) solid var(--sb-border);
+    font-size: 0.8rem;
+  }
+
+  .sb-studio-page-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+  }
+
+  .sb-studio-page-buttons [role='status'] {
+    color: var(--sb-muted);
+  }
+
+  .sb-studio-action:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .sb-studio-page-form {
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .sb-studio-page-form p {
+    margin: 0;
+  }
+
+  .sb-studio-page-form label {
+    display: grid;
+    gap: 0.25rem;
+    color: var(--sb-muted);
+  }
+
+  .sb-studio-page-form input {
+    padding: 0.35rem 0.5rem;
+    border: var(--sb-line) solid var(--sb-border);
+    border-radius: min(4px, var(--sb-radius));
     background: var(--sb-surface);
     color: var(--sb-text);
     font-family: var(--sb-font-mono);
-    font-size: 0.84rem;
-    line-height: 1.7;
+    font-size: 0.82rem;
+  }
+
+  .sb-studio-page-problem {
+    color: var(--sb-danger);
+  }
+
+  /*
+   * The editor is a text area with a coloured copy of its text laid over it
+   * (studio/Editor.tsx). This box scrolls; the two layers inside it are as
+   * tall as the text, and at least as tall as the box.
+   */
+  .sb-studio-code {
+    flex: 1;
+    min-block-size: 0;
+    display: grid;
+    overflow: auto;
+    background: var(--sb-surface);
+  }
+
+  .sb-studio-code:focus-within {
+    box-shadow: inset 0 0 0 2px var(--sb-accent-soft);
+  }
+
+  .sb-studio-sheet {
+    position: relative;
+    min-inline-size: 0;
+  }
+
+  /*
+   * Everything that decides where a letter stands is said once, for both
+   * layers. A text area does not inherit these from the page, and a letter
+   * that stood a pixel apart in the two would show as a caret in the wrong
+   * place.
+   */
+  .sb-studio-editor,
+  .sb-studio-colours {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 1rem;
+    border: 0;
+    font: normal 0.84rem / 1.7 var(--sb-font-mono);
+    font-kerning: none;
+    font-variant-ligatures: none;
+    font-feature-settings: normal;
+    letter-spacing: normal;
+    word-spacing: normal;
+    text-align: start;
+    text-indent: 0;
+    text-transform: none;
+    text-rendering: auto;
     tab-size: 2;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
 
-  .sb-studio-editor:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--sb-accent-soft);
+  .sb-studio-editor {
+    position: absolute;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: hidden;
+    outline: 0;
+    resize: none;
+    background: transparent;
+    /* The letters are drawn by the layer above. The caret is this one's. */
+    color: transparent;
+    caret-color: var(--sb-text);
+  }
+
+  .sb-studio-editor::selection {
+    background: color-mix(in oklab, var(--sb-accent) 24%, transparent);
+    color: transparent;
+  }
+
+  .sb-studio-colours {
+    position: relative;
+    pointer-events: none;
+    color: var(--sb-text);
+  }
+
+  .sb-studio-editor:disabled + .sb-studio-colours {
+    opacity: 0.55;
+  }
+
+  /* Colour only: a heavier or slanted letter can be wider, and the caret would drift from the text. */
+  .sbs-mark,
+  .sbs-meta {
+    color: var(--sb-muted);
+  }
+
+  /* A palette's accent can be close to one of the colours below. The line under a heading does not depend on it. */
+  .sbs-heading {
+    color: var(--sb-accent);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.3em;
+  }
+
+  .sbs-key,
+  .sbs-tag,
+  .sbs-link {
+    color: var(--sb-note);
+  }
+
+  .sbs-code {
+    color: var(--sb-tip);
+  }
+
+  .sbs-strong,
+  .sbs-em {
+    color: var(--sb-caution);
   }
 
   .sb-studio-empty {

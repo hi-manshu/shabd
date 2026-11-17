@@ -9,14 +9,17 @@
  * Loaded only in `shabd dev`, and only when the Studio is opened.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { withBase } from '../../shared/paths.js'
 import { onPageUpdate } from '../app/hmr.js'
 import { Icon } from '../app/icons.js'
-import { usePage } from '../app/router.js'
-import { useSite } from '../app/store.js'
+import { usePage, useRouter } from '../app/router.js'
+import { routeStore, siteStore, useSite } from '../app/store.js'
 import { setUi } from '../app/ui.js'
+import { Editor } from './Editor.js'
 import {
   ConflictError,
   connectFolder,
+  connectPages,
   connectServer,
   folderAccessSupported,
   restoreFolder,
@@ -130,7 +133,12 @@ export default function Studio() {
   const save = useCallback(async () => {
     const state = live.current
     window.clearTimeout(state.timer)
-    if (!backend || !id || state.text === state.saved) return
+    if (!backend || !id) return
+    if (state.text === state.saved) {
+      // Typed and taken back before it was written: nothing is unsaved after all.
+      setStatus((current) => (current.kind === 'unsaved' ? { kind: 'idle' } : current))
+      return
+    }
     const writing = state.text
     state.saveStarted = performance.now()
     state.updatedIn = undefined
@@ -253,19 +261,6 @@ export default function Studio() {
     }
   }
 
-  const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
-      event.preventDefault()
-      void save()
-    } else if (event.key === 'Tab' && !event.shiftKey) {
-      event.preventDefault()
-      const area = event.currentTarget
-      const { selectionStart, selectionEnd, value } = area
-      edit(`${value.slice(0, selectionStart)}  ${value.slice(selectionEnd)}`)
-      requestAnimationFrame(() => area.setSelectionRange(selectionStart + 2, selectionStart + 2))
-    }
-  }
-
   const resolveConflict = (choice: 'disk' | 'mine') => {
     if (status.kind !== 'conflict') return
     const state = live.current
@@ -299,17 +294,16 @@ export default function Studio() {
         </button>
       </header>
 
+      <PageFiles id={id} contentDir={contentDir} unsaved={status.kind === 'unsaved' || status.kind === 'saving'} />
+
       {id ? (
-        <textarea
-          className="sb-studio-editor"
-          aria-label={`Markdown source of ${title}`}
+        <Editor
           value={text}
+          mdx={id.toLowerCase().endsWith('.mdx')}
+          label={`Markdown source of ${title}`}
           disabled={status.kind === 'loading'}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoCorrect="off"
-          onChange={(event) => edit(event.target.value)}
-          onKeyDown={onKeyDown}
+          onChange={edit}
+          onSave={() => void save()}
         />
       ) : (
         <p className="sb-studio-empty">There is no page at this address to edit.</p>
@@ -338,6 +332,125 @@ export default function Studio() {
         )}
       </footer>
     </aside>
+  )
+}
+
+/** Wait for the page list to change after the dev server said it would. It follows within a few frames. */
+async function untilRoute(path: string, exists: boolean): Promise<void> {
+  for (let waited = 0; waited < 4000; waited += 50) {
+    if (Boolean(routeStore.get()[path] && siteStore.get().pages[path]) === exists) return
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
+
+/**
+ * New page, rename, delete. Each asks for what it needs in the same strip,
+ * does it through the dev server, and then goes where the page now is.
+ */
+function PageFiles({ id, contentDir, unsaved }: { id: string | null; contentDir: string; unsaved: boolean }) {
+  const { path, navigate } = useRouter()
+  /** Go to a page of this site. The dev server names a page by its route; the address bar has the site's base before it. */
+  const go = (route: string, options?: { replace?: boolean }) => navigate(withBase(siteStore.get().site.base, route), options)
+  const [mode, setMode] = useState<'new' | 'rename' | 'delete' | null>(null)
+  const [value, setValue] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState('')
+  const [notice, setNotice] = useState('')
+
+  const open = (next: 'new' | 'rename' | 'delete') => {
+    const folder = id?.includes('/') ? id.slice(0, id.lastIndexOf('/') + 1) : ''
+    setValue(next === 'new' ? `${folder}new-page.md` : (id ?? ''))
+    setProblem('')
+    setNotice('')
+    setMode(next)
+  }
+
+  const run = async () => {
+    if (!mode || busy) return
+    setBusy(true)
+    setProblem('')
+    try {
+      const pages = await connectPages()
+      if (mode === 'new') {
+        const made = await pages.create(value.trim())
+        await untilRoute(made.path, true)
+        await go(made.path)
+        setNotice(`Created ${contentDir}/${made.id}.`)
+      } else if (mode === 'rename' && id) {
+        const moved = await pages.rename(id, value.trim())
+        await untilRoute(moved.path, true)
+        await go(moved.path, { replace: true })
+        setNotice(`Now ${contentDir}/${moved.id}.${moved.sidebar === 'updated' ? ' sidebar.yaml follows.' : ''}`)
+      } else if (mode === 'delete' && id) {
+        const gone = await pages.remove(id)
+        await untilRoute(path, false)
+        await go('/', { replace: true })
+        setNotice(
+          `Deleted ${contentDir}/${id}.` +
+            (gone.sidebar === 'updated' ? ' Its entry is out of sidebar.yaml.' : gone.sidebar === 'mentions' ? ' sidebar.yaml still lists it.' : ''),
+        )
+      }
+      setMode(null)
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : String(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="sb-studio-pages">
+      {mode === null ? (
+        <p className="sb-studio-page-buttons">
+          <button type="button" className="sb-studio-action" onClick={() => open('new')}>
+            New page
+          </button>
+          {id && (
+            <>
+              <button type="button" className="sb-studio-action" onClick={() => open('rename')} disabled={unsaved}>
+                Rename
+              </button>
+              <button type="button" className="sb-studio-action" onClick={() => open('delete')}>
+                Delete
+              </button>
+            </>
+          )}
+          {notice && <span role="status">{notice}</span>}
+        </p>
+      ) : (
+        <form
+          className="sb-studio-page-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void run()
+          }}
+        >
+          {mode === 'delete' ? (
+            <p>
+              Delete <strong>{`${contentDir}/${id}`}</strong>? The file is removed from disk.
+            </p>
+          ) : (
+            <label>
+              {mode === 'new' ? `New page, under ${contentDir}/` : `Move to, under ${contentDir}/`}
+              <input value={value} onChange={(event) => setValue(event.target.value)} spellCheck={false} autoFocus />
+            </label>
+          )}
+          <p className="sb-studio-page-buttons">
+            <button type="submit" className="sb-studio-action" disabled={busy}>
+              {mode === 'new' ? 'Create' : mode === 'rename' ? 'Rename' : 'Delete the page'}
+            </button>
+            <button type="button" className="sb-studio-action" onClick={() => setMode(null)} disabled={busy}>
+              Cancel
+            </button>
+          </p>
+          {problem && (
+            <p className="sb-studio-page-problem" role="alert">
+              {problem}
+            </p>
+          )}
+        </form>
+      )}
+    </div>
   )
 }
 

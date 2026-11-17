@@ -72,6 +72,42 @@ export async function connectServer(): Promise<StudioBackend> {
   }
 }
 
+/* ───────────────────────────────── pages ─────────────────────────────── */
+
+/**
+ * Creating, renaming and deleting pages. These always go through the dev
+ * server, also when a folder is connected: the server moves the file, keeps
+ * `sidebar.yaml` in step, and knows the address the page ends up at.
+ */
+export interface StudioPages {
+  /** `id` is the page's path under the content folder, with its extension. */
+  create(id: string): Promise<{ id: string; path: string }>
+  rename(id: string, to: string): Promise<{ id: string; path: string; sidebar: 'updated' | 'unchanged' }>
+  /** `mentions`: the page is gone, and the sidebar file still lists it. */
+  remove(id: string): Promise<{ sidebar: 'updated' | 'unchanged' | 'mentions' }>
+}
+
+export async function connectPages(): Promise<StudioPages> {
+  const session = await fetch(endpoint('session'))
+  if (!session.ok) throw new Error('The dev server did not start a Studio session.')
+  const { token } = (await session.json()) as { token: string }
+  const send = async <T>(method: 'POST' | 'PATCH' | 'DELETE', body: Record<string, string>): Promise<T> => {
+    const response = await fetch(endpoint('page'), {
+      method,
+      headers: { 'content-type': 'application/json', 'x-shabd-studio': token },
+      body: JSON.stringify(body),
+    })
+    const answer = (await response.json()) as T & { error?: string }
+    if (!response.ok) throw new Error(answer.error ?? 'The dev server refused.')
+    return answer
+  }
+  return {
+    create: (id) => send('POST', { id }),
+    rename: (id, to) => send('PATCH', { id, to }),
+    remove: (id) => send('DELETE', { id }),
+  }
+}
+
 /* ─────────────────────── File System Access backend ──────────────────── */
 
 type PermissionMode = { mode: 'readwrite' }

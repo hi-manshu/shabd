@@ -11,10 +11,12 @@
  * policy before it gets here.
  */
 import { createHash, randomUUID } from 'node:crypto'
-import { readFile, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import nodePath from 'node:path'
 import { normalizePath, type Connect, type ViteDevServer } from 'vite'
-import { stripBase } from '../../shared/paths.js'
+import { fileToSlug, slugToPath, stripBase } from '../../shared/paths.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
 import type { ShabdContext } from '../context.js'
 import { readBody, sendJson, sendText, sendWebResponse, toWebRequest } from '../http.js'
@@ -24,6 +26,7 @@ import { createMcpHandler } from '../mcp/http.js'
 import { liveDocs } from '../mcp/live.js'
 import { SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, toRoutePath } from '../mcp/source.js'
 import { SearchService } from '../search/service.js'
+import { newPageSource, pageIdProblem, removeFromSidebar, renameInSidebar, sidebarMentions } from './studio-pages.js'
 
 const STUDIO_PREFIX = '/_shabd/studio/'
 export const STUDIO_TOKEN_HEADER = 'x-shabd-studio'
@@ -171,6 +174,90 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
       // Do not wait for the file watcher: hand the change to the HMR pipeline now.
       server.watcher.emit('change', normalizePath(page.file))
       sendJson(res, { id: page.id, hash: sha1(body.source) })
+      return
+    }
+
+    /* ── pages: create, rename, delete ── */
+
+    if (action === 'page' && (req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE')) {
+      let body: { id?: unknown; to?: unknown; title?: unknown }
+      try {
+        body = JSON.parse(await readBody(req)) as typeof body
+      } catch {
+        sendJson(res, { error: 'Expected a JSON body.' }, 400)
+        return
+      }
+
+      /** The file a page id names. Ids are checked first, so this cannot leave the content folder. */
+      const fileOf = (id: string) => nodePath.join(config.contentDir, ...id.split('/'))
+      const routeOf = (id: string) => slugToPath(fileToSlug(id))
+      /** Hand a change to the dev server at once, as a save does, and wait until the page list has caught up. */
+      const settle = async (events: ['add' | 'unlink' | 'change', string][], done: () => boolean) => {
+        for (const [event, file] of events) server.watcher.emit(event, normalizePath(file))
+        for (let waited = 0; waited < 3000 && !done(); waited += 25) await new Promise((resolve) => setTimeout(resolve, 25))
+      }
+      /** Change the sidebar file, if there is one and the change is one. */
+      const editSidebar = async (change: (source: string) => string): Promise<'updated' | 'unchanged'> => {
+        if (!existsSync(config.sidebarFile)) return 'unchanged'
+        const before = await readFile(config.sidebarFile, 'utf8')
+        const after = change(before)
+        if (after === before) return 'unchanged'
+        await writeFile(config.sidebarFile, after)
+        server.watcher.emit('change', normalizePath(config.sidebarFile))
+        return 'updated'
+      }
+
+      if (req.method === 'POST') {
+        const problem = pageIdProblem(body.id)
+        if (problem) return void sendJson(res, { error: problem }, 400)
+        const id = body.id as string
+        const file = fileOf(id)
+        if (existsSync(file)) return void sendJson(res, { error: `${id} exists already.` }, 409)
+        const taken = store.byPath(routeOf(id))
+        if (taken) return void sendJson(res, { error: `${taken.id} is already the page at ${taken.path}.` }, 409)
+        await mkdir(nodePath.dirname(file), { recursive: true })
+        await writeFile(file, newPageSource(id, typeof body.title === 'string' && body.title.trim() ? body.title.trim() : undefined), { flag: 'wx' })
+        await settle([['add', file]], () => store.byId(id) !== undefined)
+        sendJson(res, { id, path: routeOf(id) }, 201)
+        return
+      }
+
+      const page = typeof body.id === 'string' ? store.byId(body.id) : undefined
+      if (!page) return void sendJson(res, { error: 'No such page.' }, 404)
+
+      if (req.method === 'PATCH') {
+        const problem = pageIdProblem(body.to)
+        if (problem) return void sendJson(res, { error: problem }, 400)
+        const to = body.to as string
+        if (to === page.id) return void sendJson(res, { id: to, path: page.path, sidebar: 'unchanged' })
+        const target = fileOf(to)
+        if (existsSync(target)) return void sendJson(res, { error: `${to} exists already.` }, 409)
+        const taken = store.byPath(routeOf(to))
+        if (taken && taken.id !== page.id) return void sendJson(res, { error: `${taken.id} is already the page at ${taken.path}.` }, 409)
+        await mkdir(nodePath.dirname(target), { recursive: true })
+        await rename(page.file, target)
+        await settle(
+          [
+            ['unlink', page.file],
+            ['add', target],
+          ],
+          () => store.byId(to) !== undefined && store.byId(page.id) === undefined,
+        )
+        // The sidebar file follows once the page is known under its new name. Read before that, it
+        // would name a page that is not there yet, and the dev server would say so in its log.
+        const sidebar = await editSidebar((source) => renameInSidebar(source, page.id, to))
+        sendJson(res, { id: to, path: routeOf(to), sidebar })
+        return
+      }
+
+      await rm(page.file)
+      let sidebar: 'updated' | 'unchanged' | 'mentions' = await editSidebar((source) => removeFromSidebar(source, page.id))
+      // Where the entry could not be taken out safely, say that it is still there.
+      if (existsSync(config.sidebarFile) && sidebarMentions(await readFile(config.sidebarFile, 'utf8'), page.id)) sidebar = 'mentions'
+      await settle([['unlink', page.file]], () => store.byId(page.id) === undefined)
+      // Read again, the sidebar file gets the warning any entry gets that matches no page, naming its line.
+      if (sidebar === 'mentions') server.watcher.emit('change', normalizePath(config.sidebarFile))
+      sendJson(res, { id: page.id, sidebar })
       return
     }
 
