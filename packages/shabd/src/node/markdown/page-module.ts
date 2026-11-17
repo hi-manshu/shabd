@@ -8,6 +8,7 @@
  * and code colours all change in the same frame.
  */
 import type { Frontmatter } from '../../shared/schema.js'
+import type { PageUpdated } from '../../shared/types.js'
 import { codeFrame, type ShabdError } from '../config/errors.js'
 import type { CompiledPage } from './compile.js'
 
@@ -21,11 +22,14 @@ export function toPageModule(
   frontmatter: Frontmatter,
   /** Page id to register for hot updates. Omit in production builds. */
   hotId?: string,
+  /** The day the page was last changed, when the site shows it. */
+  updated?: PageUpdated,
 ): string {
   let code = compiled.code
   code += `\nexport const frontmatter = ${JSON.stringify(frontmatter)};`
   code += `\nexport const toc = ${JSON.stringify(compiled.toc)};`
   code += `\nexport const codeCss = ${JSON.stringify(compiled.codeCss)};\n`
+  if (updated) code += `export const updated = ${JSON.stringify(updated)};\n`
 
   if (hotId !== undefined) {
     // The module accepts its own updates and hands the new version to the

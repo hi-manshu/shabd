@@ -261,7 +261,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
 
       return {
         code: page
-          ? toPageModule(compiled, page.frontmatter, context.dev ? page.id : undefined)
+          ? toPageModule(compiled, page.frontmatter, context.dev ? page.id : undefined, page.updated)
           : compiled.code,
         map: { mappings: '' },
       }
@@ -357,6 +357,9 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       server.watcher.add([context.config.configFile, context.config.sidebarFile])
       logSidebarWarnings(server, context)
       for (const error of context.store.errors()) server.config.logger.error(error.pretty(context.config.root))
+      if (context.store.lastUpdatedNote) {
+        server.config.logger.warn(`${pc.yellow('shabd')} defaults.lastUpdated is on, but ${context.store.lastUpdatedNote}.`)
+      }
 
       contentWatcher?.close()
       contentWatcher = watchContent(server, ctx)
@@ -573,6 +576,8 @@ async function reloadConfig(
     next.structureFingerprint !== previous.structureFingerprint ||
     next.contentDir !== previous.contentDir ||
     next.sidebarFile !== previous.sidebarFile ||
+    // The days pages were last changed are read from Git once, when the server starts.
+    next.config.defaults.lastUpdated !== previous.config.defaults.lastUpdated ||
     JSON.stringify([next.components, next.blocks, next.stylesheets, bundledFonts(next), next.config.features.search]) !==
       JSON.stringify([
         previous.components,

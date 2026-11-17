@@ -524,6 +524,8 @@ const DefaultsSchema = z.strictObject({
     .refine((t) => t.minDepth <= t.maxDepth, { error: 'toc.minDepth must not be greater than toc.maxDepth' }),
   editLink: z.boolean().default(true),
   pagination: z.boolean().default(true),
+  /** Show the day each page was last changed, read from the Git history of its file. */
+  lastUpdated: z.boolean().default(false),
 })
 
 /* ─────────────────────────────── features ─────────────────────────────── */
@@ -802,6 +804,16 @@ export const FrontmatterSchema = z.looseObject({
   api: ApiSchema.optional(),
   editLink: z.boolean().optional(),
   pagination: z.boolean().optional(),
+  /**
+   * The day this page was last changed, as `2026-11-17`, in place of the day
+   * Git has for it. `false` shows no day on this page.
+   */
+  lastUpdated: z
+    .union([
+      z.literal(false),
+      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'A day is written as year-month-day, such as 2026-11-17' }),
+    ])
+    .optional(),
 })
 
 export type FrontmatterInput = z.input<typeof FrontmatterSchema>

@@ -19,7 +19,7 @@ import {
 import { resolvePageLayout, type ActiveLayout } from '../../shared/layout.js'
 import { normalizePath, stripBase } from '../../shared/paths.js'
 import type { Frontmatter } from '../../shared/schema.js'
-import type { SiteData, TocEntry } from '../../shared/types.js'
+import type { PageUpdated, SiteData, TocEntry } from '../../shared/types.js'
 import { onPageUpdate, pageModules } from './hmr.js'
 import { NotFound } from './NotFound.js'
 import { routeStore, siteStore, useSite } from './store.js'
@@ -73,6 +73,8 @@ export interface PageView {
   toc: TocEntry[]
   /** The colours of the page's code tokens, as a stylesheet. */
   codeCss: string
+  /** The day the page was last changed, when the site shows it and has one. */
+  updated?: PageUpdated | undefined
   /** The layout chosen by frontmatter, with this page's region switches applied. */
   layout: ActiveLayout
   Content: ComponentType<Record<string, unknown>>
@@ -101,6 +103,7 @@ export function toPageView(site: SiteData, page: LoadedPage): PageView {
   const { frontmatter, toc } = page.module
   return {
     codeCss: page.module.codeCss ?? '',
+    updated: page.module.updated,
     path: page.path,
     id: meta.id,
     title: meta.title,

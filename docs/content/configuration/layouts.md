@@ -52,7 +52,7 @@ A page has up to six regions. A region with no blocks is not rendered, and the p
 | `api-endpoint` | main | The request line from `api:` frontmatter |
 | `hero` | main | The opening of a splash page, from `hero:` frontmatter |
 | `content` | main | The Markdown body |
-| `page-footer` | main | "Edit this page" |
+| `page-footer` | main | "Edit this page", and the day the page was [last changed](./site.md#when-a-page-was-last-changed) |
 | `pagination` | main | Previous and next page |
 | `toc` | aside | "On this page" |
 | `footer` | footer | The text from `site.footer` |

@@ -63,6 +63,7 @@ defaults:
   toc: { minDepth: 2, maxDepth: 3 }
   editLink: true
   pagination: true
+  lastUpdated: true # the day of each page's last commit; the build needs the whole Git history
 
 layouts:
   # Editing a built-in: every layout inherits from `base`, so this adds the

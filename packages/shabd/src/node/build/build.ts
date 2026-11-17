@@ -60,6 +60,9 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   const { problems, detailed } = await collectProblems(context)
   if (detailed.length) throw detailed[0]
   step(`${pages.length} pages compiled`)
+  if (store.lastUpdatedNote) {
+    console.log(pc.yellow(`    defaults.lastUpdated is on, but ${store.lastUpdatedNote}. No page shows when it was last changed.`))
+  }
 
   const viteOptions = { configFile: false as const, root: config.root, logLevel: 'warn' as const }
   let phase = performance.now()
@@ -199,7 +202,8 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   const listed = site.noindex ? [] : pages.filter((page) => !page.frontmatter.noindex)
   const hasSitemap = site.url !== undefined && listed.length > 0
   if (hasSitemap) {
-    await write('sitemap.xml', renderSitemap(listed.map((page) => ({ loc: pageAddress(context, page.path) }))))
+    const entries = listed.map((page) => ({ loc: pageAddress(context, page.path), lastmod: page.updated?.day }))
+    await write('sitemap.xml', renderSitemap(entries))
   }
 
   // A robots.txt in public/ is the site's own, and was copied into dist/ with the other files there.

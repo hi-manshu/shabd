@@ -12,11 +12,12 @@ import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileToSlug, isPageFile, slugToPath } from '../../shared/paths.js'
 import { FrontmatterSchema, type Frontmatter } from '../../shared/schema.js'
-import type { PageMeta, SiteData } from '../../shared/types.js'
+import type { PageMeta, PageUpdated, SiteData } from '../../shared/types.js'
 import { isShabdError, ShabdError, type SourceIssue } from '../config/errors.js'
 import { loadSidebar, type LoadedSidebar, type ResolvedConfig } from '../config/load.js'
 import { paletteChoices, themeToCss } from '../config/theme-css.js'
 import { leadingHeading, parseFrontmatter } from './frontmatter.js'
+import { formatDay, lastCommitDates } from './git.js'
 import { resolveSidebar, type ResolvedSidebar } from './sidebar.js'
 
 export interface PageRecord {
@@ -39,6 +40,8 @@ export interface PageRecord {
   /** The title came from a leading `# heading`, which the pipeline lifts out of the body. */
   titleFromHeading: boolean
   description: string
+  /** The day the page was last changed: from its frontmatter, or from Git when the site shows the day. */
+  updated?: PageUpdated
   /** Set when the frontmatter is invalid. The page keeps its route so the error can be shown there. */
   error?: ShabdError
 }
@@ -81,6 +84,10 @@ export class ContentStore {
   #sidebarSource: LoadedSidebar
   #sidebar: ResolvedSidebar | undefined
   #revision = 0
+  /** File → the day of its last commit. Empty unless `defaults.lastUpdated` is on. */
+  #commitDays = new Map<string, string>()
+  /** Why Git gave no days, when the site asked for them and got none. */
+  lastUpdatedNote: string | undefined
 
   constructor(config: ResolvedConfig, sidebar: LoadedSidebar, options: StoreOptions) {
     this.config = config
@@ -91,6 +98,11 @@ export class ContentStore {
   /** Scan the content directory and read every page. */
   static async load(config: ResolvedConfig, options: StoreOptions): Promise<ContentStore> {
     const store = new ContentStore(config, await loadSidebar(config), options)
+    if (config.config.defaults.lastUpdated) {
+      const git = await lastCommitDates(config.contentDir)
+      store.#commitDays = git.dates
+      store.lastUpdatedNote = git.note
+    }
     let files: string[]
     try {
       files = await scanContent(config.contentDir)
@@ -276,6 +288,8 @@ export class ContentStore {
 
     const heading = frontmatter.title === undefined ? leadingHeading(body, format) : undefined
     const fallback = slug === '' ? this.config.config.site.title : titleFromFileName(fileName === 'index' ? slug : fileName)
+    // A day written in the page is the author's word and is always shown. Git's is shown when the site asks for it.
+    const day = frontmatter.lastUpdated === false ? undefined : (frontmatter.lastUpdated ?? this.#commitDays.get(file))
 
     return {
       id,
@@ -291,6 +305,7 @@ export class ContentStore {
       title: frontmatter.title ?? heading ?? fallback,
       titleFromHeading: heading !== undefined,
       description: frontmatter.description ?? '',
+      ...(day ? { updated: { day, text: formatDay(day, this.config.config.site.lang) } } : {}),
       ...(error ? { error } : {}),
     }
   }

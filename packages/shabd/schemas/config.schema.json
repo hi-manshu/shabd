@@ -1290,6 +1290,10 @@
         "pagination": {
           "default": true,
           "type": "boolean"
+        },
+        "lastUpdated": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "additionalProperties": false

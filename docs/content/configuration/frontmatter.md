@@ -33,6 +33,7 @@ The page starts here.
 | `noindex` | `true` | Asks [search engines](./site.md#search-engines) not to list the page. It stays in the site's own search |
 | `editLink` | `false` | Hide "Edit this page" |
 | `pagination` | `false` | Hide previous and next links |
+| `lastUpdated` | a day, or `false` | The day shown as [last updated](./site.md#when-a-page-was-last-changed), such as `2026-11-17`, in place of the one Git has. `false` shows none |
 | `hero` | options | Content for the `splash` layout |
 | `api` | options | Content for the `api` layout |
 

@@ -190,6 +190,32 @@ These apply to every page. A page's [frontmatter](./frontmatter.md) overrides th
 | `toc` | `{ minDepth: 2, maxDepth: 3 }` | Which heading levels appear under "On this page" |
 | `editLink` | `true` | Show "Edit this page" (needs `site.repo`) |
 | `pagination` | `true` | Show previous and next links |
+| `lastUpdated` | `false` | Show the day each page was last changed, from Git |
+
+### When a page was last changed
+
+With `lastUpdated: true`, the end of each page says "Last updated" and a day: the day of the last commit that
+touched the page's file, as its author's clock had it. The day is also given to search engines in `sitemap.xml`.
+This page has one.
+
+```yaml title="shabd.config.yaml"
+defaults:
+  lastUpdated: true
+```
+
+The days are read from Git once, when a build or the dev server starts, so the folder has to be in a Git
+repository with its history. Build machines often fetch the newest commit alone, and every page would then show the
+day of that commit. Shabd notices such a shallow clone, shows no day at all, and says so in the build's output. On
+GitHub Actions, give the checkout step the whole history:
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+```
+
+A page can state its own day in [frontmatter](./frontmatter.md) with `lastUpdated: 2026-11-17`, which is shown
+whatever this setting is, or show none with `lastUpdated: false`.
 
 ## features
 

@@ -403,9 +403,20 @@
     color: var(--sb-text);
   }
 
+  /* "Edit this page" at one end and the day the page last changed at the other. */
   .sb-page-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
     margin-block-start: 3rem;
     font-size: var(--sb-step--1);
+  }
+
+  .sb-page-updated {
+    /* Alone in the footer it still sits at the far end, where it is when the link is there. */
+    margin-inline-start: auto;
+    color: var(--sb-muted);
   }
 
   .sb-page-footer a {
