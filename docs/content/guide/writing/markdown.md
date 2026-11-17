@@ -126,6 +126,43 @@ things too: a template in a code sample, an expression in MDX. A name that is ne
 To keep a code sample as it is written, add `noVars` after its language. To write the braces themselves in prose,
 put a backslash before each one.
 
+## Maths
+
+With `markdown.math` on, text between dollar signs is typeset as maths: one pair for maths in a line of text, two
+pairs for a formula on lines of its own.
+
+````md
+The roots are $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$.
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+````
+
+The roots are $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$.
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$
+
+A fenced block with the language `math` is a formula too. The notation is LaTeX, typeset by
+[KaTeX](https://katex.org) when the site is built. It needs two packages, and the switch:
+
+```sh
+npm install remark-math rehype-katex
+```
+
+```yaml title="shabd.config.yaml"
+markdown:
+  math: true
+```
+
+- A page carries the finished formula as HTML, with MathML beside it for screen readers. No script is sent to the
+  browser for it. KaTeX's stylesheet joins the site's own, and its fonts are fetched by pages that use them.
+- A formula that KaTeX cannot read is an error with its line, like a mistake in frontmatter.
+- Once maths is on, a dollar sign that is not maths has to be written `\$`. Dollar signs in code are left alone.
+- Search finds a formula by what you typed, not by how it looks.
+
 ## Tables, task lists and footnotes
 
 | Syntax | Renders as |

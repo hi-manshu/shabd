@@ -269,6 +269,39 @@ Mistakes are reported in three places:
 - They also warn about a link in your content that points at an address that has moved, so that you can link to
   the new one.
 
+## markdown
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `remarkPlugins` | none | Plugins that work on the Markdown of a page |
+| `rehypePlugins` | none | Plugins that work on the HTML made from it |
+| `math` | `false` | Typeset [maths](../guide/writing/markdown.md#maths) written between dollar signs |
+
+Shabd's Markdown pipeline is [remark](https://github.com/remarkjs/remark) and
+[rehype](https://github.com/rehypejs/rehype), and their plugins can be added to it by name. A plugin is a package
+the site has installed, or a file of the site's own. Written as a pair, the second part is the plugin's options.
+
+```yaml title="shabd.config.yaml"
+markdown:
+  remarkPlugins:
+    - remark-emoji
+    - [remark-toc, { heading: contents }]
+    - ./plugins/shout.mjs
+  rehypePlugins:
+    - [rehype-external-links, { rel: [nofollow] }]
+```
+
+Your plugins run after Shabd's own, in the order written. That decides what they see:
+
+- A remark plugin sees the page after callouts have been made and the title has been lifted out. What it changes
+  reaches the outline, search and the page.
+- A rehype plugin sees the page after headings have their ids, links between pages have been rewritten and code
+  has been highlighted. What it changes reaches the page only: the outline and what is searched were read before
+  it ran.
+
+A name that cannot be found, and a module whose default export is not a plugin, are errors on their line of the
+config. `shabd dev` restarts when the list changes; after editing a plugin file of your own, restart it yourself.
+
 ## vars
 
 Values that pages use by name. A page writes the name between two pairs of braces, and

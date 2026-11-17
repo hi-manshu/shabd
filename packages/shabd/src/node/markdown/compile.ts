@@ -34,6 +34,7 @@ import { rehypeHeadings } from './plugins/rehype-headings.js'
 import { rehypeLinks } from './plugins/rehype-links.js'
 import { remarkCallouts } from './plugins/remark-callouts.js'
 import { remarkLiftTitle } from './plugins/remark-lift-title.js'
+import type { UserPlugins } from './user-plugins.js'
 
 /** Compiled pages import their component map from here. Resolved by the Vite plugin. */
 export const MDX_COMPONENTS_ID = 'virtual:shabd/mdx-components'
@@ -43,6 +44,8 @@ export interface CompilerOptions extends CodeOptions {
   fingerprint: string
   /** Directory for the on-disk cache. Omit to cache in memory only. */
   cacheDir?: string | undefined
+  /** The site's own plugins, and those an option brings. They run after Shabd's. */
+  plugins?: Pick<UserPlugins, 'remark' | 'rehype' | 'rehypeBeforeCode'> | undefined
 }
 
 export interface CompileInput {
@@ -146,6 +149,17 @@ export class MarkdownCompiler {
     } catch (error) {
       throw toShabdError(error, input)
     }
+    // KaTeX does not stop at maths it cannot read: it leaves the source on the page in red and says so
+    // in a message. A mistake in a page is reported where it is, like any other.
+    const maths = file.messages.find((message) => message.source === 'rehype-katex')
+    if (maths) {
+      const why = (maths.cause as Error | undefined)?.message?.replace(/^KaTeX parse error: /, '') ?? maths.reason
+      throw new ShabdError(
+        input.file,
+        [{ path: [], message: `This maths could not be typeset. ${why}`, ...(maths.line ? { line: maths.line, column: maths.column ?? 1 } : {}) }],
+        input.source,
+      )
+    }
 
     return {
       code: String(file.value),
@@ -161,12 +175,24 @@ export class MarkdownCompiler {
   #processor(format: 'md' | 'mdx'): Processor {
     let processor = this.#processors.get(format)
     if (!processor) {
+      const user = this.options.plugins
       processor = createProcessor({
         format,
         jsxImportSource: 'react',
         providerImportSource: MDX_COMPONENTS_ID,
-        remarkPlugins: [remarkFrontmatter, remarkGfm, remarkLiftTitle, remarkCallouts],
-        rehypePlugins: [rehypeHeadings, rehypeLinks, [rehypeCode, this.highlighter], rehypeMdxImportMedia],
+        // The site's plugins are loaded by name, so all that is known of one is that it is a function.
+        remarkPlugins: [remarkFrontmatter, remarkGfm, remarkLiftTitle, remarkCallouts, ...(user?.remark ?? [])] as NonNullable<
+          Parameters<typeof createProcessor>[0]
+        >['remarkPlugins'],
+        rehypePlugins: [
+          // First, while the page is still as its author wrote it: the outline, what is searched, the links.
+          rehypeHeadings,
+          rehypeLinks,
+          ...(user?.rehypeBeforeCode ?? []),
+          [rehypeCode, this.highlighter],
+          ...(user?.rehype ?? []),
+          rehypeMdxImportMedia,
+        ] as NonNullable<Parameters<typeof createProcessor>[0]>['rehypePlugins'],
       })
       this.#processors.set(format, processor)
     }

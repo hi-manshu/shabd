@@ -644,6 +644,31 @@ const redirectTarget = z
     error: 'A redirect leads to a path on this site, such as /new-page, or to an address that starts with https://',
   })
 
+/* ──────────────────────────────── markdown ────────────────────────────── */
+
+export interface PluginRef {
+  /** A package name, or a path to a file of the site's own. */
+  name: string
+  options: Record<string, unknown> | undefined
+}
+
+/** `remark-emoji`, or `[remark-toc, { heading: contents }]` to give the plugin options. */
+const PluginRefSchema = z
+  .union([z.string().min(1), z.tuple([z.string().min(1), z.record(z.string(), z.unknown())])])
+  .transform((ref): PluginRef => (typeof ref === 'string' ? { name: ref, options: undefined } : { name: ref[0], options: ref[1] }))
+
+const MarkdownSchema = z.strictObject({
+  /**
+   * remark plugins, which work on the Markdown, and rehype plugins, which
+   * work on the HTML made from it. They run after Shabd's own, in the order
+   * written.
+   */
+  remarkPlugins: z.array(PluginRefSchema).default([]),
+  rehypePlugins: z.array(PluginRefSchema).default([]),
+  /** Typeset maths written between dollar signs. Needs `remark-math` and `rehype-katex` installed. */
+  math: z.boolean().default(false),
+})
+
 /* ──────────────────────────────── variables ───────────────────────────── */
 
 export type VarsInput = { [name: string]: string | number | boolean | VarsInput }
@@ -682,6 +707,8 @@ export const ConfigSchema = z.strictObject({
   redirects: z.record(redirectSource, redirectTarget).default({}),
   /** Values every page can use by name: `{{version}}`. */
   vars: VarsSchema.default({}),
+  /** How Markdown is read: the site's own plugins, and maths. */
+  markdown: MarkdownSchema.prefault({}),
 })
 
 export type ShabdConfigInput = z.input<typeof ConfigSchema>

@@ -170,6 +170,8 @@ export function resolveConfig(root: string, configFile: string, source: string):
     config.site.base,
     // A page is read with its variables filled in, so another value is another page.
     vars,
+    // The site's own plugins, their options, and whether maths is typeset.
+    config.markdown,
     config.theme.code,
     // The presets in the theme menu decide which other syntax themes every code block is coloured in.
     codeThemePlan(config.theme).themes,

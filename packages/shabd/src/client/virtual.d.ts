@@ -25,6 +25,8 @@ declare module 'virtual:shabd/fonts' {}
 
 declare module 'virtual:shabd/user-styles' {}
 
+declare module 'virtual:shabd/math-styles' {}
+
 declare module 'virtual:shabd/embedder' {
   /** False when semantic search is off or @huggingface/transformers is not installed. */
   export const available: boolean

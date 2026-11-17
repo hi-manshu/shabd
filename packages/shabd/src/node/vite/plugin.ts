@@ -45,6 +45,7 @@ import { substituteVars } from '../content/vars.js'
 import { compilePage, createContext, type ShabdContext } from '../context.js'
 import { MDX_COMPONENTS_ID } from '../markdown/compile.js'
 import { HMR_RUNTIME_ID, PAGE_ERROR_ID, toErrorModule, toPageModule } from '../markdown/page-module.js'
+import { mathStylesheet } from '../markdown/user-plugins.js'
 import { CLIENT_DIR, CLIENT_ENTRY, PACKAGE_ROOT, packageName, resolveFromPackage, SERVER_ENTRY } from '../paths.js'
 import { devMiddlewares } from './dev-middleware.js'
 
@@ -62,6 +63,7 @@ const VIRTUAL = {
   blocks: 'virtual:shabd/blocks',
   fonts: 'virtual:shabd/fonts',
   styles: 'virtual:shabd/user-styles',
+  math: 'virtual:shabd/math-styles',
   embedder: 'virtual:shabd/embedder',
   sqlite: 'virtual:shabd/sqlite',
 } as const
@@ -202,6 +204,12 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
 
         case VIRTUAL.styles:
           return `${config.stylesheets.map((file) => `import ${importPath(file)}`).join('\n')}\n`
+
+        case VIRTUAL.math: {
+          // KaTeX's stylesheet and the fonts it names, on sites that typeset maths and on no others.
+          const stylesheet = config.config.markdown.math ? mathStylesheet(config.root) : undefined
+          return stylesheet ? `import ${importPath(stylesheet)}\n` : ''
+        }
 
         case VIRTUAL.embedder:
           return embedderModule(config)

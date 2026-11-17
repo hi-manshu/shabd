@@ -87,7 +87,9 @@
     "@resvg/resvg-js": "^2.6.0",
     "@sqlite.org/sqlite-wasm": "^3.54.1-build1",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "rehype-katex": "^7.0.0",
+    "remark-math": "^6.0.0"
   },
   "peerDependenciesMeta": {
     "@huggingface/transformers": {
@@ -97,6 +99,12 @@
       "optional": true
     },
     "@sqlite.org/sqlite-wasm": {
+      "optional": true
+    },
+    "rehype-katex": {
+      "optional": true
+    },
+    "remark-math": {
       "optional": true
     }
   },

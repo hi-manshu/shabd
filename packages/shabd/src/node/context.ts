@@ -8,6 +8,7 @@ import path from 'node:path'
 import { loadConfig, type ResolvedConfig } from './config/load.js'
 import { ContentStore } from './content/store.js'
 import { MarkdownCompiler, type CompileResult } from './markdown/compile.js'
+import { loadUserPlugins } from './markdown/user-plugins.js'
 import type { PageRecord } from './content/store.js'
 
 export interface ShabdContext {
@@ -22,7 +23,9 @@ export async function createContext(root: string, options: { dev: boolean }): Pr
   const config = await loadConfig(root)
   const store = await ContentStore.load(config, { drafts: options.dev })
   const { theme } = config.config
+  const plugins = await loadUserPlugins(config)
   const compiler = new MarkdownCompiler({
+    plugins,
     themes: { light: theme.code.light, dark: theme.code.dark },
     more: codeThemePlan(theme).themes.slice(2),
     backgrounds: codeBackgrounds(theme),
@@ -30,7 +33,8 @@ export async function createContext(root: string, options: { dev: boolean }): Pr
     wrap: theme.code.wrap,
     lineNumbers: theme.code.lineNumbers,
     sandbox: config.config.features.sandbox.enabled,
-    fingerprint: config.compileFingerprint,
+    // A plugin that was edited or upgraded compiles pages differently from the one before it.
+    fingerprint: plugins.fingerprint ? `${config.compileFingerprint}:${plugins.fingerprint}` : config.compileFingerprint,
     cacheDir: path.join(config.cacheDir, 'pages'),
   })
   return { config, store, compiler, dev: options.dev }

@@ -25,6 +25,8 @@
     "@playwright/test": "^1.65.1",
     "@resvg/resvg-js": "^2.6.2",
     "@sqlite.org/sqlite-wasm": "^3.54.1-build1",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   }

@@ -1,5 +1,6 @@
 import 'virtual:shabd/fonts'
 import './styles/index.css'
+import 'virtual:shabd/math-styles'
 import 'virtual:shabd/user-styles'
 import { createRoot, hydrateRoot } from 'react-dom/client'
 import { App } from './app/App.js'

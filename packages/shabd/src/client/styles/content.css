@@ -514,6 +514,16 @@
     margin-block-start: 1rem;
   }
 
+  /* ───────────── maths ───────────── */
+
+  /* A formula too wide for the column scrolls in its own box, as a wide table does, and the page stays put. */
+  .sb-content .katex-display {
+    margin-block: 1.4em;
+    padding-block: 0.25rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
   /* ───────────── steps ───────────── */
 
   /*
