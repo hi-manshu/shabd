@@ -12,7 +12,7 @@ doc:
   width: content
   regions:
     sidebar: [sidebar-nav]
-    main: [breadcrumbs, page-header, content, page-footer, pagination]
+    main: [breadcrumbs, page-header, page-actions, content, page-footer, pagination]
     aside: [toc]
 ```
 
@@ -48,6 +48,7 @@ A page has up to six regions. A region with no blocks is not rendered, and the p
 | `sidebar-nav` | sidebar | The [sidebar](./sidebar.md) |
 | `breadcrumbs` | main | The sidebar groups above this page |
 | `page-header` | main | Title, badges and description |
+| `page-actions` | main | [The page as Markdown](../features/mcp.md#on-the-page): copy it, open it, hand it to an assistant |
 | `api-endpoint` | main | The request line from `api:` frontmatter |
 | `hero` | main | The opening of a splash page, from `hero:` frontmatter |
 | `content` | main | The Markdown body |
@@ -80,7 +81,7 @@ layouts:
   doc:
     regions:
       # No "Edit this page" and no previous/next links
-      main: [breadcrumbs, page-header, content]
+      main: [breadcrumbs, page-header, page-actions, content]
 ```
 
 Every built-in layout extends `base`, so a change to `base` shows on every page. This site adds its announcement bar
@@ -127,7 +128,8 @@ regions:
       props: { title: Contents }
 ```
 
-`toc` takes `title`, and `search` takes `label`. Your own blocks receive whatever you pass.
+`toc` takes `title`, `search` takes `label`, and `page-actions` takes
+[the options listed with it](../features/mcp.md#on-the-page). Your own blocks receive whatever you pass.
 
 ## Your own blocks
 

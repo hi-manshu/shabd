@@ -382,6 +382,27 @@
     text-wrap: pretty;
   }
 
+  /* A quiet row under the title: it is there for the reader who wants it and out of the way of the one who does not. */
+  .sb-page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.25rem;
+    /* The header above keeps its space for pages without this row; here some of it is taken back. */
+    margin-block: -1.1rem 2rem;
+    font-size: var(--sb-step--1);
+  }
+
+  .sb-page-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--sb-muted);
+  }
+
+  .sb-page-action:hover {
+    color: var(--sb-text);
+  }
+
   .sb-page-footer {
     margin-block-start: 3rem;
     font-size: var(--sb-step--1);

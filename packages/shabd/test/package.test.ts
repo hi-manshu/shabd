@@ -188,6 +188,15 @@ describe('layouts', () => {
     ])
   })
 
+  it('offers a page as Markdown only on a site that writes the Markdown copies', () => {
+    const main = (features: string) => {
+      const { config } = resolveConfig('/site', '/site/shabd.config.yaml', `site:\n  title: Docs\n${features}`)
+      return blocksOf(resolvePageLayout({ ...site, site: config.site, features: config.features }, page({}), toc).regions.main)
+    }
+    expect(main('')).toEqual(['breadcrumbs', 'page-header', 'page-actions', 'content', 'page-footer', 'pagination'])
+    expect(main('features:\n  llms: false\n')).not.toContain('page-actions')
+  })
+
   it('applies page switches on top of the layout', () => {
     expect(resolvePageLayout(site, page({ sidebar: false }), toc).regions.sidebar).toBeUndefined()
     expect(resolvePageLayout(site, page({ sidebar: { visible: false } }), toc).regions.sidebar).toBeUndefined()

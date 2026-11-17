@@ -381,6 +381,28 @@ test.describe('for agents', () => {
     const body = (await mcp.json()) as { result: { content: { text: string }[] } }
     expect(body.result.content[0]?.text).toContain('path: /guide/setup#second-step')
   })
+
+  test('a page offers itself as Markdown: to copy, to open and to hand to an assistant', async ({ page, context, browserName }) => {
+    await open(page, `${BUILT}/guide/setup`)
+    const actions = page.locator('.sb-page-actions')
+    await expect(actions.getByRole('link', { name: 'View as Markdown' })).toHaveAttribute('href', '/guide/setup.md')
+    // An assistant is given the address the site is deployed at, since that is where it can fetch the page.
+    const claude = (await actions.getByRole('link', { name: 'Open in Claude' }).getAttribute('href')) ?? ''
+    expect(claude).toMatch(/^https:\/\/claude\.ai\/new\?q=/)
+    expect(decodeURIComponent(claude)).toContain('Read https://fixture.test/guide/setup.md so that')
+
+    if (browserName === 'chromium') {
+      // Clipboard permissions can only be granted to Chromium.
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+      await actions.getByRole('button', { name: 'Copy page' }).click()
+      await expect(actions.getByRole('button')).toContainText('Copied')
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^# Setting up\n\nThis page has no frontmatter/)
+    }
+
+    // The home page is a splash page: its layout has no such row.
+    await open(page, `${BUILT}/`)
+    await expect(page.locator('.sb-page-actions')).toHaveCount(0)
+  })
 })
 
 test.describe('redirects', () => {

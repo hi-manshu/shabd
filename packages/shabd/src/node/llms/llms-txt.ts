@@ -8,16 +8,13 @@
  * Both are generated from the same sidebar the reader sees, so the order an
  * agent reads in is the order the author intended.
  */
-import { siteHref, withBase } from '../../shared/paths.js'
+import { markdownPath, siteHref, withBase } from '../../shared/paths.js'
 import type { SidebarNode, SidebarPage } from '../../shared/types.js'
 import type { ShabdContext } from '../context.js'
 import type { PageRecord } from '../content/store.js'
 import { pageMarkdown } from './markdown.js'
 
-/** Where a page's Markdown copy is served: `/guide/install` → `/guide/install.md`, `/` → `/index.md`. */
-export function markdownPath(routePath: string): string {
-  return routePath === '/' ? '/index.md' : `${routePath}.md`
-}
+export { markdownPath }
 
 /** Absolute when `site.url` is set, otherwise relative to the site root. */
 export function publicUrl(context: ShabdContext, sitePath: string): string {

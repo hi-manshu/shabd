@@ -25,6 +25,7 @@ export const BUILTIN_BLOCKS = [
   // main
   'breadcrumbs',
   'page-header',
+  'page-actions',
   'api-endpoint',
   'hero',
   'content',

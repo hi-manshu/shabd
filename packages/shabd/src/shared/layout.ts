@@ -35,7 +35,7 @@ export const BUILTIN_LAYOUT_DEFINITIONS: Record<string, LayoutDefinition> = {
     width: 'content',
     regions: {
       sidebar: blocks('sidebar-nav'),
-      main: blocks('breadcrumbs', 'page-header', 'content', 'page-footer', 'pagination'),
+      main: blocks('breadcrumbs', 'page-header', 'page-actions', 'content', 'page-footer', 'pagination'),
       aside: blocks('toc'),
     },
   },
@@ -51,7 +51,7 @@ export const BUILTIN_LAYOUT_DEFINITIONS: Record<string, LayoutDefinition> = {
     width: 'full',
     regions: {
       sidebar: blocks('sidebar-nav'),
-      main: blocks('breadcrumbs', 'page-header', 'api-endpoint', 'content', 'pagination'),
+      main: blocks('breadcrumbs', 'page-header', 'page-actions', 'api-endpoint', 'content', 'pagination'),
     },
   },
 }
@@ -190,6 +190,8 @@ export function resolvePageLayout(
     if (site.site.social.length === 0) hidden.add('social')
   }
   if (site.features && !site.features.search.enabled) hidden.add('search')
+  // The actions lead to the page's Markdown copy, which is written with llms.txt.
+  if (site.features && !site.features.llms.enabled) hidden.add('page-actions')
   if (!site.palettes?.length) hidden.add('theme-menu')
 
   const regions: ActiveLayout['regions'] = {}

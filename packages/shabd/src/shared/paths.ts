@@ -111,6 +111,11 @@ export function siteHref(
   return (site.urls === 'slash' ? `${address}/` : address) + rest
 }
 
+/** Where a page's Markdown copy is served: `/guide/install` → `/guide/install.md`, `/` → `/index.md`. */
+export function markdownPath(routePath: string): string {
+  return routePath === '/' ? '/index.md' : `${routePath}.md`
+}
+
 /** Inverse of `withBase` for a location pathname. */
 export function stripBase(base: string, pathname: string): string {
   const prefix = base.replace(/\/$/, '')

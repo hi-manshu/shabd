@@ -17,6 +17,51 @@ Each page is also written as Markdown, at its own address with `.md` added. The 
 
 Frontmatter and MDX `import` lines are removed. The rest is the Markdown you wrote.
 
+### On the page
+
+A reader who works with an assistant can get to that copy from the page itself. Under the title of every `doc` and
+`api` page is a row with three things:
+
+| | What it does |
+| --- | --- |
+| Copy page | Puts the page's Markdown on the clipboard |
+| View as Markdown | Opens the Markdown copy |
+| Open in Claude, Open in ChatGPT | Opens the assistant with a prompt that asks it to read the page |
+
+The assistant fetches the page from the network, so the last two are only shown when `site.url` is set, and they
+lead somewhere useful only once the site is deployed there. They are links to other companies' sites, whose
+addresses can change.
+
+The row is the `page-actions` [block](../configuration/layouts.md#blocks). To change it, pass it options where the
+layout places it:
+
+```yaml title="shabd.config.yaml"
+layouts:
+  doc:
+    regions:
+      main:
+        - breadcrumbs
+        - page-header
+        - block: page-actions
+          props:
+            assistants:
+              - { label: Claude, url: "https://claude.ai/new?q={prompt}" }
+            prompt: "Read {url} and summarise it."
+        - content
+        - page-footer
+        - pagination
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `copy` | `true` | Show "Copy page" |
+| `view` | `true` | Show "View as Markdown" |
+| `assistants` | Claude and ChatGPT | A list of `{ label, url }`. `{prompt}` in the `url` is replaced by the prompt. An empty list shows none |
+| `prompt` | `Read {url} so that I can ask questions about it.` | What the assistant is asked. `{url}` is replaced by the address of the Markdown copy |
+
+Leave the block out of a layout to remove the row. It is also left out when `features.llms` is off, since the
+Markdown copies are then not written.
+
 ## llms.txt
 
 `/llms.txt` follows the [llms.txt convention](https://llmstxt.org): a short Markdown file that lists every page with
