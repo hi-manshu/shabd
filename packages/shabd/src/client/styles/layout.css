@@ -111,6 +111,12 @@
       inset: var(--sb-panel-top, var(--sb-header-height)) 0 0 0;
       z-index: 20;
       block-size: auto;
+      /*
+       * Fill the space between those edges and scroll inside it. On a wide screen the sidebar is aligned to the
+       * start of its column; kept here, that makes the panel as tall as its links, and a browser moves a box that
+       * is taller than the window up to the window's top, under the header.
+       */
+      align-self: stretch;
       border: 0;
       visibility: hidden;
       transform: translateY(-0.5rem);

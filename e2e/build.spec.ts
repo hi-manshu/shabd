@@ -330,6 +330,36 @@ test.describe('narrow screens', () => {
     expect(overflows).toBe(false)
   })
 
+  test('a sidebar longer than the screen scrolls inside the panel, under the header', async ({ page }) => {
+    // Short enough that the test site's sidebar does not fit.
+    await page.setViewportSize({ width: 390, height: 300 })
+    await open(page, `${BUILT}/guide/intro`)
+    const sidebar = page.locator('.sb-region-sidebar')
+    await page.getByRole('button', { name: 'Open navigation' }).click()
+    await expect(sidebar).toBeVisible()
+
+    const box = () =>
+      page.evaluate(() => {
+        const panel = document.querySelector('.sb-region-sidebar')!
+        const { top, bottom } = panel.getBoundingClientRect()
+        const header = document.querySelector('.sb-region-header')!.getBoundingClientRect().bottom
+        return { top: Math.round(top), bottom: Math.round(bottom), header: Math.round(header), scrolls: panel.scrollHeight > panel.clientHeight + 1 }
+      })
+    await expect.poll(async () => (await box()).top).toBe((await box()).header)
+    const { bottom, scrolls } = await box()
+    // The panel ends where the window ends, and what does not fit is reached by scrolling it.
+    expect(bottom).toBe(300)
+    expect(scrolls).toBe(true)
+
+    // The first link is in view, and the last one comes into view when the panel is scrolled.
+    await expect(sidebar.getByRole('link', { name: 'Introduction' })).toBeInViewport()
+    const last = sidebar.locator('.sb-nav-link').last()
+    await expect(last).not.toBeInViewport()
+    await last.scrollIntoViewIfNeeded()
+    await expect(last).toBeInViewport()
+    expect(await page.evaluate(() => Math.round(window.scrollY))).toBe(0)
+  })
+
   test('the panel starts where the header ends, also when a banner holds the header down', async ({ page }) => {
     await open(page, `${BUILT}/guide/hosting`)
     const header = page.locator('.sb-region-header')
