@@ -5,6 +5,7 @@
 import path from 'node:path'
 import pc from 'picocolors'
 import { isShabdError, type ShabdError } from './config/errors.js'
+import { redirectRoute } from './config/load.js'
 import { compilePage, createContext, type ShabdContext } from './context.js'
 
 export interface Problem {
@@ -49,13 +50,46 @@ export async function collectProblems(context: ShabdContext): Promise<CheckResul
     }
   }
 
+  const moved = new Map(config.redirects.map((redirect) => [redirect.from, redirect]))
+
   for (const { file, target } of links) {
     const [route = '', fragment] = target.split('#')
     const known = anchors.get(route)
-    if (!known) {
+    const redirect = moved.get(route)
+    if (!known && redirect) {
+      // The link works, by way of the redirect. It is still worth saying: the reader makes a stop they need not.
+      problems.push({ level: 'warning', file, message: `Link to ${route}, which has moved to ${redirect.to}. Link there instead.` })
+    } else if (!known) {
       problems.push({ level: 'error', file, message: `Broken link: no page at ${route}` })
     } else if (fragment && known.size > 0 && !known.has(decodeURIComponent(fragment))) {
       problems.push({ level: 'error', file, message: `Broken link: ${route} has no heading "#${fragment}"` })
+    }
+  }
+
+  const configFile = relative(config.configFile)
+  for (const redirect of config.redirects) {
+    const line = config.locate(['redirects', redirect.key])?.line
+    if (anchors.has(redirect.from)) {
+      problems.push({
+        level: 'error',
+        file: configFile,
+        line,
+        message: `Redirect from ${redirect.from}: a page has that address, so the redirect is never used. Remove one of them.`,
+      })
+    }
+    if (redirect.external) continue
+    const route = redirectRoute(redirect.to)
+    const fragment = redirect.to.split('#')[1]
+    const known = anchors.get(route)
+    if (!known) {
+      problems.push({ level: 'error', file: configFile, line, message: `Redirect from ${redirect.from} leads to ${route}, where there is no page` })
+    } else if (fragment && known.size > 0 && !known.has(decodeURIComponent(fragment))) {
+      problems.push({
+        level: 'error',
+        file: configFile,
+        line,
+        message: `Redirect from ${redirect.from} leads to ${route}, which has no heading "#${fragment}"`,
+      })
     }
   }
 

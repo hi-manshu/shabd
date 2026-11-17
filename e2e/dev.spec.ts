@@ -361,4 +361,13 @@ test.describe('dev endpoints', () => {
     // In dev the endpoint is for tools on this machine, not for other websites.
     expect((await call('https://elsewhere.example')).status()).toBe(403)
   })
+
+  test('an address that has moved is answered with a redirect', async ({ request, page }) => {
+    const moved = await request.get(`${DEV}/guide/start`, { maxRedirects: 0 })
+    expect(moved.status()).toBe(302)
+    expect(moved.headers().location).toBe('/guide/intro')
+
+    await open(page, `${DEV}/old-setup`)
+    await expect(page).toHaveURL(`${DEV}/guide/setup#second-step`)
+  })
 })

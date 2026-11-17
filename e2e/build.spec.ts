@@ -383,6 +383,33 @@ test.describe('for agents', () => {
   })
 })
 
+test.describe('redirects', () => {
+  test('an address that has moved leads to the new one, with and without JavaScript', async ({ page, browser }) => {
+    await page.goto(`${BUILT}/guide/start`)
+    await expect(page).toHaveURL(`${BUILT}/guide/intro`)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Introduction')
+
+    await page.goto(`${BUILT}/old-setup`)
+    await expect(page).toHaveURL(`${BUILT}/guide/setup#second-step`)
+    await expect(page.locator('#second-step')).toBeInViewport()
+
+    const context = await browser.newContext({ javaScriptEnabled: false })
+    const plain = await context.newPage()
+    await plain.goto(`${BUILT}/guide/start`)
+    await expect(plain).toHaveURL(`${BUILT}/guide/intro`)
+    await context.close()
+  })
+
+  test('the page at the old address says where it went and is kept out of search engines', async ({ request }) => {
+    const html = await (await request.get(`${BUILT}/guide/start`)).text()
+    expect(html).toContain('<link rel="canonical" href="https://fixture.test/guide/intro">')
+    expect(html).toContain('<meta name="robots" content="noindex">')
+    // Only pages are listed for search engines and for agents.
+    expect(await (await request.get(`${BUILT}/sitemap.xml`)).text()).not.toContain('/guide/start')
+    expect(await (await request.get(`${BUILT}/llms.txt`)).text()).not.toContain('/guide/start')
+  })
+})
+
 test.describe('the document', () => {
   test('carries the tags from site.head', async ({ request }) => {
     const html = await (await request.get(`${BUILT}/guide/intro`)).text()

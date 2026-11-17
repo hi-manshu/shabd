@@ -156,6 +156,33 @@ features:
 Each feature has its own page: [Search](../features/search.md), [MCP and llms.txt](../features/mcp.md),
 [Studio](../features/studio.md) and [Live sandboxes](../features/sandbox.mdx).
 
+## redirects
+
+When a page moves, list its old address here. A reader who follows an old link or a bookmark then arrives at the
+new one.
+
+```yaml title="shabd.config.yaml"
+redirects:
+  /guide/setup: /guide/installation
+  /guide/faq: /guide/introduction#questions
+  /blog: https://example.com/blog
+```
+
+The key is the address that moved. The value is a page, with a `#heading` if you want one, or a full address on
+another site. One redirect may lead to another: the reader is sent straight to where the last one ends.
+
+A static host cannot answer with a redirect, so a build writes a small page at the old address that sends the
+reader on, with or without JavaScript. It tells search engines where the content went, and asks them not to list
+the old address. `shabd dev` answers with a redirect of its own.
+
+Mistakes are reported in three places:
+
+- Redirects that lead to each other in a circle are an error when the config loads.
+- `shabd check` and the build report a redirect that leads to a page that does not exist, and one whose old address
+  still has a page.
+- They also warn about a link in your content that points at an address that has moved, so that you can link to
+  the new one.
+
 ## components and blocks
 
 Both map a name to a file. `components` are available in every `.mdx` page; `blocks` can be placed in

@@ -36,7 +36,7 @@ import {
   type PluginOption,
   type ViteDevServer,
 } from 'vite'
-import { normalizePath as normalizeRoute, stripBase } from '../../shared/paths.js'
+import { normalizePath as normalizeRoute, stripBase, withBase } from '../../shared/paths.js'
 import { codeBackgrounds } from '../../shared/presets.js'
 import { renderDocument } from '../build/html.js'
 import { isShabdError } from '../config/errors.js'
@@ -375,6 +375,14 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
             const { site } = config.config
             const route = normalizeRoute(stripBase(site.base, url.split(/[?#]/)[0] ?? '/'))
             const page = store.byPath(route)
+            // An address that has moved. A build writes a page that sends the reader on; a server can just say so.
+            const redirect = page ? undefined : config.redirects.find((entry) => entry.from === route)
+            if (redirect) {
+              res.statusCode = 302
+              res.setHeader('Location', redirect.external ? redirect.to : withBase(site.base, redirect.to))
+              res.end()
+              return
+            }
             const entry = `${site.base}@fs/${normalizePath(CLIENT_ENTRY).replace(/^\//, '')}`
             const html = await server.transformIndexHtml(
               url,

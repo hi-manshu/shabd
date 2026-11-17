@@ -14,6 +14,7 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { resolveLayouts } from '../../shared/layout.js'
+import { isExternal, normalizePath } from '../../shared/paths.js'
 import { ConfigSchema, SidebarSchema, type ShabdConfig, type SidebarInput } from '../../shared/schema.js'
 import type { ResolvedLayout } from '../../shared/types.js'
 import { ShabdError, type SourceIssue } from './errors.js'
@@ -23,6 +24,18 @@ import { locateIssues, parseYamlWithSchema } from './yaml.js'
 export const PIPELINE_VERSION = 6
 
 export const CONFIG_FILE_NAMES = ['shabd.config.yaml', 'shabd.config.yml'] as const
+
+/** One entry of `redirects:`, ready to use. */
+export interface Redirect {
+  /** The key as it is written in the config, for pointing at it. */
+  key: string
+  /** The route that has moved, e.g. `/old-page`. */
+  from: string
+  /** Where it leads in the end: a route, with its `#heading` if it has one, or a full address. */
+  to: string
+  /** True when `to` is on another site. */
+  external: boolean
+}
 
 export interface ResolvedConfig {
   /** Absolute path of the site root (the folder holding shabd.config.yaml). */
@@ -42,6 +55,10 @@ export interface ResolvedConfig {
   blocks: Record<string, string>
   /** Absolute paths of the site's own stylesheets (`theme.css`). */
   stylesheets: string[]
+  /** `redirects:` with chains followed to their end. */
+  redirects: Redirect[]
+  /** Where a key of the config is written, for problems found after it has loaded. */
+  locate(path: (string | number)[]): { line: number; column: number } | undefined
   /** Changes whenever a setting that affects compiled pages changes. Part of every cache key. */
   compileFingerprint: string
   /**
@@ -110,6 +127,8 @@ export function resolveConfig(root: string, configFile: string, source: string):
     return absolute
   })
 
+  const redirects = resolveRedirects(config.redirects, issues)
+
   if (issues.length > 0) {
     throw new ShabdError(configFile, locateIssues(issues, yaml), source)
   }
@@ -141,9 +160,57 @@ export function resolveConfig(root: string, configFile: string, source: string):
     components,
     blocks,
     stylesheets,
+    redirects,
+    locate: (path) => yaml.locate(path, 'key'),
     compileFingerprint,
     structureFingerprint,
   }
+}
+
+/** The page a redirect target names, without its `#heading`. */
+export function redirectRoute(target: string): string {
+  return normalizePath(target.split('#')[0] ?? '/')
+}
+
+/**
+ * Follow each redirect to where it ends. `/a → /b` and `/b → /c` make `/a`
+ * lead straight to `/c`, so a reader is never sent on twice. Two that lead to
+ * each other lead nowhere, which is an error.
+ */
+function resolveRedirects(
+  written: Record<string, string>,
+  issues: { path: (string | number)[]; message: string }[],
+): Redirect[] {
+  const bySource = new Map<string, { key: string; to: string }>()
+  for (const [key, to] of Object.entries(written)) {
+    const from = normalizePath(key)
+    const other = bySource.get(from)
+    if (other) {
+      issues.push({ path: ['redirects', key], message: `"${key}" and "${other.key}" are the same address. Keep one of them.` })
+      continue
+    }
+    bySource.set(from, { key, to })
+  }
+
+  const redirects: Redirect[] = []
+  for (const [from, { key, to }] of bySource) {
+    let target = to
+    const visited = [from]
+    while (!isExternal(target)) {
+      const route = redirectRoute(target)
+      const next = bySource.get(route)
+      if (!next) break
+      if (visited.includes(route)) {
+        issues.push({ path: ['redirects', key], message: `Redirects lead in a circle: ${[...visited, route].join(' → ')}` })
+        target = ''
+        break
+      }
+      visited.push(route)
+      target = next.to
+    }
+    if (target) redirects.push({ key, from, to: target, external: isExternal(target) })
+  }
+  return redirects
 }
 
 export interface LoadedSidebar {

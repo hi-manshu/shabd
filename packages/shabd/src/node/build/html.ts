@@ -102,3 +102,42 @@ export function renderDocument(options: DocumentOptions): string {
 </html>
 `
 }
+
+/**
+ * The page a static host serves at an address that has moved. A host that
+ * serves files cannot answer with a redirect, so the page sends the reader
+ * on itself: at once where scripts run, and through the refresh tag where
+ * they do not. Search engines are told where the page went and not to list
+ * this one.
+ *
+ * `target` is an address a browser can follow from here: a path with the
+ * site's base, or a full address.
+ */
+export function renderRedirect(config: ShabdConfig, target: string): string {
+  const { site } = config
+  const href = escapeHtml(target)
+  const canonical = /^https?:/i.test(target) ? target : site.url ? new URL(target, site.url).href : undefined
+  // A reader who followed a link to a heading keeps it, unless the redirect names one of its own.
+  const script = `location.replace(${JSON.stringify(target).replace(/</g, '\\u003c')}${target.includes('#') ? '' : ' + location.hash'})`
+  const head = [
+    '<meta charset="utf-8">',
+    `<title>${escapeHtml(site.title)}</title>`,
+    `<meta http-equiv="refresh" content="0; url=${href}">`,
+    '<meta name="robots" content="noindex">',
+    canonical && `<link rel="canonical" href="${escapeHtml(canonical)}">`,
+  ]
+    .filter(Boolean)
+    .join('\n    ')
+
+  return `<!doctype html>
+<html lang="${escapeHtml(site.lang)}">
+  <head>
+    ${head}
+  </head>
+  <body>
+    <p>This page has moved to <a href="${href}">${href}</a>.</p>
+    <script>${script}</script>
+  </body>
+</html>
+`
+}

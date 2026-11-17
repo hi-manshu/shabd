@@ -569,6 +569,20 @@ const ContentSchema = z.strictObject({
   sidebar: z.string().min(1).default('sidebar.yaml'),
 })
 
+/* ─────────────────────────────── redirects ────────────────────────────── */
+
+/** Where a redirect starts: a path on this site. */
+const redirectSource = z
+  .string()
+  .regex(/^\/[^?#\s]*$/, { error: 'A redirect starts from a path on this site, such as /old-page' })
+
+/** Where it leads: a page path, with a `#heading` if wanted, or a full address. */
+const redirectTarget = z
+  .string()
+  .regex(/^(?:\/(?!\/)\S*|https?:\/\/\S+)$/i, {
+    error: 'A redirect leads to a path on this site, such as /new-page, or to an address that starts with https://',
+  })
+
 /* ───────────────────────────── shabd.config.yaml ───────────────────────── */
 
 const componentName = z
@@ -590,6 +604,8 @@ export const ConfigSchema = z.strictObject({
   components: z.record(componentName, z.string().min(1)).default({}),
   /** Custom layout blocks. Name → file path. */
   blocks: z.record(blockName, z.string().min(1)).default({}),
+  /** Addresses that have moved. Old path → new path, or a full address. */
+  redirects: z.record(redirectSource, redirectTarget).default({}),
 })
 
 export type ShabdConfigInput = z.input<typeof ConfigSchema>

@@ -25,7 +25,7 @@ import { pageMarkdown } from '../llms/markdown.js'
 import { DOCS_FILE, SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, type DocsFile } from '../mcp/source.js'
 import { SearchService } from '../search/service.js'
 import { serverOutDir, shabd } from '../vite/plugin.js'
-import { escapeHtml, renderDocument } from './html.js'
+import { escapeHtml, renderDocument, renderRedirect } from './html.js'
 
 export interface BuildOptions {
   /** Set false to skip embeddings and ship keyword search only. */
@@ -101,9 +101,12 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
     })
   }
 
+  /** The file a static host serves for a route: `/guide/install` is `guide/install/index.html`. */
+  const routeFile = (routePath: string) => (routePath === '/' ? 'index.html' : `${routePath.slice(1)}/index.html`)
+
   for (const page of pages) {
     const html = await renderRoute(page.path, page.file)
-    await write(page.path === '/' ? 'index.html' : `${page.path.slice(1)}/index.html`, html)
+    await write(routeFile(page.path), html)
   }
   // Static hosts serve 404.html for unknown URLs. A `content/404.md` page customises it.
   const custom404 = store.byPath('/404')
@@ -112,6 +115,15 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   await rm(serverDir, { recursive: true, force: true })
   await rm(path.join(outDir, '.vite'), { recursive: true, force: true })
   step(`${pages.length} pages prerendered ${pc.dim(seconds(performance.now() - phase))}`)
+
+  // An address that has moved gets a page that sends the reader on. A page that exists keeps its address:
+  // the redirect over it is reported with the other problems.
+  const redirects = config.redirects.filter((redirect) => !store.byPath(redirect.from))
+  for (const redirect of redirects) {
+    const target = redirect.external ? redirect.to : withBase(config.config.site.base, redirect.to)
+    await write(routeFile(redirect.from), renderRedirect(config.config, target))
+  }
+  if (redirects.length) step(`${redirects.length} ${redirects.length === 1 ? 'redirect' : 'redirects'}`)
 
   /* ── for AI agents ── */
 
