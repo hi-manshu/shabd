@@ -14,6 +14,22 @@ export const BUILT = 'http://localhost:4412'
 const DEV_ROOT = path.join(here, '..', '.work', 'dev')
 
 /**
+ * The dev server's file watcher reports a file as changed at most once in 50
+ * milliseconds, and drops a second change inside that time. A person cannot
+ * save twice that fast, but a test can, and then the server never sees the
+ * second save. So two changes to one file are kept this far apart.
+ */
+const SAVE_GAP = 150
+const lastChange = new Map<string, number>()
+
+async function spaced(file: string, change: () => Promise<void>): Promise<void> {
+  const wait = (lastChange.get(file) ?? 0) + SAVE_GAP - Date.now()
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait))
+  await change()
+  lastChange.set(file, Date.now())
+}
+
+/**
  * The dev server's files. Everything a test changes is put back when the test
  * ends: each file returns to what it held when the test first touched it.
  */
@@ -38,7 +54,7 @@ export class SiteFiles {
   async write(file: string, contents: string): Promise<void> {
     await this.track(file)
     await mkdir(path.dirname(this.path(file)), { recursive: true })
-    await writeFile(this.path(file), contents)
+    await spaced(this.path(file), () => writeFile(this.path(file), contents))
   }
 
   async edit(file: string, change: (text: string) => string): Promise<void> {
@@ -50,13 +66,13 @@ export class SiteFiles {
 
   async remove(file: string): Promise<void> {
     await this.track(file)
-    await rm(this.path(file), { force: true })
+    await spaced(this.path(file), () => rm(this.path(file), { force: true }))
   }
 
   async restore(): Promise<void> {
     for (const [file, original] of this.#originals) {
-      if (original === null) await rm(this.path(file), { force: true })
-      else await writeFile(this.path(file), original)
+      if (original === null) await spaced(this.path(file), () => rm(this.path(file), { force: true }))
+      else await spaced(this.path(file), () => writeFile(this.path(file), original))
     }
     // Give the dev server a moment to take the restored files in before the next test.
     if (this.#originals.size > 0) await new Promise((resolve) => setTimeout(resolve, 400))

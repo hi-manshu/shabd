@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="220" viewBox="0 0 720 220" role="img" aria-label="A Shabd site: a folder with shabd.config.yaml, sidebar.yaml and a content folder">
+<path d="M1 3h718v205a11 11 0 0 1-11 11H12a11 11 0 0 1-11-11z" fill="#1c1e3d" stroke="#2f3260"/>
+<rect x="0" y="0" width="720" height="5" fill="#e8e9f5"/>
+<path d="M34 45h7l2.5 3H54a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H34a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2z" fill="#ffc53d"/>
+<text x="68" y="58" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="17" font-weight="700" fill="#e8e9f5">my-docs/</text>
+<path d="M44 72V182M44 98H66M44 140H66M44 182H66" fill="none" stroke="#4d5390" stroke-width="1.6" stroke-linecap="round"/>
+<path d="M79 89h9l6 6v11a1.5 1.5 0 0 1-1.5 1.5h-13.5a1.5 1.5 0 0 1-1.5-1.5v-15.5a1.5 1.5 0 0 1 1.5-1.5z" fill="none" stroke="#b3bbff" stroke-width="1.6" stroke-linejoin="round"/><path d="M88 89v6h6" fill="none" stroke="#b3bbff" stroke-width="1.6" stroke-linejoin="round"/>
+<text x="110" y="104" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="16" font-weight="600" fill="#e8e9f5">shabd.config.yaml</text>
+<text x="318" y="104" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="16" fill="#a3a6c6">site, theme tokens, layouts, feature switches</text>
+<path d="M79 131h9l6 6v11a1.5 1.5 0 0 1-1.5 1.5h-13.5a1.5 1.5 0 0 1-1.5-1.5v-15.5a1.5 1.5 0 0 1 1.5-1.5z" fill="none" stroke="#b3bbff" stroke-width="1.6" stroke-linejoin="round"/><path d="M88 131v6h6" fill="none" stroke="#b3bbff" stroke-width="1.6" stroke-linejoin="round"/>
+<text x="110" y="146" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="16" font-weight="600" fill="#e8e9f5">sidebar.yaml</text>
+<text x="318" y="146" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="16" fill="#a3a6c6">navigation (optional)</text>
+<path d="M78 175h7l2.5 3H98a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H78a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2z" fill="#ffc53d"/>
+<text x="110" y="188" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace" font-size="16" font-weight="600" fill="#e8e9f5">content/</text>
+<text x="318" y="188" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif" font-size="16" fill="#a3a6c6">.md and .mdx pages</text>
+</svg>

@@ -118,6 +118,37 @@ settings, add a trusted publisher for this repository, and publish from a workfl
 "Three browser engines" means the Chromium, Firefox and WebKit builds that Playwright drives, on macOS. It does not
 mean Chrome, Firefox and Safari as people install them, and it does not cover Linux or Windows.
 
+### What has been checked
+
+On one machine (macOS 26, Node 22.16), with the docs site and a small test site in this repository:
+
+- 226 unit and integration tests pass. They cover config and sidebar validation, the sidebar resolver, the Markdown
+  pipeline, layout resolution, the theme presets and their contrast, search ranking, both search stores, the
+  content store, the starter, and the MCP endpoint driven by the official MCP client.
+- 116 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
+  JavaScript, hydration, navigation, every layout, the sidebar, search, the theme menu, text contrast on every
+  theme's rendered page, sandboxes, hot updates of pages and YAML, the Studio including conflicts and its folder
+  backend, and two editors connecting peer to peer. Sixteen more are skipped where an engine lacks what they need.
+- The search tests also pass with the index held in SQLite, and semantic search with the real embedding model
+  finds a section by meaning in all three engines on both stores.
+- Version 0.1.0 was installed from npm into an empty folder under both names. Each site passed `shabd check`,
+  built and was served.
+- The 18-page docs site builds in about 2 seconds with embeddings, and in about 1 second when they are cached.
+- A saved edit to a page reached the DOM in a median of 42 ms (10 saves, 35 to 49 ms after the first, which took
+  116 ms). That was measured in Chromium for the first commit, and not again since.
+
+On GitHub's Linux machines the unit tests pass. Two browser tests fail there: the error overlay clearing after a
+mistake in the YAML is fixed, and two editors connecting peer to peer.
+
+Not yet checked:
+
+- Chrome, Firefox and Safari as people install them, and Windows.
+- The system folder picker in the Studio. Its code runs in the tests against real file handles, but the picker
+  itself needs a person.
+- Peer editing between two machines on different networks.
+- The MCP handler on a serverless or edge host.
+- Sites with thousands of real pages.
+
 ## Part 3: What comes next
 
 ### 0.2: Make what exists dependable
