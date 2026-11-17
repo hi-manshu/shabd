@@ -51,20 +51,31 @@ described there, not in components.
 You need Node.js 22 or newer.
 
 ```sh
+npm create @himanshoe/shabd@latest my-docs
+cd my-docs
+npm install
+npm run dev
+```
+
+npm would not take the name `shabd`, so the same package is also published as `shabd-docs`, with
+`npm create shabd-docs@latest my-docs`. The command is `shabd` under both. Pick one name and stay with it.
+
+To work on Shabd itself:
+
+```sh
 git clone https://github.com/hi-manshu/shabd.git
 cd shabd
 npm install
 npm run dev
 ```
 
-`npm run dev` builds the `shabd` package and starts the dev server for `docs/`, which is Shabd's own documentation
-written with Shabd. Edit anything in `docs/` and watch it update.
+`npm run dev` builds the package and starts the dev server for `docs/`, which is Shabd's own documentation written
+with Shabd. Edit anything in `docs/` and watch it update.
 
-To start a site of your own from the clone, pack Shabd and run the starter. The new site installs Shabd from the
-packed file, because it is not on npm yet:
+To try your changes in a site of your own, pack Shabd and run the starter from the clone. Packing builds the
+package first:
 
 ```sh
-npm run build
 npm pack -w packages/shabd --pack-destination ..
 node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../himanshoe-shabd-0.1.0.tgz
 ```

@@ -6,7 +6,8 @@ next.
 ## Part 1: Bootstrap on GitHub
 
 Done so far: the project is its own Git repository, pushed to <https://github.com/hi-manshu/shabd> as a private
-repository, with the repository's address filled in where the docs and the package refer to it.
+repository, with the repository's address filled in where the docs and the package refer to it. Version 0.1.0 is
+on npm (step 5).
 
 What is left, in order:
 
@@ -48,8 +49,10 @@ will.
 
 ### 5. Publish to npm
 
-npm refused the name `shabd` on 17 November 2026 as too similar to `sha1` and `sharp`, and the scope `@shabd`
-belongs to another account. So Shabd is published under two names, each with its starter:
+Done: version 0.1.0 went out on 17 November 2026, and is tagged `v0.1.0`. What follows is how, for the next one.
+
+npm refused the name `shabd` as too similar to `sha1` and `sharp`, and the scope `@shabd` belongs to another
+account. So Shabd is published under two names, each with its starter:
 
 | Package | Starter | Start a site with |
 | --- | --- | --- |
@@ -70,8 +73,10 @@ in a terminal of your own. A version that is already on npm is skipped: run it a
 up where it stopped. A published version cannot be published again, so read what the dry run lists first.
 
 After a release, run both `npm create` commands in an empty folder outside this repository: inside it, npm would
-run the local copy. After the first one, take the "not on npm yet" wording out of
-`docs/content/guide/installation.md`, `README.md` and this file.
+run the local copy. For 0.1.0 both were run that way, and each site installed, passed `shabd check`, built and was
+served.
+
+The four pages on npm link to this repository, which nobody else can open while it is private.
 
 After the first release, switch to trusted publishing so no token is stored: on npmjs.com, open the package's
 settings, add a trusted publisher for this repository, and publish from a workflow that runs on version tags with
@@ -108,7 +113,7 @@ settings, add a trusted publisher for this repository, and publish from a workfl
 | Themes: 23 presets, the reader's menu, code colours that follow the chosen preset | Built, tested in three browser engines |
 | Readable code: every syntax colour at 4.5:1 or more against what is behind it | Built, tested for all 23 presets in both modes on a sample of code in eight languages |
 | Contrast of every preset | Tested: colour against colour for all 23, and text against every pixel of the rendered page for the ten themes, in three browser engines |
-| `create-shabd`, the starter | Built, tested. A generated site was installed from a packed copy of Shabd, checked, built and served. `npm create shabd` itself needs the packages published |
+| The starter, under both names | Built, tested, published. Both `npm create` commands were run from the registry: each site installed, passed `shabd check`, built and was served |
 
 "Three browser engines" means the Chromium, Firefox and WebKit builds that Playwright drives, on macOS. It does not
 mean Chrome, Firefox and Safari as people install them, and it does not cover Linux or Windows.
