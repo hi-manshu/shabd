@@ -47,8 +47,9 @@ evidence.
 
 The log of a run is full of `Invalid page` and `Invalid configuration` messages from `[WebServer]`. They are not
 failures. Several tests break a page or the config on purpose, to see that the mistake is shown and that fixing it
-clears it, and the dev server reports each one as it would to you. The count at the end is what says how the run
-went. Some tests are skipped where a browser lacks what they need: the clipboard and the File System Access API
+clears it, and the dev server reports each one as it would to you. One test deletes a page that the sidebar file
+still lists, so the log also holds a `does not match any page` warning. The count at the end is what says how the
+run went. Some tests are skipped where a browser lacks what they need: the clipboard and the File System Access API
 outside Chromium, and the SQLite and semantic tests unless they are switched on.
 
 A new feature that has something to click belongs in these tests. They have caught bugs the unit tests could not:

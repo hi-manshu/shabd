@@ -33,7 +33,9 @@ What is left to set up:
 2. **Protect `main`.** In the repository: Settings → Rules → Rulesets → New branch ruleset, targeting `main`, with
    the `test` and `browsers` jobs required. The release workflow pushes the commit that sets the version straight
    to `main`: if pull requests become required, let the owner bypass that, or release from a machine.
-3. **Tests on macOS and Windows.** `ci.yml` runs on Linux only. File paths are the likely trouble on Windows.
+3. **Browser tests on macOS and Windows.** `ci.yml` runs the unit tests, the docs check and a build on Linux,
+   macOS and Windows. A failure on Windows is reported and does not turn the check red yet. The browser tests run
+   on Linux only.
 4. **The copyright holder.** `LICENSE` says "Shabd contributors". Check that this is the name you want.
 5. **Community files:** `SECURITY.md` with a private way to report vulnerabilities, which matters here because the
    dev server can write files; `CODE_OF_CONDUCT.md`; issue forms and a pull request template; a changelog.
@@ -56,6 +58,8 @@ What is left to set up:
 | MCP: dev route, `shabd preview`, stdio | Built; protocol tested with the official client |
 | MCP on a host that runs code | `shabd build --adapter` writes a function for Cloudflare Pages, Vercel or Netlify. Each is run in the tests as its host runs it, with code generation from strings forbidden. None has been deployed to its host |
 | Studio: dev-server saving, tab sync, conflicts | Built, tested in three browser engines |
+| Studio: an editor that shows Markdown in colour, with keys for indenting, lists, bold and italic | Built, tested in three browser engines. That one undo takes back one such edit was seen in Chromium and Firefox; WebKit under test takes back all typing at once, in any text area |
+| Studio: creating, renaming and deleting pages, with `sidebar.yaml` kept in step | Built, tested in three browser engines |
 | Studio: folder saving (File System Access API) | Built, tested in Chromium against real file handles; the system folder picker itself needs a person |
 | Studio: peer editing over WebRTC | Built, tested between two browser sessions on one machine; not across networks |
 | Live sandboxes | Built, tested in three browser engines |
@@ -63,7 +67,7 @@ What is left to set up:
 | Readable code: every syntax colour at 4.5:1 or more against what is behind it | Built, tested for all 23 presets in both modes on a sample of code in eight languages |
 | Contrast of every preset | Tested: colour against colour for all 23, and text against every pixel of the rendered page for the ten themes, in three browser engines |
 | The starter, under both names | Built, tested, published. Both `npm create` commands were run from the registry: each site installed, passed `shabd check`, built and was served |
-| A site served from a sub-path, as GitHub Pages serves one | Built. Checked on the deployed docs: every page, the links between them, search, the theme menu, the 404 page |
+| A site served from a sub-path, as GitHub Pages serves one | Built. Checked on the deployed docs: every page, the links between them, search, the theme menu, the 404 page. `shabd dev` for such a site showed an empty page in 0.1.0. That is fixed, and tested: a unit test asks such a server for everything its page names, and three browser tests open such a site in dev, save a page, and make, move and delete one in the Studio |
 
 "Three browser engines" means the Chromium, Firefox and WebKit builds that Playwright drives, on macOS and, on
 GitHub, on Linux. It does not mean Chrome, Firefox and Safari as people install them, and it does not cover
@@ -73,14 +77,17 @@ Windows.
 
 On one machine (macOS 26, Node 22.16), with the docs site and a small test site in this repository:
 
-- 227 unit and integration tests pass. They cover config and sidebar validation, the sidebar resolver, the Markdown
+- 283 unit and integration tests pass. They cover config and sidebar validation, the sidebar resolver, the Markdown
   pipeline, layout resolution, the theme presets and their contrast, search ranking, both search stores, the
-  content store, the starter, and the MCP endpoint driven by the official MCP client.
-- 122 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
+  content store, the starter, the MCP endpoint driven by the official MCP client and the functions written for
+  three hosts, a dev server that is told of pages added and removed, a dev server for a site under a sub-path, and
+  the Studio's editor: what it colours and what its keys do.
+- 149 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
   JavaScript, hydration, navigation, every layout, the sidebar, the phone-size layout, search, the theme menu, text
-  contrast on every theme's rendered page, sandboxes, hot updates of pages and YAML, the Studio including conflicts
-  and its folder backend, and two editors connecting peer to peer. Sixteen more are skipped where an engine lacks
-  what they need.
+  contrast on every theme's rendered page, sandboxes, hot updates of pages and YAML, the Studio including its
+  editor, conflicts, making, moving and deleting pages, and its folder backend, two editors connecting peer to
+  peer, and a dev server for a site under a sub-path. Sixteen more are skipped where an engine lacks what they
+  need.
 - The search tests also pass with the index held in SQLite, and semantic search with the real embedding model
   finds a section by meaning in all three engines on both stores.
 - Version 0.1.0 was installed from npm into an empty folder under both names. Each site passed `shabd check`,
@@ -90,8 +97,9 @@ On one machine (macOS 26, Node 22.16), with the docs site and a small test site 
   116 ms). That was measured in Chromium for the first commit, and not again since.
 
 On GitHub's Linux machines the same tests pass, except that two editors connecting peer to peer runs in Chromium
-only there: 120 pass and 18 are skipped. Playwright's Firefox and WebKit connected two pages on Linux only some of
-the time. The suite then runs again on the SQLite search store, where 129 pass.
+only there, so two fewer pass and two more are skipped. Playwright's Firefox and WebKit connected two pages on
+Linux only some of the time. The suite then runs again on the SQLite search store. The unit tests also run on
+GitHub's macOS and Windows machines.
 
 On the deployed docs site, on 17 November 2026, in Chromium: all 18 pages open with nothing in the console, the 36
 links between them lead somewhere, and each of these worked when tried as a reader would: search by keyword and
@@ -112,7 +120,8 @@ Not yet checked:
 
 ### 0.2: Make what exists dependable
 
-- Run the tests on Windows and macOS on GitHub. They run on Linux there today.
+- Run the browser tests on Windows and macOS on GitHub. The unit tests run on all three there, the browser tests
+  on Linux.
 - On Linux, a file saved twice within 50 ms is seen once: the dev server's file watcher drops the second change.
   An editor that saves in two writes could leave the server one save behind. Reading the file again a moment
   after each change would close that. It was found because a test did exactly this.
@@ -159,8 +168,9 @@ Not yet checked:
 
 **Studio**
 
-- A real code editor in place of the text area.
-- Create, rename and delete pages. Paste images.
+- Autocomplete in the editor: links to pages, frontmatter keys, the names of components.
+- When a page is renamed, rewrite the links to it in other pages. Today only `sidebar.yaml` follows.
+- Paste images.
 - A CRDT (Yjs) for drafts, so two people can type at once. Today the newest draft replaces the other.
 - Signalling that does not need two codes pasted by hand.
 
