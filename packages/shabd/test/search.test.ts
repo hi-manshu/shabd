@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { chunkPage, embeddingInput } from '../src/node/search/chunk.js'
+import { editDistance } from '../src/shared/edit-distance.js'
 import { locatePassage, passageTarget } from '../src/shared/passage.js'
 import {
+  closeTerms,
   fuseRanks,
   KeywordIndex,
   makeSnippet,
@@ -11,6 +13,7 @@ import {
   search,
   similarities,
   tokenize,
+  typoBudget,
   wordSpans,
   wordsToMark,
   type SearchDoc,
@@ -56,8 +59,8 @@ describe('tokenize', () => {
   })
 
   it('marks the words of a query that say why a result matched, not the very short ones', () => {
-    expect(wordsToMark('how do I change the colours')).toEqual(['change', 'colours'])
-    expect(wordsToMark('go to it')).toEqual([])
+    expect(wordsToMark(index.plan('how do I change the colours'))).toEqual(['change', 'colours'])
+    expect(wordsToMark(index.plan('go to it'))).toEqual([])
   })
 })
 
@@ -86,6 +89,80 @@ describe('keyword search', () => {
   it('returns nothing for words that are not in the index', () => {
     expect(top('zzqqxx')).toEqual([])
     expect(top('   ')).toEqual([])
+  })
+})
+
+describe('typos', () => {
+  it('counts the edits between two words, a swap of neighbours as one', () => {
+    expect(editDistance('badge', 'badge')).toBe(0)
+    expect(editDistance('bagde', 'badge')).toBe(1)
+    expect(editDistance('colurs', 'colours')).toBe(1)
+    expect(editDistance('colour', 'color')).toBe(1)
+    expect(editDistance('kitten', 'sitting')).toBe(3)
+    expect(editDistance('', 'abc')).toBe(3)
+  })
+
+  it('stops counting at a limit, and says only that the limit was passed', () => {
+    expect(editDistance('kitten', 'sitting', 3)).toBe(3)
+    expect(editDistance('kitten', 'sitting', 2)).toBe(3)
+    expect(editDistance('kitten', 'sitting', 1)).toBe(2)
+    expect(editDistance('a', 'abcdefgh', 2)).toBe(3)
+  })
+
+  it('forgives one edit from four letters and two from eight, and none in a short word or a number', () => {
+    expect(['fnt', 'font', 'colours', 'headings', 'typography'].map(typoBudget)).toEqual([0, 1, 1, 2, 2])
+    // A number one digit away is another number, not a misspelling.
+    expect(['8080', 'es2023', 'sha256sum'].map(typoBudget)).toEqual([0, 0, 0])
+  })
+
+  it('finds a section by a misspelt word', () => {
+    expect(top('colurs ')).toEqual(['Colours'])
+    expect(top('tyopgraphy ')).toEqual(['Typography'])
+    // Two edits in a long word: a letter missing and another one wrong.
+    expect(top('typografy ')).toEqual(['Typography'])
+    expect(top('srever ')).toEqual(['Install', 'Hosting'])
+    // The word still being typed is forgiven once it is close to a whole word.
+    expect(top('instaler')).toEqual(['Install'])
+  })
+
+  it('does not forgive a word of three letters, or more edits than the word is allowed', () => {
+    expect(top('fnt ')).toEqual([])
+    expect(top('colrs ')).toEqual([])
+  })
+
+  it('takes a word for a misspelling only when it matches nothing', () => {
+    // "colour" is in the index, so it is not also taken for "colours", one edit away.
+    expect(index.plan('colour ')).toEqual([{ word: 'colour', terms: [{ term: 'colour', weight: 1 }], corrected: false }])
+    expect(index.plan('colurs ')).toEqual([{ word: 'colurs', terms: [{ term: 'colours', weight: 0.5 }], corrected: true }])
+    // Nearest first, and the further one counts for less.
+    expect(index.plan('instaler ')[0]?.terms).toEqual([
+      { term: 'installer', weight: 0.5 },
+      { term: 'install', weight: 0.25 },
+    ])
+  })
+
+  it('ranks an exact match above a match by a misspelt word', () => {
+    // "colours" is a heading, which counts three times over, and "font" is in a body. Typed correctly, the heading wins.
+    expect(top('font colours ')).toEqual(['Colours', 'Typography'])
+    expect(top('font colurs ')).toEqual(['Typography', 'Colours'])
+  })
+
+  it('never takes a word for a filler word', () => {
+    expect(closeTerms('form', ['for', 'from', 'farm', 'forms', 'form'])).toEqual([
+      { term: 'farm', edits: 1 },
+      { term: 'forms', edits: 1 },
+    ])
+  })
+
+  it('marks what a misspelt word was taken for, and cuts the excerpt around it', () => {
+    const filler = 'Filler sentence about nothing in particular. '.repeat(8)
+    const long = [doc('/long', 'Long', `${filler}The highlight colour marks the current page. ${filler}`)]
+    const [hit] = search(new KeywordIndex(long), null, null, 'hihglight ', 3)
+    expect(hit?.marks).toEqual(['highlight'])
+    expect(hit?.snippet).toContain('The highlight colour marks')
+    expect(hit?.snippet.startsWith('…')).toBe(true)
+    // A word spelt as the index has it is marked as it was typed.
+    expect(search(index, null, null, 'accent colour', 3)[0]?.marks).toEqual(['accent', 'colour'])
   })
 })
 

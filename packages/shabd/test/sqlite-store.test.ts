@@ -5,7 +5,7 @@
  */
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { MemoryStore, type SearchDoc, type SearchIndexFile } from '../src/shared/search-core.js'
+import { MemoryStore, type SearchDoc, type SearchHit, type SearchIndexFile } from '../src/shared/search-core.js'
 import {
   openSearchDatabase,
   readSearchMeta,
@@ -122,6 +122,43 @@ describe('keyword search through FTS5', () => {
   })
 })
 
+describe('typos, which FTS5 knows nothing of', () => {
+  it('finds a section by a misspelt word', () => {
+    expect(headings(store.search('colurs ', null, 5))).toEqual(['Colours'])
+    expect(headings(store.search('tyopgraphy ', null, 5))).toEqual(['Typography'])
+    expect(headings(store.search('typografy ', null, 5))).toEqual(['Typography'])
+    expect(headings(store.search('srever ', null, 5))).toEqual(['Install', 'Hosting'])
+    expect(headings(store.search('instaler', null, 5))).toEqual(['Install'])
+  })
+
+  it('does not forgive a word of three letters, or more edits than the word is allowed', () => {
+    expect(store.search('fnt ', null, 5)).toEqual([])
+    expect(store.search('colrs ', null, 5)).toEqual([])
+  })
+
+  it('ranks an exact match above a match by a misspelt word', () => {
+    // FTS5 scores the words of a query alike, so the misspelt one is asked for apart and its score halved.
+    expect(headings(store.search('font colours ', null, 5))).toEqual(['Colours', 'Typography'])
+    expect(headings(store.search('font colurs ', null, 5))).toEqual(['Typography', 'Colours'])
+  })
+
+  it('marks what a misspelt word was taken for', () => {
+    expect(store.search('hihglight ', null, 5)[0]?.marks).toEqual(['highlight'])
+    expect(store.search('accent colour', null, 5)[0]?.marks).toEqual(['accent', 'colour'])
+  })
+
+  it('reads the terms of the index out only when a word is not found', () => {
+    const database = openSearchDatabase(sqlite3, bytes)
+    const fresh = new SqliteStore(database)
+    const listed = () => database.selectValue("SELECT count(*) FROM sqlite_temp_master WHERE name = 'sections_terms'")
+    fresh.search('colours typog', null, 5)
+    expect(listed()).toBe(0)
+    fresh.search('colurs ', null, 5)
+    expect(listed()).toBe(1)
+    fresh.close()
+  })
+})
+
 describe('semantic search through a SQL function', () => {
   it('finds a section that shares no word with the query, and says so', () => {
     const hits = store.search('publish my documentation online', pointingAt('Hosting'), 3)
@@ -158,5 +195,35 @@ describe('the two stores', () => {
       const fromMemory = memory.search(query, vector, 3)[0]?.doc.heading
       expect(fromSqlite, query).toBe(fromMemory)
     }
+  })
+
+  it('take a misspelt word for the same words, and list what they find in the same order', () => {
+    const cases: [string, number[] | null][] = [
+      ['colurs ', null],
+      ['tyopgraphy ', null],
+      ['typografy ', null],
+      ['instaler', null],
+      ['srever ', null],
+      ['hedings ', null],
+      ['cofee ', null],
+      // A misspelt word beside one that is spelt right, in either order.
+      ['font colurs ', null],
+      ['colurs font ', null],
+      ['server instaler ', null],
+      ['uplaod dist', null],
+      // Nothing to forgive: too short, too far off, a number, and no word at all.
+      ['fnt ', null],
+      ['colrs ', null],
+      ['8081 ', null],
+      ['zzqqxx ', null],
+      // With a section found by meaning as well.
+      ['hedings ', pointingAt('Hosting')],
+    ]
+    const found = (hits: SearchHit[]) => hits.map((hit) => [hit.doc.heading, hit.marks, hit.matched])
+    for (const [query, vector] of cases) {
+      expect(found(store.search(query, vector, 5)), query).toEqual(found(memory.search(query, vector, 5)))
+    }
+    // The cases above are not all empty on both sides.
+    expect(headings(memory.search('server instaler ', null, 5))).toEqual(['Install', 'Hosting'])
   })
 })

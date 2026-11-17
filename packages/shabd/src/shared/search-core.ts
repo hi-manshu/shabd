@@ -6,6 +6,7 @@
  *   - the MCP server (so an agent searching the docs sees what a reader sees)
  *   - tests
  */
+import { editDistance } from './edit-distance.js'
 
 /** One searchable unit: a section of a page (long sections are split further). */
 export interface SearchDoc {
@@ -54,6 +55,8 @@ export interface SearchHit {
   matched: { keywords: boolean; meaning: boolean }
   /** A passage of the section around the first matching word. */
   snippet: string
+  /** The words to mark in the snippet, and on the page when the reader goes to it: see `wordsToMark`. */
+  marks: string[]
 }
 
 /* ─────────────────────────────── tokens ─────────────────────────────── */
@@ -112,14 +115,74 @@ export function queryTerms(query: string): string[] {
   return kept.length > 0 ? kept : words
 }
 
+/* ─────────────────────────────── typos ──────────────────────────────── */
+
+/** A match by a word one edit from the one typed counts for half of an exact match; two edits, for a quarter. */
+const TYPO_DISCOUNT = 0.5
+/** Cap on how many indexed words a misspelt one may be taken for. */
+const MAX_TYPO_TERMS = 20
+
 /**
- * The words of a query to mark where a result is shown. A word of the text is
- * marked when it starts with one of them. Very short ones ("a", "to") are
- * left out: marking them lights up half the text and says nothing about why
- * it matched.
+ * How many edits a query word is forgiven: none under four letters, one up
+ * to seven, two from eight. A short word has too many neighbours for a near
+ * miss to mean anything ("for", "far", "fir"). And a number one digit away
+ * is another number, not a misspelling.
  */
-export function wordsToMark(query: string): string[] {
-  return queryTerms(query).filter((word) => word.length > 2)
+export function typoBudget(word: string): number {
+  if (/\p{N}/u.test(word)) return 0
+  const letters = [...word].length
+  return letters >= 8 ? 2 : letters >= 4 ? 1 : 0
+}
+
+/**
+ * The indexed words a misspelt query word may have been meant as: those
+ * within its budget of edits, nearest first. Filler words are never offered:
+ * "form" is one edit from "for" and from "from", which most sections have.
+ */
+export function closeTerms(word: string, vocabulary: Iterable<string>): { term: string; edits: number }[] {
+  const budget = typoBudget(word)
+  if (budget === 0) return []
+  const close: { term: string; edits: number }[] = []
+  for (const term of vocabulary) {
+    const edits = editDistance(word, term, budget)
+    if (edits > 0 && edits <= budget && !STOPWORDS.has(term)) close.push({ term, edits })
+  }
+  close.sort((a, b) => a.edits - b.edits || (a.term < b.term ? -1 : 1))
+  return close.slice(0, MAX_TYPO_TERMS)
+}
+
+/** How one word of a query is looked up in an index. */
+export interface QueryWord {
+  word: string
+  /** The indexed terms that stand for it, and what a match by each counts for. */
+  terms: { term: string; weight: number }[]
+  /** True when the word itself matched nothing, and `terms` are the words it was taken for. */
+  corrected: boolean
+}
+
+/**
+ * A query word that matched nothing, looked up as the words close to it.
+ *
+ * Both stores call this with their vocabulary, so a misspelt word is taken
+ * for the same words, at the same discount, whichever store is searched.
+ */
+export function correctedWord(word: string, vocabulary: Iterable<string>): QueryWord {
+  const terms = closeTerms(word, vocabulary).map(({ term, edits }) => ({ term, weight: TYPO_DISCOUNT ** edits }))
+  return { word, terms, corrected: terms.length > 0 }
+}
+
+/** The words to look for in a result's text: the query's own, or what a misspelt one was taken for. */
+export function soughtWords(plan: readonly QueryWord[]): string[] {
+  return plan.flatMap(({ word, terms, corrected }) => (corrected ? terms.map(({ term }) => term) : [word]))
+}
+
+/**
+ * The words to mark where a result is shown. A word of the text is marked
+ * when it starts with one of them. Very short ones ("a", "to") are left out:
+ * marking them lights up half the text and says nothing about why it matched.
+ */
+export function wordsToMark(plan: readonly QueryWord[]): string[] {
+  return soughtWords(plan).filter((word) => word.length > 2)
 }
 
 /* ──────────────────────────── keyword index ─────────────────────────── */
@@ -139,7 +202,11 @@ interface Posting {
   tf: number
 }
 
-/** A BM25 index over SearchDocs with as-you-type prefix matching on the last word. */
+/**
+ * A BM25 index over SearchDocs. The last word of a query also matches as the
+ * start of a longer word, as it is typed, and a word that matches nothing
+ * matches the words it may be a misspelling of.
+ */
 export class KeywordIndex {
   readonly docs: SearchDoc[]
   #postings = new Map<string, Posting[]>()
@@ -178,25 +245,37 @@ export class KeywordIndex {
 
   /** Document indexes with scores, best first. */
   search(query: string, limit: number): { doc: number; score: number }[] {
+    return this.rank(this.plan(query), limit)
+  }
+
+  /** How each word of a query is looked up here: as itself, as the start of a longer word, or as a misspelling. */
+  plan(query: string): QueryWord[] {
     const words = queryTerms(query)
-    if (words.length === 0) return []
     // While someone is typing, the last word is probably unfinished.
     const lastIsPrefix = !/\s$/.test(query)
 
+    return words.map((word, position) => {
+      const terms: QueryWord['terms'] = []
+      if (this.#postings.has(word)) terms.push({ term: word, weight: 1 })
+      if (lastIsPrefix && position === words.length - 1) {
+        for (const term of this.#termsWithPrefix(word)) {
+          if (term !== word) terms.push({ term, weight: PREFIX_DISCOUNT })
+        }
+      }
+      // Only a word that matched nothing is taken for a misspelling, so a correct word is never second-guessed.
+      return terms.length > 0 ? { word, terms, corrected: false } : correctedWord(word, this.#terms)
+    })
+  }
+
+  /** Document indexes with scores, best first, for a query that has been looked up with `plan`. */
+  rank(plan: readonly QueryWord[], limit: number): { doc: number; score: number }[] {
+    if (plan.length === 0) return []
     const scores = new Map<number, number>()
     const coverage = new Map<number, number>()
 
-    words.forEach((word, position) => {
-      const candidates: { term: string; weight: number }[] = []
-      if (this.#postings.has(word)) candidates.push({ term: word, weight: 1 })
-      if (lastIsPrefix && position === words.length - 1) {
-        for (const term of this.#termsWithPrefix(word)) {
-          if (term !== word) candidates.push({ term, weight: PREFIX_DISCOUNT })
-        }
-      }
-
+    for (const { terms } of plan) {
       const matchedDocs = new Set<number>()
-      for (const { term, weight } of candidates) {
+      for (const { term, weight } of terms) {
         const postings = this.#postings.get(term)!
         const idf = Math.log(1 + (this.docs.length - postings.length + 0.5) / (postings.length + 0.5))
         for (const { doc, tf } of postings) {
@@ -206,12 +285,12 @@ export class KeywordIndex {
         }
       }
       for (const doc of matchedDocs) coverage.set(doc, (coverage.get(doc) ?? 0) + 1)
-    })
+    }
 
     // A section matching every word should beat one that repeats a single word.
     const ranked = [...scores].map(([doc, score]) => ({
       doc,
-      score: score * ((coverage.get(doc) ?? 0) / words.length) ** 2,
+      score: score * ((coverage.get(doc) ?? 0) / plan.length) ** 2,
     }))
     ranked.sort((a, b) => b.score - a.score || a.doc - b.doc)
     return ranked.slice(0, limit)
@@ -299,10 +378,14 @@ export function fuseRanks(lists: number[][], k = 60): Map<number, number> {
 
 /* ───────────────────────────── snippets ─────────────────────────────── */
 
-/** A window of `text` around the first query word, cut at word boundaries. */
-export function makeSnippet(text: string, query: string, maxLength = 180): string {
+/**
+ * A window of `text` around the first query word, cut at word boundaries.
+ * `query` is the query as typed, or the words to look for when they are not
+ * the ones typed: see `soughtWords`.
+ */
+export function makeSnippet(text: string, query: string | readonly string[], maxLength = 180): string {
   if (text.length <= maxLength) return text
-  const words = [...new Set(queryTerms(query))]
+  const words = typeof query === 'string' ? queryTerms(query) : query
   let start = 0
   for (const span of wordSpans(text)) {
     if (words.some((word) => span.token.startsWith(word))) {
@@ -372,15 +455,18 @@ export function search(
   minSimilarity = MIN_SIMILARITY,
 ): SearchHit[] {
   const pool = candidatePool(limit)
-  const keywordIds = index.search(query, pool).map((hit) => hit.doc)
+  const plan = index.plan(query)
+  const keywordIds = index.rank(plan, pool).map((hit) => hit.doc)
   const meaningIds =
     semantic && queryVector
       ? rankBySimilarity(similarities(queryVector, semantic.vectors, semantic.dims), pool, minSimilarity)
       : []
 
+  const sought = soughtWords(plan)
+  const marks = wordsToMark(plan)
   return fuseHits(keywordIds, meaningIds, limit).map(({ id, score, matched }) => {
     const doc = index.docs[id]!
-    return { doc, score, matched, snippet: makeSnippet(doc.text, query) }
+    return { doc, score, matched, snippet: makeSnippet(doc.text, sought), marks }
   })
 }
 

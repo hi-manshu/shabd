@@ -9,7 +9,9 @@ a static file, and the ranking happens in a Web Worker on the reader's device.
 
 There are two kinds of matching, and results combine both.
 
-- **Keyword** search finds sections that contain the words typed. It works as soon as the index has loaded.
+- **Keyword** search finds sections that contain the words typed. It works as soon as the index has loaded. The
+  word still being typed matches as the start of a longer word, and a word that matches nothing is taken for a
+  [misspelling](#misspelt-words).
 - **Semantic** search finds sections that mean something similar, even with no word in common. Searching this site
   for "warn the reader about something dangerous" finds the section on callouts.
 
@@ -32,6 +34,23 @@ When a reader opens search:
 
 A result that matched by meaning alone is labelled "Related", so it is clear why a section without the typed words is
 on the list.
+
+## Misspelt words
+
+A word that no section contains is looked up again as the words close to it. Searching this site for "calouts"
+finds the section on callouts.
+
+- Close means one edit away, or two for a word of eight letters or more. An edit is a letter added, dropped or
+  changed, or two neighbouring letters swapped.
+- Only a word that matches nothing is treated this way. A word the site does use is never taken for another one.
+- A match by a misspelt word counts for half of an exact match, and for a quarter at two edits, so a section with
+  the words as they were typed comes first.
+- Words of fewer than four letters are not guessed at, because nearly every short word is one edit from another.
+  Neither are words with a digit in them: `8081` is not a misspelling of `8080`. And a word is never taken for a
+  filler word such as "for" or "from".
+- In a result, the word that is marked is the one the site has, not the one that was typed.
+
+Both stores pick the close words with the same code, and the MCP endpoint does it too.
 
 ## Where a result leads
 
@@ -160,6 +179,11 @@ If the package is missing, or the database cannot be opened, search uses the mem
   model that Transformers.js supports. The build and the browser always use the same one.
 - Keyword search splits text on letters and digits. Languages written without spaces between words, such as
   Chinese and Japanese, are matched by meaning but poorly by keyword.
+- A misspelt word is compared with whole words. While it is still being typed it is too far from any of them, so
+  results can go away in the middle of a word and come back when it is finished.
+- Misspellings are counted in letters, which suits an alphabet. They were tried in English only.
+- The SQLite store reads the list of its words the first time a word is not found. That happens once per visit,
+  and takes longer the larger the index is.
 - Vectors are compared with a plain scan in both stores, not an approximate index. At 20,000 sections that is 19 ms
   in the memory store and 72 ms in the SQLite store.
 - A passage is found on the page by its words, so it is found only where the page shows them as text. Words in a

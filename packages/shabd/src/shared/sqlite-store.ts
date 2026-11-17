@@ -13,15 +13,24 @@
  * column through a SQL function implemented here. Both feed the same rank
  * fusion as the in-memory store (src/shared/search-core.ts).
  *
+ * FTS5 finds a word or the start of one. It has nothing for a misspelt word,
+ * so that part is done here: the index's terms are read out once, the ones
+ * close to the word are picked by the code the in-memory store uses, and
+ * FTS5 is asked for those.
+ *
  * This module takes the SQLite API as an argument and touches nothing else,
  * so it runs unchanged in Node, in a Web Worker, and in tests.
  */
 import {
   candidatePool,
+  correctedWord,
   fuseHits,
   makeSnippet,
   MIN_SIMILARITY,
   queryTerms,
+  soughtWords,
+  wordsToMark,
+  type QueryWord,
   type SearchDoc,
   type SearchHit,
   type SearchIndexFile,
@@ -49,6 +58,7 @@ export interface SqliteDatabase {
   prepare(sql: string): SqliteStatement
   selectObjects(sql: string, bind?: unknown[]): Record<string, unknown>[]
   selectValue(sql: string, bind?: unknown[]): unknown
+  selectValues(sql: string, bind?: unknown[]): unknown[]
   createFunction(
     name: string,
     fn: (context: unknown, ...args: unknown[]) => unknown,
@@ -184,20 +194,24 @@ export function readSearchMeta(db: SqliteDatabase): { version: string; sections:
   }
 }
 
+/** A word as FTS5 is asked for it: a quoted string, and a prefix when it is still being typed. */
+function phrase(term: string, prefix: boolean): string {
+  const quoted = `"${term.replaceAll('"', '""')}"`
+  return prefix ? `${quoted}*` : quoted
+}
+
 /**
  * A query for FTS5: every word as a quoted string, joined with OR, the word
  * still being typed as a prefix. Quoting means nothing a reader types can be
  * read as FTS5 syntax.
+ *
+ * This is what the store asks when no word of the query is misspelt. It
+ * builds that, and the queries for misspelt words, from the same quoting.
  */
 export function toMatchExpression(query: string): string {
   const terms = queryTerms(query)
   const typing = !/\s$/.test(query)
-  return terms
-    .map((term, position) => {
-      const quoted = `"${term.replaceAll('"', '""')}"`
-      return typing && position === terms.length - 1 ? `${quoted}*` : quoted
-    })
-    .join(' OR ')
+  return terms.map((term, position) => phrase(term, typing && position === terms.length - 1)).join(' OR ')
 }
 
 export class SqliteStore implements SearchStore {
@@ -208,6 +222,8 @@ export class SqliteStore implements SearchStore {
   readonly version: string
   #db: SqliteDatabase
   #queryVector: ArrayLike<number> | null = null
+  /** Every term of the index, once a misspelt word has made it worth reading them out. */
+  #terms: string[] | null = null
 
   constructor(db: SqliteDatabase) {
     const meta = readSearchMeta(db)
@@ -232,20 +248,83 @@ export class SqliteStore implements SearchStore {
     )
   }
 
+  /**
+   * The terms of the index, read out the first time a word is not found.
+   *
+   * FTS5 lists them through a table of its own kind, which holds nothing and
+   * is made here, in the temporary schema, because the database is opened
+   * read-only. Listing them means walking the whole index: 32 ms for 2,000
+   * sections of 120 words and 106 ms for 20,000, measured in Node. A table
+   * of terms written at build time would be read faster, and would make
+   * every reader download it, misspelling or not.
+   */
+  #vocabulary(): readonly string[] {
+    if (!this.#terms) {
+      this.#db.exec("CREATE VIRTUAL TABLE IF NOT EXISTS temp.sections_terms USING fts5vocab('main', 'sections_fts', 'row')")
+      this.#terms = this.#db.selectValues('SELECT term FROM temp.sections_terms').map(String)
+    }
+    return this.#terms
+  }
+
+  /**
+   * How each word of a query is looked up. A word that FTS5 finds, as itself
+   * or as the start of a longer word while it is being typed, is left to
+   * FTS5. One it does not find is taken for the words close to it.
+   */
+  #plan(query: string, typing: boolean): QueryWord[] {
+    const words = queryTerms(query)
+    return words.map((word, position) => {
+      const asked = phrase(word, typing && position === words.length - 1)
+      const found = this.#db.selectValue('SELECT 1 FROM sections_fts WHERE sections_fts MATCH ? LIMIT 1', [asked]) !== undefined
+      return found ? { word, terms: [{ term: word, weight: 1 }], corrected: false } : correctedWord(word, this.#vocabulary())
+    })
+  }
+
+  /** Section ids for a looked-up query, best first. */
+  #rank(plan: readonly QueryWord[], typing: boolean, limit: number): number[] {
+    // FTS5's BM25 cannot weigh one word of a query against another. But it adds the words of a query up, so the
+    // words are asked for in groups, one per weight, and the groups are added up here.
+    const groups = new Map<number, string[]>()
+    plan.forEach(({ terms, corrected }, position) => {
+      for (const { term, weight } of terms) {
+        const asked = phrase(term, typing && !corrected && position === plan.length - 1)
+        const group = groups.get(weight)
+        if (group) group.push(asked)
+        else groups.set(weight, [asked])
+      }
+    })
+    if (groups.size === 0) return []
+
+    const scored = `bm25(sections_fts, ${BM25_WEIGHTS})`
+    const asked = [...groups].map(([weight, phrases]) => ({ weight, match: phrases.join(' OR ') }))
+    // One group needs no adding up, whatever its weight: the order is FTS5's own. This is every query without a
+    // misspelt word in it, and it is the query this store has always run.
+    const rows =
+      asked.length === 1
+        ? this.#db.selectObjects(`SELECT rowid AS id FROM sections_fts WHERE sections_fts MATCH ? ORDER BY ${scored} LIMIT ?`, [
+            asked[0]!.match,
+            limit,
+          ])
+        : this.#db.selectObjects(
+            // Materialised, so that each group is scored where FTS5 can score it. Left to itself, SQLite may
+            // fold the groups into the sum, and bm25() cannot be called from inside one.
+            `WITH scores (id, score) AS MATERIALIZED (${asked
+              .map(() => `SELECT rowid, ? * ${scored} FROM sections_fts WHERE sections_fts MATCH ?`)
+              .join(' UNION ALL ')})
+             SELECT id FROM scores GROUP BY id ORDER BY SUM(score), id LIMIT ?`,
+            [...asked.flatMap(({ weight, match }) => [weight, match]), limit],
+          )
+    return rows.map((row) => Number(row.id) - 1)
+  }
+
   search(query: string, queryVector: ArrayLike<number> | null, limit: number, minSimilarity = MIN_SIMILARITY): SearchHit[] {
     const pool = candidatePool(limit)
     const ids = (rows: Record<string, unknown>[]) => rows.map((row) => Number(row.id) - 1)
 
-    let keywordIds: number[] = []
-    const match = toMatchExpression(query)
-    if (match) {
-      keywordIds = ids(
-        this.#db.selectObjects(
-          `SELECT rowid AS id FROM sections_fts WHERE sections_fts MATCH ? ORDER BY bm25(sections_fts, ${BM25_WEIGHTS}) LIMIT ?`,
-          [match, pool],
-        ),
-      )
-    }
+    // While someone is typing, the last word is probably unfinished.
+    const typing = !/\s$/.test(query)
+    const plan = this.#plan(query, typing)
+    const keywordIds = this.#rank(plan, typing, pool)
 
     let meaningIds: number[] = []
     if (this.semantic && queryVector) {
@@ -282,9 +361,11 @@ export class SqliteStore implements SearchStore {
         },
       ]),
     )
+    const sought = soughtWords(plan)
+    const marks = wordsToMark(plan)
     return fused.flatMap(({ id, score, matched }) => {
       const doc = docs.get(id)
-      return doc ? [{ doc, score, matched, snippet: makeSnippet(doc.text, query) }] : []
+      return doc ? [{ doc, score, matched, snippet: makeSnippet(doc.text, sought), marks }] : []
     })
   }
 

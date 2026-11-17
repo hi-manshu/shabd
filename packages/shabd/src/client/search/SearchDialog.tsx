@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { passageTarget } from '../../shared/passage.js'
-import { wordsToMark, type SearchHit } from '../../shared/search-core.js'
+import type { SearchHit } from '../../shared/search-core.js'
 import { Icon } from '../app/icons.js'
 import { useRouter } from '../app/router.js'
 import { useSite, useStore } from '../app/store.js'
@@ -10,9 +10,12 @@ import { openSearch, runSearch, searchStatus, type SearchResults, type SearchSta
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/** `text` with the words of the query marked. Words are matched from their first letter. */
-function Highlighted({ text, query }: { text: string; query: string }) {
-  const words = wordsToMark(query)
+/**
+ * `text` with the words that were searched for marked. Words are matched
+ * from their first letter. The words come with the result, because they are
+ * not always the ones typed: a misspelt word is marked as what it was taken for.
+ */
+function Highlighted({ text, words }: { text: string; words: string[] }) {
   if (words.length === 0) return <>{text}</>
   const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(${words.map(escapeRegExp).join('|')})`, 'giu')
   const parts = text.split(pattern)
@@ -91,7 +94,7 @@ export default function SearchDialog() {
   /** Go to a result. The address is its section's; the passage and the words to mark travel beside it. */
   const go = (hit: SearchHit) => {
     close()
-    void router.navigate(target(hit), { passage: passageTarget(hit.doc.text, wordsToMark(results?.query ?? '')) })
+    void router.navigate(target(hit), { passage: passageTarget(hit.doc.text, hit.marks) })
   }
 
   const onKeyDown = (event: React.KeyboardEvent) => {
@@ -186,7 +189,7 @@ export default function SearchDialog() {
                 </span>
                 {hit.snippet && (
                   <span className="sb-search-hit-snippet">
-                    <Highlighted text={hit.snippet} query={results?.query ?? ''} />
+                    <Highlighted text={hit.snippet} words={hit.marks} />
                   </span>
                 )}
               </a>

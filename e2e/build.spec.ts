@@ -160,6 +160,34 @@ test.describe('search', () => {
     await expect(dialog).toHaveCount(0)
   })
 
+  test('forgives a misspelt word, and marks the word it was taken for', async ({ page }) => {
+    await open(page, `${BUILT}/guide/intro`)
+    await page.locator('.sb-search-button').click()
+    const dialog = page.locator('dialog.sb-search')
+    const input = dialog.getByRole('combobox')
+    const hits = dialog.locator('.sb-search-hit')
+
+    // Two letters swapped. No section has the word as typed.
+    await input.fill('pelicnas')
+    await expect(hits).toHaveCount(1)
+    await expect(hits.first()).toContainText('Second step')
+    await expect(hits.first().locator('mark')).toHaveText('Pelicans')
+    // Whichever store the site was built with is the one that forgave it.
+    await expect(dialog).toHaveAttribute('data-store', process.env.SHABD_E2E_STORE ?? 'memory')
+
+    // A word of three letters is too short to guess at.
+    await input.fill('zbe')
+    await expect(dialog.locator('.sb-search-empty')).toContainText('Nothing matches')
+
+    await input.fill('pelicnas')
+    await expect(hits).toHaveCount(1)
+    await input.press('Enter')
+    await expect(page).toHaveURL(`${BUILT}/guide/setup#second-step`)
+    await expect
+      .poll(() => page.evaluate(() => [...(CSS.highlights.get('sb-search') ?? [])].map((range) => String(range))))
+      .toEqual(['Pelicans'])
+  })
+
   test('moves through results with the arrow keys', async ({ page }) => {
     await open(page, `${BUILT}/`)
     await page.locator('.sb-search-button').click()
