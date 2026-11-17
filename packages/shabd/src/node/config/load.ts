@@ -129,6 +129,13 @@ export function resolveConfig(root: string, configFile: string, source: string):
 
   const redirects = resolveRedirects(config.redirects, issues)
 
+  if (config.features.feed.enabled && !config.site.url) {
+    issues.push({
+      path: ['features', 'feed'],
+      message: 'The feed needs `site.url`: a feed reader is given full addresses, such as https://docs.example.com/guide',
+    })
+  }
+
   if (issues.length > 0) {
     throw new ShabdError(configFile, locateIssues(issues, yaml), source)
   }

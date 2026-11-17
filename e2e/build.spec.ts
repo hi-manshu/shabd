@@ -439,6 +439,33 @@ test.describe('the document', () => {
   })
 })
 
+test.describe('the feed', () => {
+  test('lists the pages that have a day, and every page says where it is', async ({ page, request }) => {
+    const feed = await request.get(`${BUILT}/rss.xml`)
+    expect(feed.ok()).toBe(true)
+    const xml = await feed.text()
+    expect(xml).toContain('<link>https://fixture.test/extras/alpha</link>')
+    expect(xml).toContain('<pubDate>Tue, 03 Feb 2026 00:00:00 GMT</pubDate>')
+    // A page with no day has no place in a feed.
+    expect(xml).not.toContain('/guide/intro')
+
+    const html = await (await request.get(`${BUILT}/guide/intro`)).text()
+    expect(html).toContain('<link rel="alternate" type="application/rss+xml" title="Fixture" href="/rss.xml">')
+
+    // The browser's own XML parser takes it as it is.
+    await page.goto(`${BUILT}/guide/intro`)
+    const parsed = await page.evaluate(async () => {
+      const document = new DOMParser().parseFromString(await (await fetch('/rss.xml')).text(), 'application/xml')
+      return {
+        error: document.querySelector('parsererror')?.textContent ?? null,
+        root: document.documentElement.nodeName,
+        items: document.querySelectorAll('channel > item').length,
+      }
+    })
+    expect(parsed).toEqual({ error: null, root: 'rss', items: 1 })
+  })
+})
+
 test.describe('on paper', () => {
   test('a printed page is the page alone, in the light colours, with nothing left to scroll', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light' })

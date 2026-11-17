@@ -16,6 +16,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { normalizePath, type Connect, type ViteDevServer } from 'vite'
 import { stripBase } from '../../shared/paths.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
+import { FEED_FILE, renderFeed } from '../build/feed.js'
 import type { ShabdContext } from '../context.js'
 import { readBody, sendJson, sendText, sendWebResponse, toWebRequest } from '../http.js'
 import { renderLlmsFull, renderLlmsTxt } from '../llms/llms-txt.js'
@@ -64,6 +65,11 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
     }
     if (features.llms.enabled && features.llms.full && path === '/llms-full.txt') {
       sendText(res, renderLlmsFull(context()), 'text/plain; charset=utf-8')
+      return true
+    }
+
+    if (features.feed.enabled && path === `/${FEED_FILE}`) {
+      sendText(res, renderFeed(context()), 'application/rss+xml; charset=utf-8')
       return true
     }
 

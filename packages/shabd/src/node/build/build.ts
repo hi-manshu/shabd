@@ -26,6 +26,7 @@ import { pageMarkdown } from '../llms/markdown.js'
 import { DOCS_FILE, SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, type DocsFile } from '../mcp/source.js'
 import { SearchService } from '../search/service.js'
 import { serverOutDir, shabd } from '../vite/plugin.js'
+import { FEED_FILE, feedEntries, renderFeed } from './feed.js'
 import { escapeHtml, renderDocument, renderRedirect } from './html.js'
 import { renderRobots, renderSitemap, wantsRobots } from './robots.js'
 
@@ -193,6 +194,17 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
           ),
         )
       }
+    }
+  }
+
+  if (features.feed.enabled) {
+    const entries = feedEntries(context).length
+    await write(FEED_FILE, renderFeed(context))
+    step(`${FEED_FILE}: ${entries} ${entries === 1 ? 'page' : 'pages'}`)
+    if (entries === 0) {
+      console.log(
+        pc.yellow('    The feed is empty: no page has a `date`, and none has a day it was last changed (`defaults.lastUpdated`).'),
+      )
     }
   }
 

@@ -33,6 +33,7 @@ layouts:
 features:
   search: { semantic: false }
   studio: { sync: peers }
+  feed: true
 
 redirects:
   /guide/start: /guide/intro

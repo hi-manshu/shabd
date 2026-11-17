@@ -228,6 +228,7 @@ Each feature takes `true`, `false`, or an object of options.
 | `llms` | `enabled`, `full` | on, with `llms-full.txt` |
 | `studio` | `enabled`, `sync` (`off`, `tabs` or `peers`) | on, syncing between tabs |
 | `sandbox` | `enabled` | on |
+| `feed` | `enabled`, `title`, `directory`, `limit` | off |
 
 ```yaml
 features:
@@ -236,7 +237,7 @@ features:
 ```
 
 Each feature has its own page: [Search](../features/search.md), [MCP and llms.txt](../features/mcp.md),
-[Studio](../features/studio.md) and [Live sandboxes](../features/sandbox.mdx).
+[Studio](../features/studio.md), [Live sandboxes](../features/sandbox.mdx) and [Feed](../features/feed.md).
 
 ## redirects
 

@@ -362,6 +362,12 @@ test.describe('dev endpoints', () => {
     expect((await call('https://elsewhere.example')).status()).toBe(403)
   })
 
+  test('the feed is written from the files as they are now', async ({ request, site }) => {
+    await site.write('content/extras/epsilon.md', '---\ntitle: Epsilon notes\ndate: 2026-06-07\n---\n\nNew.\n')
+    await expect.poll(async () => (await request.get(`${DEV}/rss.xml`)).text()).toContain('<title>Epsilon notes</title>')
+    expect((await request.get(`${DEV}/rss.xml`)).headers()['content-type']).toContain('application/rss+xml')
+  })
+
   test('an address that has moved is answered with a redirect', async ({ request, page }) => {
     const moved = await request.get(`${DEV}/guide/start`, { maxRedirects: 0 })
     expect(moved.status()).toBe(302)

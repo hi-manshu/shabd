@@ -582,12 +582,24 @@ const SandboxFeatureSchema = z.strictObject({
   enabled: z.boolean().default(true),
 })
 
+const FeedFeatureSchema = z.strictObject({
+  enabled: z.boolean().default(false),
+  /** The feed's own title. Defaults to the site's. */
+  title: z.string().min(1).optional(),
+  /** A content folder whose pages make up the feed, such as `changelog`. Left out, every page with a day is in it. */
+  directory: z.string().min(1).optional(),
+  /** How many pages the feed holds, newest first. */
+  limit: z.int().min(1).max(500).default(20),
+})
+
 const FeaturesSchema = z.strictObject({
   search: feature(SearchFeatureSchema, true),
   mcp: feature(McpFeatureSchema, true),
   llms: feature(LlmsFeatureSchema, true),
   studio: feature(StudioFeatureSchema, true),
   sandbox: feature(SandboxFeatureSchema, true),
+  /** rss.xml: the pages that have a day, newest first. Needs `site.url`. */
+  feed: feature(FeedFeatureSchema, false),
 })
 
 /* ──────────────────────────────── content ─────────────────────────────── */
@@ -783,6 +795,9 @@ const PageSidebarSchema = z
   .optional()
   .transform((s) => (typeof s === 'boolean' ? { visible: s } : (s ?? {})))
 
+/** A calendar day. YAML reads `2026-11-17` without quotes as text, so that is how it is written. */
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'A day is written as year-month-day, such as 2026-11-17' })
+
 /**
  * Frontmatter is loose: authors may add their own keys for custom blocks
  * and components. The keys Shabd understands are validated strictly.
@@ -808,12 +823,9 @@ export const FrontmatterSchema = z.looseObject({
    * The day this page was last changed, as `2026-11-17`, in place of the day
    * Git has for it. `false` shows no day on this page.
    */
-  lastUpdated: z
-    .union([
-      z.literal(false),
-      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'A day is written as year-month-day, such as 2026-11-17' }),
-    ])
-    .optional(),
+  lastUpdated: z.union([z.literal(false), day]).optional(),
+  /** The day this page was published, as `2026-11-17`. The feed lists the page under it. */
+  date: day.optional(),
 })
 
 export type FrontmatterInput = z.input<typeof FrontmatterSchema>

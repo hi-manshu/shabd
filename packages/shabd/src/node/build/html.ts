@@ -82,6 +82,8 @@ export function renderDocument(options: DocumentOptions): string {
     site.favicon && `<link rel="icon" href="${escapeHtml(withBase(site.base, site.favicon))}">`,
     config.features.llms.enabled &&
       `<link rel="alternate" type="text/plain" title="llms.txt" href="${escapeHtml(withBase(site.base, '/llms.txt'))}">`,
+    config.features.feed.enabled &&
+      `<link rel="alternate" type="application/rss+xml" title="${escapeHtml(config.features.feed.title ?? site.title)}" href="${escapeHtml(withBase(site.base, '/rss.xml'))}">`,
     '<meta name="generator" content="Shabd">',
     `<script${options.scriptAttributes ?? ''}>${colorModeScript(theme)}</script>`,
     options.paletteStylesheet

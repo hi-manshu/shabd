@@ -29,6 +29,7 @@ The page starts here.
 | `sidebar` | `false` or options | Hide the sidebar on this page, or set this page's sidebar entry |
 | `toc` | `false`, a number, or `{ minDepth, maxDepth }` | The "On this page" outline |
 | `badges` | list | Badges beside the title |
+| `date` | a day | The day the page was published, such as `2026-11-17`. [The feed](../features/feed.md) lists the page under it |
 | `draft` | `true` | Visible in `shabd dev`, left out of builds |
 | `noindex` | `true` | Asks [search engines](./site.md#search-engines) not to list the page. It stays in the site's own search |
 | `editLink` | `false` | Hide "Edit this page" |

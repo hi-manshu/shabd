@@ -90,6 +90,7 @@ features:
   llms: true # llms.txt and llms-full.txt
   studio: true # in-browser editor, dev server only
   sandbox: true # ```tsx live code fences
+  feed: true # rss.xml: the pages newest first, by the day each was last changed
 
 # Components every .mdx file can use without importing them.
 components:

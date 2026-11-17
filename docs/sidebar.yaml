@@ -41,6 +41,7 @@
       badge: Beta
     - file: features/sandbox
       badge: { text: Beta, variant: caution }
+    - features/feed
 
 - link: https://github.com/hi-manshu/shabd
   label: GitHub
