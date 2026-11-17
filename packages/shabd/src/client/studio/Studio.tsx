@@ -75,7 +75,17 @@ export default function Studio() {
   const [status, setStatus] = useState<Status>({ kind: 'loading' })
 
   /** State the save loop needs without re-subscribing effects on every keystroke. */
-  const live = useRef({ text: '', saved: '', version: '', revision: 0, remotePeer: peerId, saveStarted: 0, timer: 0 })
+  const live = useRef({
+    text: '',
+    saved: '',
+    version: '',
+    revision: 0,
+    remotePeer: peerId,
+    saveStarted: 0,
+    /** How long the page took to follow the save in flight, when it followed before the save was confirmed. */
+    updatedIn: undefined as number | undefined,
+    timer: 0,
+  })
   const channel = useRef<StudioChannel | null>(null)
 
   /* ── backend ── */
@@ -123,6 +133,7 @@ export default function Studio() {
     if (!backend || !id || state.text === state.saved) return
     const writing = state.text
     state.saveStarted = performance.now()
+    state.updatedIn = undefined
     setStatus({ kind: 'saving' })
     try {
       const file = await backend.write(id, writing, state.version)
@@ -130,7 +141,8 @@ export default function Studio() {
       state.saved = writing
       // More was typed while the write was in flight: go again.
       if (state.text !== writing) state.timer = window.setTimeout(() => void save(), SAVE_DELAY)
-      else setStatus({ kind: 'saved' })
+      // The page can follow the file before the write is confirmed: where the watcher is quick, it does.
+      else setStatus(state.updatedIn === undefined ? { kind: 'saved' } : { kind: 'saved', updatedIn: state.updatedIn })
     } catch (error) {
       if (error instanceof ConflictError) setStatus({ kind: 'conflict', current: error.current })
       else setStatus({ kind: 'error', message: error instanceof Error ? error.message : String(error) })
@@ -163,7 +175,8 @@ export default function Studio() {
       const state = live.current
       const sinceSave = performance.now() - state.saveStarted
       if (state.saveStarted && sinceSave < 2000) {
-        // Our own save came back as a rendered page.
+        // Our own save came back as a rendered page. It is kept for a save that is still waiting for its answer.
+        state.updatedIn = sinceSave
         setStatus((current) => (current.kind === 'saved' ? { kind: 'saved', updatedIn: sinceSave } : current))
         state.saveStarted = 0
       } else if (state.text === state.saved) {

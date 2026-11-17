@@ -343,12 +343,15 @@ test.describe('narrow screens', () => {
         const panel = document.querySelector('.sb-region-sidebar')!
         const { top, bottom } = panel.getBoundingClientRect()
         const header = document.querySelector('.sb-region-header')!.getBoundingClientRect().bottom
-        return { top: Math.round(top), bottom: Math.round(bottom), header: Math.round(header), scrolls: panel.scrollHeight > panel.clientHeight + 1 }
+        // Where the window ends for a positioned box: above a scrollbar along the bottom, where a browser draws one.
+        const floor = document.documentElement.clientHeight
+        return { top: Math.round(top), bottom: Math.round(bottom), header: Math.round(header), floor, scrolls: panel.scrollHeight > panel.clientHeight + 1 }
       })
     await expect.poll(async () => (await box()).top).toBe((await box()).header)
-    const { bottom, scrolls } = await box()
+    const { bottom, floor, scrolls } = await box()
     // The panel ends where the window ends, and what does not fit is reached by scrolling it.
-    expect(bottom).toBe(300)
+    expect(bottom).toBe(floor)
+    expect(floor).toBeGreaterThan(280)
     expect(scrolls).toBe(true)
 
     // The first link is in view, and the last one comes into view when the panel is scrolled.
