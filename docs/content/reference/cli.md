@@ -4,7 +4,7 @@ description: The shabd command and its options.
 layout: reference
 ---
 
-Every command takes the site folder as an optional argument. It defaults to the current folder.
+Every command but `import` takes the site folder as an optional argument. It defaults to the current folder.
 
 | Command | What it does |
 | --- | --- |
@@ -13,6 +13,7 @@ Every command takes the site folder as an optional argument. It defaults to the 
 | `shabd preview [root]` | Serves `dist/`, including the MCP route |
 | `shabd check [root]` | Validates the config, sidebar, frontmatter and links: see [what it looks for](#what-check-looks-for) |
 | `shabd mcp [root]` | Runs the docs MCP server over stdio |
+| `shabd import <site>` | Makes a Shabd site from a Docusaurus, VitePress, Starlight or MkDocs site: see [Importing a site](../guide/importing.md) |
 
 ## Options
 
@@ -24,6 +25,9 @@ Every command takes the site folder as an optional argument. It defaults to the 
 | `--no-semantic` | `build` | Skip embeddings and build keyword search only |
 | `--external` | `check` | Also ask the links that lead to other sites whether they answer |
 | `--format <name>` | `check` | How the result is printed: `text`, `json` or `github` |
+| `--out <folder>` | `import` | Write the new site here. Without it, the folder is named after the site, with `-shabd` at the end |
+| `--from <tool>` | `import` | The tool that made the site: `docusaurus`, `vitepress`, `starlight` or `mkdocs`. Without it, the site's config file decides |
+| `--force` | `import` | Write into a folder that is not empty |
 
 ## What check looks for
 

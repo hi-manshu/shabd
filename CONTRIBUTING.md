@@ -125,7 +125,8 @@ shabd/
 │   │   │   ├── search/             sections, embeddings, index
 │   │   │   ├── llms/               llms.txt, llms-full.txt, Markdown copies
 │   │   │   ├── mcp/                MCP server, HTTP handler, stdio
-│   │   │   └── cli.ts              dev, build, preview, check, mcp
+│   │   │   ├── import/             shabd import: one module for each tool it reads
+│   │   │   └── cli.ts              dev, build, preview, check, mcp, import
 │   │   └── client/                 shipped as source, compiled by the site's build
 │   │       ├── app/                router, stores, hot-update hub
 │   │       ├── layout/             PageLayout (the layout engine) and its blocks
