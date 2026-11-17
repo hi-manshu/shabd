@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { renderDocument, renderRedirect } from '../src/node/build/html.js'
+import { renderRobots, renderSitemap, wantsRobots } from '../src/node/build/robots.js'
 import { collectProblems } from '../src/node/check.js'
 import { resolveConfig } from '../src/node/config/load.js'
 import { createContext } from '../src/node/context.js'
@@ -140,5 +141,49 @@ redirects:
       'error shabd.config.yaml:6 Redirect from /gone leads to /nowhere, where there is no page',
       'error shabd.config.yaml:7 Redirect from /lost leads to /guide/install, which has no heading "#no-such-heading"',
     ])
+  })
+})
+
+describe('what search engines are told', () => {
+  const siteOf = (yaml: string) => load(`site:\n  title: Docs\n${yaml}`).config.site
+
+  it('asks them not to list a page that says `noindex`, or any page of a site that does', () => {
+    const tag = '<meta name="robots" content="noindex">'
+    const config = load('site:\n  title: Docs\n').config
+    const page = { config, title: 'Guide', description: '', path: '/guide' }
+    expect(renderDocument(page)).not.toContain(tag)
+    expect(renderDocument({ ...page, noindex: true })).toContain(tag)
+    expect(documentFor('site:\n  title: Docs\n  noindex: true\n')).toContain(tag)
+  })
+
+  it('writes robots.txt at the root of a host, and elsewhere only when asked', () => {
+    expect(wantsRobots(siteOf(''))).toBe(true)
+    expect(wantsRobots(siteOf('  base: /docs/\n'))).toBe(false)
+    expect(wantsRobots(siteOf('  base: /docs/\n  robots: true\n'))).toBe(true)
+    expect(wantsRobots(siteOf('  robots: false\n'))).toBe(false)
+    expect(wantsRobots(siteOf('  robots: { disallow: [/drafts/] }\n'))).toBe(true)
+  })
+
+  it('lets every crawler in, names the sitemap, and keeps crawlers out of the paths listed', () => {
+    expect(renderRobots(siteOf(''), 'https://docs.example/sitemap.xml')).toBe(
+      'User-agent: *\nAllow: /\n\nSitemap: https://docs.example/sitemap.xml\n',
+    )
+    expect(renderRobots(siteOf('  base: /docs/\n  robots: { disallow: [/drafts/, /internal] }\n'), undefined)).toBe(
+      'User-agent: *\nDisallow: /docs/drafts\nDisallow: /docs/internal\n',
+    )
+    const error = failure(() => load('site:\n  title: Docs\n  robots: { disallow: [drafts] }\n'))
+    expect(error.issues[0]).toMatchObject({ path: ['site', 'robots', 'disallow', 0], line: 3 })
+  })
+
+  it('lists pages in the sitemap, with the day each last changed when it is known', () => {
+    expect(
+      renderSitemap([{ loc: 'https://docs.example/a?b&c' }, { loc: 'https://docs.example/d', lastmod: '2026-11-17' }]),
+    ).toBe(
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+        '  <url><loc>https://docs.example/a?b&amp;c</loc></url>\n' +
+        '  <url><loc>https://docs.example/d</loc><lastmod>2026-11-17</lastmod></url>\n' +
+        '</urlset>\n',
+    )
   })
 })

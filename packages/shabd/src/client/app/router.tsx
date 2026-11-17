@@ -79,7 +79,7 @@ export interface PageView {
   notFound: boolean
 }
 
-const NO_FRONTMATTER = { sidebar: {}, badges: [], draft: false, toc: undefined } as Frontmatter
+const NO_FRONTMATTER = { sidebar: {}, badges: [], draft: false, noindex: false, toc: undefined } as Frontmatter
 
 export function toPageView(site: SiteData, page: LoadedPage): PageView {
   const meta = site.pages[page.path]

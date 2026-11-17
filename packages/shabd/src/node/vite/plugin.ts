@@ -391,6 +391,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
                 title: page?.title ?? 'Page not found',
                 description: page?.description ?? '',
                 path: route,
+                noindex: !page || page.frontmatter.noindex,
                 scripts: `<script type="module" src="${entry}"></script>`,
               }),
             )

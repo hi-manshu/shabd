@@ -235,6 +235,31 @@
             ],
             "additionalProperties": false
           }
+        },
+        "noindex": {
+          "default": false,
+          "type": "boolean"
+        },
+        "robots": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "disallow": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^\\/\\S*$"
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
         }
       },
       "required": [

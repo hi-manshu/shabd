@@ -9,6 +9,7 @@
  * all, if the on-disk cache already holds it).
  */
 import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -26,6 +27,7 @@ import { DOCS_FILE, SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, type DocsFile } from
 import { SearchService } from '../search/service.js'
 import { serverOutDir, shabd } from '../vite/plugin.js'
 import { escapeHtml, renderDocument, renderRedirect } from './html.js'
+import { renderRobots, renderSitemap, wantsRobots } from './robots.js'
 
 export interface BuildOptions {
   /** Set false to skip embeddings and ship keyword search only. */
@@ -94,6 +96,8 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
       title: rendered.title,
       description: rendered.description,
       path: routePath,
+      // The page for an address that does not exist is not one to list either.
+      noindex: sourceFile === undefined || store.byPath(routePath)?.frontmatter.noindex,
       body: rendered.html,
       head: assets.headTags(sourceFile),
       scripts: assets.entryScript(),
@@ -189,12 +193,26 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
     }
   }
 
-  if (site.url) {
-    const urls = pages.map((page) => `  <url><loc>${escapeHtml(publicUrl(context, page.path))}</loc></url>`)
-    await write(
-      'sitemap.xml',
-      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`,
-    )
+  /* ── for search engines ── */
+
+  // The sitemap lists what a search engine should list. A site that asks not to be listed has none.
+  const listed = site.noindex ? [] : pages.filter((page) => !page.frontmatter.noindex)
+  const hasSitemap = site.url !== undefined && listed.length > 0
+  if (hasSitemap) {
+    await write('sitemap.xml', renderSitemap(listed.map((page) => ({ loc: publicUrl(context, page.path) }))))
+  }
+
+  // A robots.txt in public/ is the site's own, and was copied into dist/ with the other files there.
+  const ownRobots = existsSync(path.join(config.root, 'public', 'robots.txt'))
+  if (wantsRobots(site) && !ownRobots) {
+    await write('robots.txt', renderRobots(site, hasSitemap ? publicUrl(context, '/sitemap.xml') : undefined))
+    if (site.base !== '/') {
+      console.log(
+        pc.yellow(
+          `    robots.txt was written, but crawlers only read it at the root of a host, and this site is served from ${site.base}`,
+        ),
+      )
+    }
   }
 
   await compiler.cache.prune()

@@ -63,6 +63,8 @@ with Shabd:
 | `nav` | none | Header links: a list of `{ label, link, badge }` |
 | `footer` | none | Text for the page footer |
 | `head` | none | Tags for the `<head>` of every page: see [head tags](#head-tags) |
+| `noindex` | `false` | Ask search engines not to list any page of the site: see [search engines](#search-engines) |
+| `robots` | see below | `false`, or `{ disallow: [/drafts/] }`: see [search engines](#search-engines) |
 
 ### Logo
 
@@ -116,6 +118,35 @@ other path in the config.
 
 The tags are written by `shabd dev` as well as by a build. An analytics script therefore counts your own visits
 while you write, unless the script leaves `localhost` out by itself.
+
+### Search engines
+
+With `site.url` set, a build writes `sitemap.xml`, which lists every page, and gives each page its canonical
+address.
+
+It also writes `robots.txt`, which lets every crawler in and names the sitemap. Crawlers read that file at the root
+of a host and nowhere else, so a site served from a sub-path (`base: /docs/`) gets one only if `robots` is set. A
+`robots.txt` of your own in `public/` is used instead of the generated one.
+
+```yaml title="shabd.config.yaml"
+site:
+  robots:
+    disallow: [/drafts/, /internal/] # paths crawlers should stay out of
+```
+
+`robots: false` writes no file.
+
+To keep pages out of search results, use `noindex`. On the site it covers every page, which suits a staging copy or
+a preview of a pull request. In a page's [frontmatter](./frontmatter.md) it covers that page.
+
+```yaml title="shabd.config.yaml"
+site:
+  noindex: true
+```
+
+A page that is `noindex` carries a tag that says so and is left out of the sitemap. It is not added to
+`robots.txt`: a crawler that may not fetch a page never sees the tag, and can still list the bare address. The page
+stays in the site's own search, in the sidebar and in `llms.txt`.
 
 ## content
 

@@ -30,6 +30,7 @@ The page starts here.
 | `toc` | `false`, a number, or `{ minDepth, maxDepth }` | The "On this page" outline |
 | `badges` | list | Badges beside the title |
 | `draft` | `true` | Visible in `shabd dev`, left out of builds |
+| `noindex` | `true` | Asks [search engines](./site.md#search-engines) not to list the page. It stays in the site's own search |
 | `editLink` | `false` | Hide "Edit this page" |
 | `pagination` | `false` | Hide previous and next links |
 | `hero` | options | Content for the `splash` layout |

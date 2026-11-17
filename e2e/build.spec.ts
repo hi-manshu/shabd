@@ -416,3 +416,20 @@ test.describe('the document', () => {
     expect(html).toContain('<meta name="fixture-head" content="written by site.head">')
   })
 })
+
+test.describe('for search engines', () => {
+  test('robots.txt names the sitemap, and a page that says noindex is left out of it', async ({ request }) => {
+    const text = (path: string) => request.get(`${BUILT}${path}`).then((response) => response.text())
+    expect(await text('/robots.txt')).toBe('User-agent: *\nAllow: /\n\nSitemap: https://fixture.test/sitemap.xml\n')
+
+    const sitemap = await text('/sitemap.xml')
+    expect(sitemap).toContain('<loc>https://fixture.test/extras/alpha</loc>')
+    expect(sitemap).not.toContain('/extras/beta')
+
+    const noindex = '<meta name="robots" content="noindex">'
+    expect(await text('/extras/beta')).toContain(noindex)
+    expect(await text('/extras/alpha')).not.toContain(noindex)
+    // The page that answers for an address that does not exist is not one to list.
+    expect(await text('/no/such/page')).toContain(noindex)
+  })
+})

@@ -215,6 +215,27 @@ const SiteSchema = z.strictObject({
   footer: z.string().optional(),
   /** Tags added to the `<head>` of every page, after Shabd's own. */
   head: z.array(HeadTagSchema).default([]),
+  /**
+   * Ask search engines not to list any page of this site: a staging copy, a
+   * preview of a pull request. A page can ask for itself with `noindex` in
+   * its frontmatter.
+   */
+  noindex: z.boolean().default(false),
+  /**
+   * robots.txt. `false` writes none. An object lists paths crawlers should
+   * stay out of. Left out, the file is written when the site is served from
+   * the root of its host, which is the only place crawlers read it.
+   */
+  robots: z
+    .union([
+      z.boolean(),
+      z.strictObject({
+        disallow: z
+          .array(z.string().regex(/^\/\S*$/, { error: 'A path crawlers should stay out of starts with /, such as /drafts/' }))
+          .default([]),
+      }),
+    ])
+    .optional(),
 })
 
 /* ──────────────────────────────── theme ───────────────────────────────── */
@@ -768,6 +789,8 @@ export const FrontmatterSchema = z.looseObject({
   badges: z.array(BadgeSchema).default([]),
   /** Drafts are visible in dev and left out of production builds. */
   draft: z.boolean().default(false),
+  /** Ask search engines not to list this page. It stays in the site's own search and navigation. */
+  noindex: z.boolean().default(false),
   hero: HeroSchema.optional(),
   api: ApiSchema.optional(),
   editLink: z.boolean().optional(),

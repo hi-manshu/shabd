@@ -12,6 +12,8 @@ export interface DocumentOptions {
   description: string
   /** Route path of the page, for the canonical URL. */
   path: string
+  /** Ask search engines not to list this page. A site that is `noindex` asks for every page. */
+  noindex?: boolean | undefined
   /** Prerendered app markup. */
   body?: string
   /** Extra tags for <head>: stylesheets, module preloads. */
@@ -71,6 +73,7 @@ export function renderDocument(options: DocumentOptions): string {
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<title>${escapeHtml(title)}</title>`,
     description && `<meta name="description" content="${escapeHtml(description)}">`,
+    (site.noindex || options.noindex) && '<meta name="robots" content="noindex">',
     `<meta property="og:title" content="${escapeHtml(title)}">`,
     description && `<meta property="og:description" content="${escapeHtml(description)}">`,
     '<meta property="og:type" content="article">',
