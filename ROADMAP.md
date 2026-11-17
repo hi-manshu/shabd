@@ -76,7 +76,7 @@ On one machine (macOS 26, Node 22.16), with the docs site and a small test site 
 - 227 unit and integration tests pass. They cover config and sidebar validation, the sidebar resolver, the Markdown
   pipeline, layout resolution, the theme presets and their contrast, search ranking, both search stores, the
   content store, the starter, and the MCP endpoint driven by the official MCP client.
-- 119 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
+- 122 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
   JavaScript, hydration, navigation, every layout, the sidebar, the phone-size layout, search, the theme menu, text
   contrast on every theme's rendered page, sandboxes, hot updates of pages and YAML, the Studio including conflicts
   and its folder backend, and two editors connecting peer to peer. Sixteen more are skipped where an engine lacks
@@ -90,7 +90,8 @@ On one machine (macOS 26, Node 22.16), with the docs site and a small test site 
   116 ms). That was measured in Chromium for the first commit, and not again since.
 
 On GitHub's Linux machines the same tests pass, except that two editors connecting peer to peer runs in Chromium
-only there. Playwright's Firefox and WebKit connected two pages on Linux only some of the time.
+only there: 120 pass and 18 are skipped. Playwright's Firefox and WebKit connected two pages on Linux only some of
+the time. The suite then runs again on the SQLite search store, where 129 pass.
 
 On the deployed docs site, on 17 November 2026, in Chromium: all 18 pages open with nothing in the console, the 36
 links between them lead somewhere, and each of these worked when tried as a reader would: search by keyword and
@@ -117,6 +118,10 @@ Not yet checked:
   after each change would close that. It was found because a test did exactly this.
 - A setting for the colour of the header's text, so that a theme can have a dark header. The Windows XP theme
   would use it for a blue taskbar.
+- Run the browser tests on a phone-size screen with a long sidebar and on real page lengths. Two faults on the
+  docs site were found only by walking the deployed site: a sidebar longer than the screen sat under the header,
+  and the Studio's footer missed a page update that arrived before the save was confirmed. The test site was too
+  small and too slow to show either.
 - Try the real browsers by hand, Safari above all. WebKit under test did not offer its private file system to the
   search worker; whether Safari does needs checking.
 - Peer editing between two machines on different networks.
