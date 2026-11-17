@@ -16,6 +16,24 @@ describe('package', () => {
     expect(VERSION).toBe((JSON.parse(read('package.json')) as { version: string }).version)
   })
 
+  it('builds itself before it is packed, so a publish cannot ship an old build', () => {
+    const { scripts } = JSON.parse(read('package.json')) as { scripts: Record<string, string> }
+    expect(scripts.prepack).toBe('npm run build')
+  })
+
+  it('has a readme and a licence to publish, and so has the starter', () => {
+    for (const file of ['README.md', 'LICENSE', '../create-shabd/README.md', '../create-shabd/LICENSE']) {
+      expect(read(file).length, file).toBeGreaterThan(300)
+    }
+    expect(read('../create-shabd/LICENSE')).toBe(read('LICENSE'))
+    // npm shows a readme as it was when the version was published. Neither may describe the time before that,
+    // or link to a file by a path that only means something inside the repository.
+    for (const file of ['README.md', '../create-shabd/README.md']) {
+      expect(read(file), file).not.toMatch(/not on npm|not published|until (they|it) (are|is) published/i)
+      expect(read(file), file).not.toMatch(/\]\(\.{1,2}\//)
+    }
+  })
+
   it('keeps the public MCP entry free of Node built-ins, so it can run in an edge function', () => {
     const seen = new Set<string>()
     const builtins: string[] = []

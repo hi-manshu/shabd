@@ -20,7 +20,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "create-shabd": "./bin/create-shabd.js"
+    "create-shabd": "bin/create-shabd.js"
   },
   "files": [
     "bin",

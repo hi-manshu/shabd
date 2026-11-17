@@ -126,6 +126,13 @@ describe('create-shabd', () => {
 
     expect(await run(directory)).toBe(1)
     expect(errors.join('\n')).toContain('is not empty')
+
+    // `npm create shabd my-docs --preset forest` arrives like this: npm keeps `--preset` and passes its value on.
+    errors.length = 0
+    expect(await run(path.join(scratch, 'two'), 'forest')).toBe(1)
+    expect(errors.join('\n')).toContain('Expected one directory, got 2')
+    expect(errors.join('\n')).toContain('npm create shabd@latest my-docs -- --preset forest')
+    expect(existsSync(path.join(scratch, 'two'))).toBe(false)
     expect(await run('one', 'two')).toBe(1)
     expect(await run('--nonsense')).toBe(1)
   })

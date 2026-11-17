@@ -39,6 +39,12 @@ npm create shabd@latest my-docs
 | `--shabd <spec>` | What to install as `shabd`: a version range, or the path of a local build or tarball |
 | `--force` | Write into a directory that is not empty. Files that are already there are kept, not replaced |
 
+Through `npm create`, the options need `--` before them, or npm keeps them for itself:
+
+```sh
+npm create shabd@latest my-docs -- --preset forest
+```
+
 The starter refuses a directory that already has files in it unless you pass `--force`. A `.git` folder does not
 count, so you can run `git init` first. It never deletes or replaces a file.
 

@@ -27,6 +27,7 @@ const HARMLESS = new Set(['.git', '.DS_Store'])
 const RENAMED = { _gitignore: '.gitignore' }
 
 const HELP = `Usage: create-shabd [directory] [options]
+       npm create shabd@latest [directory] -- [options]
 
 Writes a small Shabd site into the directory (default: my-docs).
 
@@ -152,7 +153,11 @@ export async function main(argv, print = console.log, printError = console.error
     return 0
   }
   if (parsed.positionals.length > 1) {
-    printError(`Expected one directory, got ${parsed.positionals.length}: ${parsed.positionals.join(' ')}\n\n${HELP}`)
+    // `npm create shabd my-docs --preset forest` reaches us as `my-docs forest`: npm keeps the option's name.
+    printError(
+      `Expected one directory, got ${parsed.positionals.length}: ${parsed.positionals.join(' ')}\n` +
+        `Through npm create, options need "--" before them: npm create shabd@latest my-docs -- --preset forest\n\n${HELP}`,
+    )
     return 1
   }
 

@@ -57,8 +57,13 @@ npm publish -w shabd --access public
 npm publish -w create-shabd --access public
 ```
 
-`create-shabd` writes `"shabd": "^0.1.0"` into a new site, so publish `shabd` first. After both are out, run
-`npm create shabd@latest my-docs` in an empty folder: that command has never been run.
+`create-shabd` writes `"shabd": "^0.1.0"` into a new site, so publish `shabd` first. `shabd` builds itself before
+it is packed, so the `npm run build` above is a second look and not a requirement. A published version cannot be
+published again, so read what `npm publish -w shabd --dry-run` lists first.
+
+After both are out, run `npm create shabd@latest my-docs` in an empty folder outside this repository: that command
+has never been run from the registry, and inside the repository npm would run the local copy. Then take the
+"not on npm yet" wording out of `docs/content/guide/installation.md`, `README.md` and this file.
 
 After the first release, switch to trusted publishing so no token is stored: on npmjs.com, open the package's
 settings, add a trusted publisher for this repository, and publish from a workflow that runs on version tags with

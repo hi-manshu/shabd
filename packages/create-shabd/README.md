@@ -3,23 +3,14 @@
 Starts a [Shabd](https://github.com/hi-manshu/shabd) documentation site.
 
 ```sh
-npm create shabd my-docs
+npm create shabd@latest my-docs
 cd my-docs
 npm install
 npm run dev
 ```
 
 It writes a `package.json`, a `.gitignore`, `shabd.config.yaml`, `sidebar.yaml`, a home page and two guide pages,
-and nothing else.
-
-Neither `shabd` nor `create-shabd` is on npm yet, so the command above does not work today. Until they are
-published, run the starter from a clone of the repository and point the new site at a packed copy of Shabd:
-
-```sh
-npm run build
-npm pack -w shabd --pack-destination ..
-node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../shabd-0.1.0.tgz
-```
+and nothing else. It needs Node.js 22 or newer.
 
 | Option | Meaning |
 | --- | --- |
@@ -28,4 +19,12 @@ node packages/create-shabd/bin/create-shabd.js ../my-docs --shabd file:../shabd-
 | `--shabd <spec>` | What to install as `shabd`: a version range, or the path of a local build or tarball |
 | `--force` | Write into a directory that is not empty. Files already there are kept |
 
-The files it copies are in [`template/`](./template), laid out as the site they become.
+Through `npm create`, options need `--` before them, or npm keeps them for itself:
+
+```sh
+npm create shabd@latest my-docs -- --preset forest
+```
+
+The files it copies are in
+[`template/`](https://github.com/hi-manshu/shabd/tree/main/packages/create-shabd/template), laid out as the site
+they become.
