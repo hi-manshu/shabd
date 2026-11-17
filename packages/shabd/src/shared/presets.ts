@@ -65,7 +65,7 @@ export const OPTIONAL_COLOR_TOKENS = [
 export type OptionalColorToken = (typeof OPTIONAL_COLOR_TOKENS)[number]
 
 export const CORNERS = ['hang', 'round'] as const
-export const CODE_FRAMES = ['bar', 'window'] as const
+export const CODE_FRAMES = ['bar', 'window', 'xp'] as const
 export const HEADING_CASES = ['none', 'uppercase'] as const
 
 /** Everything about a theme's shape that is not a colour. */
@@ -96,7 +96,10 @@ export interface Look {
   shadow: string
   /** Draw the heavy bar above page titles and the hero. */
   bars: boolean
-  /** `bar`: code hangs from a rule. `window`: code sits in a window with a title bar and its three buttons. */
+  /**
+   * `bar`: code hangs from a rule. `window`: code sits in a window with a title bar and its three buttons at the
+   * left. `xp`: the window has a blue title bar, with the title at the left and the three buttons at the right.
+   */
   codeFrame: (typeof CODE_FRAMES)[number]
 }
 
@@ -214,6 +217,44 @@ export const THEME_PRESETS = {
             'radial-gradient(46rem 34rem at 0% 8%, rgb(120 185 255 / 0.5), transparent 62%), radial-gradient(38rem 30rem at 8% 92%, rgb(120 215 225 / 0.38), transparent 62%)',
           dark:
             'radial-gradient(46rem 34rem at 0% 8%, rgb(30 95 200 / 0.5), transparent 62%), radial-gradient(38rem 30rem at 8% 92%, rgb(20 120 140 / 0.34), transparent 62%)',
+        },
+      },
+    },
+  ),
+  xp: preset(
+    'Windows XP',
+    'After the look of Windows XP: code in windows with a blue title bar and its three buttons, cream panels, a pale blue side pane, a green button and Tahoma.',
+    { accent: '#0046d5', highlight: '#f59b00', background: '#ffffff', surface: '#ece9d8', text: '#000000', muted: '#555555', border: '#7f9db9', note: '#0046d5', tip: '#00695c', success: '#1a6b2c', caution: '#8f4700', danger: '#b3171f' },
+    { accent: '#8fc0ff', highlight: '#ffb84a', background: '#101a30', surface: '#1b2942', text: '#f1f5ff', muted: '#a9b6d2', border: '#40598a', ...CALLOUTS_DARK },
+    // The colours of Visual Studio, which is where most people read code on that desktop.
+    { light: 'light-plus', dark: 'dark-plus' },
+    {
+      // No font is shipped: Tahoma and Trebuchet MS are on Windows and macOS, and the rest stand in elsewhere.
+      sans: 'Tahoma, Verdana, "Segoe UI", "DejaVu Sans", sans-serif',
+      mono: '"Lucida Console", "Courier New", ui-monospace, monospace',
+      heading: '"Trebuchet MS", Tahoma, Verdana, sans-serif',
+      headingWeight: 700,
+      headingWidth: 100,
+      displayWidth: 100,
+      radius: '3px',
+      corners: 'round',
+      rule: '3px',
+      codeFrame: 'xp',
+      colors: {
+        // Title-bar blue for the headline bars, and the navy of a window's caption for headings.
+        bar: { light: '#0a55dd', dark: '#3d86f5' },
+        heading: { light: '#0a2a80', dark: '#dbe7ff' },
+        // The green of the button in the corner of that desktop.
+        button: { light: '#2b7a2b', dark: '#86d886' },
+        selection: { light: '#b9d1f7', dark: '#2f5fa8' },
+        // A toolbar above, and a task pane down the side. Both are solid: there is no wallpaper behind them.
+        header: {
+          light: 'linear-gradient(180deg, #fdfcf7, #ece9d8)',
+          dark: 'linear-gradient(180deg, #1f2f4d, #17243d)',
+        },
+        sidebar: {
+          light: 'linear-gradient(180deg, #dbe8fb, #c3d6f5)',
+          dark: 'linear-gradient(180deg, #152748, #101d38)',
         },
       },
     },

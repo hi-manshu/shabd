@@ -166,6 +166,21 @@ describe('theme presets and the reader\'s menu', () => {
     expect(defaults.picker).toEqual([])
   })
 
+  it('gives every code frame the same tokens, so that a change of frame leaves nothing of the last one behind', () => {
+    const tokens = (frame: string) =>
+      [...themeBaseCss(theme(`  code:\n    frame: ${frame}\n`)).matchAll(/--sb-(code-[a-z-]+):/g)].map((match) => match[1]).sort()
+    expect(tokens('bar').length).toBeGreaterThan(10)
+    expect(tokens('window')).toEqual(tokens('bar'))
+    expect(tokens('xp')).toEqual(tokens('bar'))
+
+    // The Windows XP preset brings its own frame: buttons at the right of a title bar, not at the left.
+    const xp = theme('  preset: xp\n')
+    expect(xp.code.frame).toBe('xp')
+    expect(themeBaseCss(xp)).toContain('--sb-code-caption: block;')
+    expect(themeBaseCss(xp)).toContain('--sb-code-dots: none;')
+    expect(themeBaseCss(theme('  preset: macos\n'))).toContain('--sb-code-caption: none;')
+  })
+
   it('holds code to a contrast of 4.5:1 unless told otherwise', () => {
     expect(theme('  preset: forest\n').code.minContrast).toBe(4.5)
     expect(theme('  code:\n    minContrast: 0\n').code.minContrast).toBe(0)

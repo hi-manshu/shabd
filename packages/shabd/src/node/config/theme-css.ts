@@ -39,12 +39,23 @@ const OPTIONAL_COLOR_FALLBACKS: Record<OptionalColorToken, string> = {
 }
 
 /**
- * How a code block is framed. The stylesheet has one set of rules for both
- * frames and reads the difference from these, so a reader's palette can
+ * How a code block is framed. The stylesheet has one set of rules for every
+ * frame and reads the difference from these, so a reader's palette can
  * change the frame without the markup changing.
  */
+/** What a frame leaves to the palette: the border, the rule on top, the corners and the ink of the strip. */
+const PLAIN_FRAME = {
+  'code-border': 'var(--sb-line) solid var(--sb-border)',
+  'code-rule-width': 'var(--sb-rule)',
+  'code-radius': 'var(--sb-hang)',
+  'code-caption': 'none',
+  'code-bar-ink': 'var(--sb-text)',
+  'code-bar-muted': 'var(--sb-muted)',
+}
+
 const CODE_FRAME_TOKENS: Record<Look['codeFrame'], Record<string, string>> = {
   bar: {
+    ...PLAIN_FRAME,
     'code-dots': 'none',
     'code-bar-columns': '1fr auto',
     'code-bar-padding': '0.3rem 0.4rem 0 0.95rem',
@@ -55,6 +66,7 @@ const CODE_FRAME_TOKENS: Record<Look['codeFrame'], Record<string, string>> = {
     'code-shadow': 'var(--sb-shadow)',
   },
   window: {
+    ...PLAIN_FRAME,
     'code-dots': 'block',
     // Equal columns either side keep the title in the middle of the window, whatever sits beside it.
     'code-bar-columns': '1fr auto 1fr',
@@ -63,6 +75,24 @@ const CODE_FRAME_TOKENS: Record<Look['codeFrame'], Record<string, string>> = {
     'code-bar-rule': '1px',
     'code-label-weight': '600',
     'code-shadow': '0 0.9rem 2.2rem rgb(0 0 0 / 0.16), 0 0.15rem 0.4rem rgb(0 0 0 / 0.1)',
+  },
+  // A picture of a window, like the buttons of the other one: it is blue with white lettering on any palette.
+  xp: {
+    'code-border': '3px solid #0a4fd3',
+    // The title bar is the top of the window, so nothing is ruled above it.
+    'code-rule-width': '0px',
+    'code-radius': '8px 8px 0 0',
+    'code-caption': 'block',
+    'code-bar-ink': '#ffffff',
+    'code-bar-muted': '#ffffff',
+    'code-dots': 'none',
+    // The title at the left, then whatever button the block has, then the window's own three.
+    'code-bar-columns': '1fr auto auto',
+    'code-bar-padding': '0.25rem 0.3rem 0.25rem 0.6rem',
+    'code-bar-background': 'linear-gradient(180deg, #3b93ff 0%, #0b61ea 10%, #0a55dd 48%, #0e66f2 86%, #0a4fd0 100%)',
+    'code-bar-rule': '0px',
+    'code-label-weight': '700',
+    'code-shadow': '0.15rem 0.2rem 0.5rem rgb(0 0 0 / 0.3)',
   },
 }
 

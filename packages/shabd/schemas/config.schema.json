@@ -229,6 +229,7 @@
             "shabd",
             "ink",
             "macos",
+            "xp",
             "blueprint",
             "newsprint",
             "brutal",
@@ -265,6 +266,7 @@
                   "shabd",
                   "ink",
                   "macos",
+                  "xp",
                   "blueprint",
                   "newsprint",
                   "brutal",
@@ -1138,7 +1140,8 @@
               "type": "string",
               "enum": [
                 "bar",
-                "window"
+                "window",
+                "xp"
               ]
             },
             "wrap": {

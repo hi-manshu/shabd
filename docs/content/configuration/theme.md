@@ -24,11 +24,12 @@ In `shabd dev`, saving a token change updates the page without a reload.
 `preset` names one of the built-in themes. Each has a light and a dark mode, and a pair of code themes that go
 with it. This site has the [menu](#a-theme-menu-for-readers) turned on, so you can try each one from the header.
 
-Nine presets are themes: they change fonts, corners and how code is framed as well as colour.
+Ten presets are themes: they change fonts, corners and how code is framed as well as colour.
 
 | Preset | Look |
 | --- | --- |
 | `macos` | After the look of a macOS app: code in windows with a title bar, a frosted sidebar and header, the system font and system blue |
+| `xp` | After the look of Windows XP: code in windows with a blue title bar and its three buttons, cream panels, a pale blue side pane, a green button and Tahoma |
 | `blueprint` | An engineer's drawing: a measured grid behind the page, capital headings in a typewriter face, square corners |
 | `newsprint` | A broadsheet: serif text on off-white paper, a heavy rule over every headline, one red |
 | `brutal` | Black lines, hard shadows and flat colour. Nothing is rounded and nothing is subtle |
@@ -60,7 +61,7 @@ A test holds every preset to the same floor: body text has a contrast of at leas
 callout titles at least 4.5:1, against both the page and the surface colour.
 
 Comparing one colour with another is not enough for a theme that puts a picture behind the page, because what is
-behind the text there is not one colour. A second test renders a page in each of the nine themes, light and dark,
+behind the text there is not one colour. A second test renders a page in each of the ten themes, light and dark,
 in Chromium, Firefox and WebKit. It holds body text, muted text and the accent colour to the same ratios against
 every pixel of the header, the sidebar and the content area.
 
@@ -82,12 +83,14 @@ A theme's look is made of settings you could write yourself. `macos`, for exampl
 - The font stacks name the system font, with `radius: 10px`, `corners: round` and `rule: 1px`.
 
 `brutal` uses `line: 2px` and a hard `shadow`, `blueprint` uses `headingCase: uppercase` and a grid for its
-`backdrop`, and so on. Every one of these is in the tables below.
+`backdrop`, `xp` uses `code.frame: xp` and a gradient for its `header` and its `sidebar`, and so on. Every one of
+these is in the tables below.
 
 No font is shipped for any theme. Each font stack names fonts that come with an operating system, and falls back
 to the platform's own serif, sans-serif or monospace face where they are missing. `macos` is San Francisco on Apple
-devices; `newsprint` sets its headlines in Bodoni or Didot there and in Georgia elsewhere. The window buttons are
-drawn in CSS and do nothing.
+devices; `newsprint` sets its headlines in Bodoni or Didot there and in Georgia elsewhere; `xp` is Tahoma and
+Trebuchet MS where they are installed, and Verdana or the system's sans-serif where they are not. The window
+buttons of `macos` and `xp` are pictures and do nothing.
 
 For each of those settings, what you write comes first, then the preset's look, then the defaults in the tables
 below.
@@ -117,15 +120,15 @@ Code follows the choice. A preset from the menu shows code in its own pair of sy
 entry shows the pair you set under [`code`](#code).
 
 The menu makes pages with code heavier. Each page carries the colours of its own code in every syntax theme the
-menu can reach, once in its HTML and once in its script. This site offers all twenty-two presets, which use 25
-syntax themes between them: its page with the most code carries about 35 KB of those colours in each, a little
-under 5 KB compressed. A page with no code carries none.
+menu can reach, once in its HTML and once in its script. This site offers all twenty-three presets, which use 27
+syntax themes between them: its page with the most code carries about 39 KB of those colours in each, a little
+over 5 KB compressed. A page with no code carries none.
 
 Without a menu a page carries two syntax themes, and each preset on the menu adds at most two. If page weight
 matters to you, list the presets you want under `picker` and leave `picker: true` alone.
 
 The presets' own colours are not repeated in every page. A build puts them in one stylesheet that every page
-shares: about 36 KB here, a little over 4 KB compressed.
+shares: about 40 KB here, about 5 KB compressed.
 
 The menu is the `theme-menu` block, so a [layout](./layouts.md) can move it or leave it out.
 
@@ -171,7 +174,8 @@ Eleven more are optional. Most take their value from one of the twelve until you
 | `backdrop` | A picture behind the whole page: any CSS background, such as a gradient | None |
 
 Text in the header and the sidebar keeps using `text` and `muted`. If you give either a background of its own,
-choose one that those stay readable on, in both modes.
+choose one that those stay readable on, in both modes. Both are drawn as backgrounds, so a gradient works as well
+as a colour: `xp` uses one for each.
 
 A `header` or `sidebar` colour with some transparency, such as `rgb(255 255 255 / 0.7)`, blurs whatever is behind
 it. The header always has the page scrolling under it. The sidebar has only the page's background, so it needs a
@@ -228,7 +232,7 @@ you set a stack that does not name them, their files are left out of the build. 
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `code.light`, `code.dark` | The preset's pair | [Shiki themes](https://shiki.style/themes) for syntax colours |
-| `code.frame` | `bar` | `bar` hangs a code block from a rule. `window` puts it in a window with a title bar |
+| `code.frame` | `bar` | `bar` hangs a code block from a rule. `window` puts it in a window with a title bar and its buttons at the left. `xp` gives the window a blue title bar, with the buttons at the right |
 | `code.lineNumbers` | `false` | Number the lines of every code block |
 | `code.wrap` | `false` | Wrap long lines in every code block instead of scrolling |
 | `code.minContrast` | `4.5` | The least contrast a syntax colour may have against what is behind it. `0` leaves the syntax themes as they ship |

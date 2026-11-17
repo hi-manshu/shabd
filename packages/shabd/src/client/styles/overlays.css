@@ -338,9 +338,9 @@
   .sb-sandbox {
     margin-block: 1.4em;
     margin-inline: 0;
-    border: var(--sb-line) solid var(--sb-border);
-    border-block-start: var(--sb-rule) solid var(--sb-highlight);
-    border-radius: var(--sb-hang);
+    border: var(--sb-code-border);
+    border-block-start: var(--sb-code-rule-width) solid var(--sb-highlight);
+    border-radius: var(--sb-code-radius);
     background: var(--sb-surface);
     box-shadow: var(--sb-code-shadow);
     overflow: hidden;

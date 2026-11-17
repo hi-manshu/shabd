@@ -92,9 +92,9 @@ settings, add a trusted publisher for this repository, and publish from a workfl
 | Studio: folder saving (File System Access API) | Built, tested in Chromium against real file handles; the system folder picker itself needs a person |
 | Studio: peer editing over WebRTC | Built, tested between two browser sessions on one machine; not across networks |
 | Live sandboxes | Built, tested in three browser engines |
-| Themes: 22 presets, the reader's menu, code colours that follow the chosen preset | Built, tested in three browser engines |
-| Readable code: every syntax colour at 4.5:1 or more against what is behind it | Built, tested for all 22 presets in both modes on a sample of code in eight languages |
-| Contrast of every preset | Tested: colour against colour for all 22, and text against every pixel of the rendered page for the nine themes, in three browser engines |
+| Themes: 23 presets, the reader's menu, code colours that follow the chosen preset | Built, tested in three browser engines |
+| Readable code: every syntax colour at 4.5:1 or more against what is behind it | Built, tested for all 23 presets in both modes on a sample of code in eight languages |
+| Contrast of every preset | Tested: colour against colour for all 23, and text against every pixel of the rendered page for the ten themes, in three browser engines |
 | `create-shabd`, the starter | Built, tested. A generated site was installed from a packed copy of Shabd, checked, built and served. `npm create shabd` itself needs the packages published |
 
 "Three browser engines" means the Chromium, Firefox and WebKit builds that Playwright drives, on macOS. It does not
@@ -117,9 +117,9 @@ mean Chrome, Firefox and Safari as people install them, and it does not cover Li
   checks, but whether Firefox and Safari as people install them blur it has not been looked at.
 - The logo's animation under "Reduce motion" in Safari. It was checked in Chromium and Firefox.
 - Lighter pages on a site with a theme menu. Each page carries the colours of its own code for every syntax theme
-  the menu can reach, in its HTML and again in its script. On the docs site, which offers all 22 presets, that is
-  about 35 KB in each on the page with the most code. The themes a reader has to pick could live in one shared
-  stylesheet, fetched when one is picked; for the docs site it would be an estimated 68 KB, fetched once.
+  the menu can reach, in its HTML and again in its script. On the docs site, which offers all 23 presets, that is
+  about 39 KB in each on the page with the most code. The themes a reader has to pick could live in one shared
+  stylesheet, fetched when one is picked; for the docs site it would be an estimated 78 KB, fetched once.
 - Type declarations for `shabd/client`. It ships as TypeScript source today, which a site's own type check cannot
   follow into the generated `virtual:` modules.
 - Keep React Fast Refresh working while editing the theme's own source. A few client modules export both components

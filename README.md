@@ -28,7 +28,7 @@ described there, not in components.
 
 - **Layouts as data.** A layout is a table of regions (`header`, `sidebar`, `main`, …) and the blocks in each. A page
   picks one with `layout:` in its frontmatter. Editing a layout, or adding one, is a YAML change.
-- **Themes as tokens.** Twenty-two built-in presets, each with a light and a dark mode, and an optional menu that
+- **Themes as tokens.** Twenty-three built-in presets, each with a light and a dark mode, and an optional menu that
   lets readers switch between them; code blocks follow in each preset's own syntax colours, adjusted where a
   colour would be hard to read. Every colour, font, width and corner is a token in YAML.
 - **A sidebar that fills itself in.** `sidebar.yaml` is used as written. Any content folder it does not mention is

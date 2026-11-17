@@ -212,9 +212,9 @@
   .sb-code {
     margin-block: 1.4em;
     margin-inline: 0;
-    border: var(--sb-line) solid var(--sb-border);
-    border-block-start: var(--sb-rule) solid var(--sb-bar);
-    border-radius: var(--sb-hang);
+    border: var(--sb-code-border);
+    border-block-start: var(--sb-code-rule-width) solid var(--sb-bar);
+    border-radius: var(--sb-code-radius);
     background: var(--sb-code);
     box-shadow: var(--sb-code-shadow);
     /* Keeps the title bar and highlighted lines inside the rounded corners. */
@@ -224,7 +224,9 @@
   /*
    * The strip above the code. With `code.frame: window` it is a title bar:
    * it gets a background and a rule under it, the label moves to the middle,
-   * and the three window buttons appear. The tokens say which.
+   * and the three window buttons appear at the left. With `code.frame: xp`
+   * the title bar is blue, the label stays at the left in white, and the
+   * buttons are at the right. The tokens say which.
    */
   .sb-code-bar {
     display: grid;
@@ -236,7 +238,7 @@
     border-block-end: var(--sb-code-bar-rule) solid var(--sb-border);
     background: var(--sb-code-bar-background);
     font-size: 0.78rem;
-    color: var(--sb-muted);
+    color: var(--sb-code-bar-muted);
   }
 
   /*
@@ -255,6 +257,19 @@
       radial-gradient(circle at 46px 50%, #28c840 0 5.2px, #1aab29 5.3px 5.8px, transparent 6.2px);
   }
 
+  /*
+   * Minimise, maximise and close as the `xp` frame has them: three 21px
+   * buttons 2px apart, two blue and one red, each with a white edge. A
+   * picture like the three above, in pixels for the same reason.
+   */
+  .sb-code-bar::after {
+    content: '';
+    display: var(--sb-code-caption);
+    inline-size: 67px;
+    block-size: 21px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='67' height='21' viewBox='0 0 67 21'%3E%3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238ab8ff'/%3E%3Cstop offset='.5' stop-color='%232b68ea'/%3E%3Cstop offset='1' stop-color='%231a48bd'/%3E%3C/linearGradient%3E%3ClinearGradient id='r' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f6ad98'/%3E%3Cstop offset='.5' stop-color='%23dc4c2c'/%3E%3Cstop offset='1' stop-color='%23a92a0b'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cg stroke='%23fff'%3E%3Crect x='.5' y='.5' width='20' height='20' rx='3' fill='url(%23b)'/%3E%3Crect x='23.5' y='.5' width='20' height='20' rx='3' fill='url(%23b)'/%3E%3Crect x='46.5' y='.5' width='20' height='20' rx='3' fill='url(%23r)'/%3E%3C/g%3E%3Cg fill='%23fff'%3E%3Crect x='5' y='13' width='8' height='3'/%3E%3Cpath fill-rule='evenodd' d='M28 5h11v11H28zM30 9v5h7V9z'/%3E%3C/g%3E%3Cpath d='M52.5 6.5l8 8m0-8l-8 8' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' fill='none'/%3E%3C/svg%3E") center / 67px 21px no-repeat;
+  }
+
   .sb-code-label {
     min-inline-size: 0;
     overflow: hidden;
@@ -268,7 +283,7 @@
   }
 
   .sb-code-label[data-kind='title'] {
-    color: var(--sb-text);
+    color: var(--sb-code-bar-ink);
     font-family: var(--sb-font-mono);
   }
 
@@ -278,12 +293,12 @@
     gap: 0.35rem;
     padding: 0.2rem 0.5rem;
     border-radius: min(4px, var(--sb-radius));
-    color: var(--sb-muted);
+    color: var(--sb-code-bar-muted);
   }
 
   .sb-code-copy:hover {
-    color: var(--sb-text);
-    background: color-mix(in oklab, var(--sb-text) 8%, transparent);
+    color: var(--sb-code-bar-ink);
+    background: color-mix(in oklab, var(--sb-code-bar-ink) 8%, transparent);
   }
 
   .sb-code pre,
