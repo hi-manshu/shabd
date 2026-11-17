@@ -70,6 +70,27 @@ export function tokenize(text: string): string[] {
   return text.toLowerCase().normalize('NFD').replace(LATIN_DIACRITICS, '').match(WORD) ?? []
 }
 
+/** A word where it stands in a text, with the form it is indexed and matched in. */
+export interface WordSpan {
+  token: string
+  start: number
+  end: number
+}
+
+/**
+ * The words of `text` and where each one is, for code that cuts or marks the
+ * text itself: the excerpt under a result, the marks on a page.
+ */
+export function wordSpans(text: string): WordSpan[] {
+  const spans: WordSpan[] = []
+  for (const match of text.matchAll(WORD)) {
+    // A run of accents on their own folds away to nothing.
+    const [token] = tokenize(match[0])
+    if (token) spans.push({ token, start: match.index, end: match.index + match[0].length })
+  }
+  return spans
+}
+
 /**
  * Words that say nothing about what a query is looking for. They are dropped
  * from queries (never from the index) so that "how do I change the colours"
@@ -89,6 +110,16 @@ export function queryTerms(query: string): string[] {
   // The word still being typed is kept: "the" may be the start of "theme".
   const kept = words.filter((word, index) => !STOPWORDS.has(word) || (typing && index === words.length - 1))
   return kept.length > 0 ? kept : words
+}
+
+/**
+ * The words of a query to mark where a result is shown. A word of the text is
+ * marked when it starts with one of them. Very short ones ("a", "to") are
+ * left out: marking them lights up half the text and says nothing about why
+ * it matched.
+ */
+export function wordsToMark(query: string): string[] {
+  return queryTerms(query).filter((word) => word.length > 2)
 }
 
 /* ──────────────────────────── keyword index ─────────────────────────── */
@@ -271,12 +302,11 @@ export function fuseRanks(lists: number[][], k = 60): Map<number, number> {
 /** A window of `text` around the first query word, cut at word boundaries. */
 export function makeSnippet(text: string, query: string, maxLength = 180): string {
   if (text.length <= maxLength) return text
-  const words = new Set(queryTerms(query))
+  const words = [...new Set(queryTerms(query))]
   let start = 0
-  for (const match of text.matchAll(WORD)) {
-    const [token = ''] = tokenize(match[0])
-    if ([...words].some((word) => token.startsWith(word))) {
-      start = Math.max(0, match.index - Math.floor(maxLength / 3))
+  for (const span of wordSpans(text)) {
+    if (words.some((word) => span.token.startsWith(word))) {
+      start = Math.max(0, span.start - Math.floor(maxLength / 3))
       break
     }
   }

@@ -99,6 +99,17 @@
     text-decoration-color: var(--sb-link);
   }
 
+  /*
+   * The words of a search, marked in the passage a result led to. They are
+   * ranges the page registers under this name (client/search/passage.ts), not
+   * elements, so this is all there is to style. The tint is the one a marked
+   * word has in the search results, and text keeps its own colour over it.
+   * The rule stands alone: a browser that does not know the selector drops it.
+   */
+  ::highlight(sb-search) {
+    background-color: var(--sb-highlight-soft);
+  }
+
   .sb-content strong {
     font-weight: 650;
   }

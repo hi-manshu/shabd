@@ -159,7 +159,7 @@ Each colour is one value for both modes, or `{ light, dark }`. A preset defines 
 | Token | Used for |
 | --- | --- |
 | `accent` | Links and focus rings |
-| `highlight` | Marks: the bar on the current page, highlighted code lines, the bar on a primary button |
+| `highlight` | Marks: the bar on the current page, highlighted code lines, the words a search found, the bar on a primary button |
 | `background` | The page |
 | `surface` | Code blocks, inline code, hovered items |
 | `text` | Body text |

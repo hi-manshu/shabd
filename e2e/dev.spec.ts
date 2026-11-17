@@ -17,6 +17,28 @@ test.describe('hot updates', () => {
     expect(await stillThere()).toBe(true)
   })
 
+  test('a page that carries the marks of a search result still updates in place', async ({ page, site, problems }) => {
+    await open(page, `${DEV}/guide/intro`)
+    await page.locator('.sb-search-button').click()
+    const dialog = page.locator('dialog.sb-search')
+    await dialog.getByRole('combobox').fill('wombats')
+    await expect(dialog.locator('.sb-search-hit')).toHaveCount(1)
+    await dialog.getByRole('combobox').press('Enter')
+    await expect(page).toHaveURL(`${DEV}/guide/long-read#the-keepers-log`)
+    const marked = () => page.evaluate(() => [...(CSS.highlights.get('sb-search') ?? [])].map((range) => String(range)))
+    await expect.poll(marked).toEqual(['wombats'])
+    const stillThere = await markPage(page)
+
+    // The marks are ranges over the page's text, not elements in it: React has nothing of theirs to reconcile.
+    await site.edit('content/guide/long-read.md', (text) => text.replace('He was right twice.', 'He was right three times.'))
+    await expect(page.getByText('He was right three times.')).toBeVisible()
+    expect(await stillThere()).toBe(true)
+    // A hot update renders the body again. The text that was marked is gone, and the marks go with it.
+    expect(await marked()).toEqual([])
+    expect(await page.evaluate(() => Math.round(window.scrollY))).toBeGreaterThan(500)
+    expect(problems).toEqual([])
+  })
+
   test('frontmatter edits change the layout of the page on screen', async ({ page, site }) => {
     await open(page, `${DEV}/guide/intro`)
     const stillThere = await markPage(page)

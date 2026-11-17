@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { queryTerms, type SearchHit } from '../../shared/search-core.js'
+import { passageTarget } from '../../shared/passage.js'
+import { wordsToMark, type SearchHit } from '../../shared/search-core.js'
 import { Icon } from '../app/icons.js'
 import { useRouter } from '../app/router.js'
 import { useSite, useStore } from '../app/store.js'
@@ -9,13 +10,9 @@ import { openSearch, runSearch, searchStatus, type SearchResults, type SearchSta
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-/**
- * `text` with the words of the query marked. Words are matched from their
- * first letter, and very short ones ("a", "to") are skipped: marking them
- * lights up half the excerpt and says nothing about why it matched.
- */
+/** `text` with the words of the query marked. Words are matched from their first letter. */
 function Highlighted({ text, query }: { text: string; query: string }) {
-  const words = queryTerms(query).filter((word) => word.length > 2)
+  const words = wordsToMark(query)
   if (words.length === 0) return <>{text}</>
   const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(${words.map(escapeRegExp).join('|')})`, 'giu')
   const parts = text.split(pattern)
@@ -52,6 +49,8 @@ export default function SearchDialog() {
 
   useEffect(() => {
     openSearch()
+    // The page a result leads to needs this the moment it is shown, so it is fetched while the reader types.
+    void import('./passage.js').catch(() => {})
     const element = dialog.current
     if (element && !element.open) element.showModal()
   }, [])
@@ -89,6 +88,12 @@ export default function SearchDialog() {
   const hits = results?.hits ?? []
   const target = (hit: SearchHit) => href(hit.doc.path) + (hit.doc.anchor ? `#${hit.doc.anchor}` : '')
 
+  /** Go to a result. The address is its section's; the passage and the words to mark travel beside it. */
+  const go = (hit: SearchHit) => {
+    close()
+    void router.navigate(target(hit), { passage: passageTarget(hit.doc.text, wordsToMark(results?.query ?? '')) })
+  }
+
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Escape') {
       // Some browsers use Escape to clear a field first. Here it always closes search.
@@ -102,9 +107,18 @@ export default function SearchDialog() {
       const hit = hits[active]
       if (!hit) return
       event.preventDefault()
-      close()
-      void router.navigate(target(hit))
+      go(hit)
     }
+  }
+
+  const onHitClick = (event: React.MouseEvent, hit: SearchHit) => {
+    // A click that asks for a new tab or window is the browser's to follow, to the section's heading.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      close()
+      return
+    }
+    event.preventDefault()
+    go(hit)
   }
 
   return (
@@ -152,7 +166,7 @@ export default function SearchDialog() {
                 aria-selected={index === active}
                 className="sb-search-hit"
                 href={target(hit)}
-                onClick={close}
+                onClick={(event) => onHitClick(event, hit)}
                 onMouseMove={() => setActive(index)}
               >
                 <span className="sb-search-hit-where">

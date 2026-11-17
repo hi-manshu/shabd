@@ -33,6 +33,22 @@ When a reader opens search:
 A result that matched by meaning alone is labelled "Related", so it is clear why a section without the typed words is
 on the list.
 
+## Where a result leads
+
+A result's address is its section's: `/guide/installation#create-a-site`. Choosing a result does more than follow
+that address. The page opens at the passage that matched, with the words of the query marked in it.
+
+- In a short section the passage is the whole section, so the page opens at the heading, with the marks under it.
+  In a long section it opens where the passage starts, however far under the heading that is. If the first marked
+  word would still be out of sight, as it can be under a long code sample, the page moves to that word.
+- The marks stay until you press <kbd>Esc</kbd> or go somewhere else, and another heading of the same page counts
+  as somewhere else. They are still there after a reload. They do not come back when you return with the back
+  button.
+- The passage and the words travel in the browser's history, not in the address. So the address stays one you can
+  share, and a copied link, or a result opened in a new tab, leads to the heading.
+- The marks are drawn with the CSS Custom Highlight API, in the theme's `highlight` colour, and add nothing to the
+  page's markup. A browser without the API goes to the passage and marks nothing.
+
 ## Setup
 
 Keyword search needs nothing. For semantic search, install Transformers.js in the site:
@@ -146,4 +162,8 @@ If the package is missing, or the database cannot be opened, search uses the mem
   Chinese and Japanese, are matched by meaning but poorly by keyword.
 - Vectors are compared with a plain scan in both stores, not an approximate index. At 20,000 sections that is 19 ms
   in the memory store and 72 ms in the SQLite store.
-- Keyword, semantic and SQLite search were each run in Chromium, Firefox and WebKit.
+- A passage is found on the page by its words, so it is found only where the page shows them as text. Words in a
+  tab that is not open, or under a folded `<details>`, cannot be scrolled to or marked: the page then opens at the
+  section's heading. That case has no test.
+- Keyword, semantic and SQLite search were each run in Chromium, Firefox and WebKit. So was going to a passage and
+  marking it: all three have the Custom Highlight API, and the path without it was run by taking the API away.

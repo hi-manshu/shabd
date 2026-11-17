@@ -1,4 +1,5 @@
 /** A production build, served the way a static host serves it. */
+import type { Page } from '@playwright/test'
 import { BUILT, expect, markPage, open, regions, test } from './support/fixtures.js'
 
 test.describe('prerendered pages', () => {
@@ -171,6 +172,132 @@ test.describe('search', () => {
     await expect(hits.nth(1)).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('ArrowUp')
     await expect(hits.nth(0)).toHaveAttribute('aria-selected', 'true')
+  })
+
+  /** The words marked on the page, as written there. */
+  const marked = (page: Page) =>
+    page.evaluate(() => [...(CSS.highlights?.get('sb-search') ?? [])].map((range) => String(range)))
+
+  /** Search for the word that one passage of the long section holds, and take the only result. */
+  const findWombats = async (page: Page, choose: 'Enter' | 'click') => {
+    await page.locator('.sb-search-button').click()
+    const dialog = page.locator('dialog.sb-search')
+    await dialog.getByRole('combobox').fill('wombats')
+    const hits = dialog.locator('.sb-search-hit')
+    await expect(hits).toHaveCount(1)
+    await expect(hits.first()).toContainText("The keeper's log")
+    if (choose === 'Enter') await dialog.getByRole('combobox').press('Enter')
+    else await hits.first().click()
+    await expect(dialog).toHaveCount(0)
+  }
+
+  test('a result leads to the passage that matched, with the words of the query marked', async ({ page, problems }) => {
+    await open(page, `${BUILT}/guide/intro`)
+    const address = `${BUILT}/guide/long-read#the-keepers-log`
+    const heading = page.locator('#the-keepers-log')
+    const sentence = page.getByText('three wombats were found asleep in the coal store')
+
+    // The section is indexed as five passages, and the word is in the fourth: some forty lines under the heading.
+    await findWombats(page, 'Enter')
+    // The address is the section's, and says nothing of the passage or the query.
+    await expect(page).toHaveURL(address)
+    await expect.poll(() => marked(page)).toEqual(['wombats'])
+    await expect(sentence).toBeInViewport()
+    await expect(heading).not.toBeInViewport()
+
+    // The mark is drawn in the theme's highlight colour, and the word it is on can be seen.
+    const mark = await page.evaluate(() => {
+      const [range] = CSS.highlights.get('sb-search')!
+      const box = (range as Range).getBoundingClientRect()
+      const probe = document.body.appendChild(document.createElement('i'))
+      probe.style.backgroundColor = 'var(--sb-highlight-soft)'
+      const token = getComputedStyle(probe).backgroundColor
+      probe.remove()
+      return {
+        colour: getComputedStyle(document.querySelector('.sb-content')!, '::highlight(sb-search)').backgroundColor,
+        token,
+        visible: box.top >= 0 && box.bottom <= window.innerHeight && box.width > 0,
+      }
+    })
+    expect(mark.colour).toBe(mark.token)
+    expect(mark.colour).not.toBe('rgba(0, 0, 0, 0)')
+    expect(mark.visible).toBe(true)
+
+    // Escape clears the marks for good: a reload shows the section from its heading, as its address says.
+    await page.keyboard.press('Escape')
+    expect(await marked(page)).toEqual([])
+    await page.reload()
+    await expect(page.locator('html[data-shabd="ready"]')).toBeAttached()
+    await expect(heading).toBeInViewport()
+    expect(await marked(page)).toEqual([])
+
+    // A click on a result does what Enter does. Left alone, the marks are still there after a reload.
+    await findWombats(page, 'click')
+    await expect(page).toHaveURL(address)
+    await expect.poll(() => marked(page)).toEqual(['wombats'])
+    await page.reload()
+    await expect(page.locator('html[data-shabd="ready"]')).toBeAttached()
+    await expect.poll(() => marked(page)).toEqual(['wombats'])
+    await expect(sentence).toBeInViewport()
+    await expect(heading).not.toBeInViewport()
+
+    // They go with the next navigation, and coming back does not bring them again.
+    await page.locator('.sb-region-sidebar').getByRole('link', { name: 'Introduction' }).click()
+    await expect(page).toHaveURL(`${BUILT}/guide/intro`)
+    expect(await marked(page)).toEqual([])
+    await page.goBack()
+    await expect(page).toHaveURL(address)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('A long read')
+    expect(await marked(page)).toEqual([])
+    expect(problems).toEqual([])
+  })
+
+  test('a browser without the Custom Highlight API goes to the passage and marks nothing', async ({ page }) => {
+    await page.addInitScript(() => {
+      delete (window as { Highlight?: unknown }).Highlight
+    })
+    await open(page, `${BUILT}/guide/intro`)
+    expect(await page.evaluate(() => typeof Highlight)).toBe('undefined')
+
+    await findWombats(page, 'Enter')
+    await expect(page).toHaveURL(`${BUILT}/guide/long-read#the-keepers-log`)
+    await expect(page.getByText('three wombats were found asleep in the coal store')).toBeInViewport()
+    await expect(page.locator('#the-keepers-log')).not.toBeInViewport()
+    expect(await marked(page)).toEqual([])
+  })
+
+  test('where the passage is taller than the window, the first marked word is brought into view', async ({ page }) => {
+    // The word is some seven lines into its passage. In a window this short, the start of the passage alone would hide it.
+    await page.setViewportSize({ width: 1280, height: 230 })
+    await open(page, `${BUILT}/guide/intro`)
+    await findWombats(page, 'Enter')
+    await expect.poll(() => marked(page)).toEqual(['wombats'])
+
+    const seen = await page.evaluate(() => {
+      const [range] = CSS.highlights.get('sb-search')!
+      const box = (range as Range).getBoundingClientRect()
+      const header = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop)
+      return box.top >= header && box.bottom <= window.innerHeight
+    })
+    expect(seen).toBe(true)
+  })
+
+  test('a result in a short section leads to its heading, with the words marked under it', async ({ page }) => {
+    await open(page, `${BUILT}/guide/intro`)
+    await page.locator('.sb-search-button').click()
+    const dialog = page.locator('dialog.sb-search')
+    await dialog.getByRole('combobox').fill('pelicans')
+    await expect(dialog.locator('.sb-search-hit')).toHaveCount(1)
+    await dialog.getByRole('combobox').press('Enter')
+
+    await expect(page).toHaveURL(`${BUILT}/guide/setup#second-step`)
+    await expect(page.locator('#second-step')).toBeInViewport()
+    await expect.poll(() => marked(page)).toEqual(['Pelicans'])
+
+    // A link to another heading of the same page is a navigation too: the marks go.
+    await page.locator('.sb-toc').getByRole('link', { name: 'First step' }).click()
+    await expect(page).toHaveURL(`${BUILT}/guide/setup#first-step`)
+    await expect.poll(() => marked(page)).toEqual([])
   })
 })
 

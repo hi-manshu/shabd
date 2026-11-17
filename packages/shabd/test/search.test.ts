@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { chunkPage, embeddingInput } from '../src/node/search/chunk.js'
+import { locatePassage, passageTarget } from '../src/shared/passage.js'
 import {
   fuseRanks,
   KeywordIndex,
@@ -10,6 +11,8 @@ import {
   search,
   similarities,
   tokenize,
+  wordSpans,
+  wordsToMark,
   type SearchDoc,
 } from '../src/shared/search-core.js'
 
@@ -43,6 +46,18 @@ describe('tokenize', () => {
     expect(queryTerms('how do I change the colours ')).toEqual(['change', 'colours'])
     expect(queryTerms('change the')).toEqual(['change', 'the'])
     expect(queryTerms('the')).toEqual(['the'])
+  })
+
+  it('says where each word is in the text it came from', () => {
+    const text = 'Café-au-lait, 2 cups!'
+    const spans = wordSpans(text)
+    expect(spans.map((span) => span.token)).toEqual(tokenize(text))
+    expect(spans.map((span) => text.slice(span.start, span.end))).toEqual(['Café', 'au', 'lait', '2', 'cups'])
+  })
+
+  it('marks the words of a query that say why a result matched, not the very short ones', () => {
+    expect(wordsToMark('how do I change the colours')).toEqual(['change', 'colours'])
+    expect(wordsToMark('go to it')).toEqual([])
   })
 })
 
@@ -170,5 +185,58 @@ describe('chunking', () => {
     // Each passage starts 160 words after the previous one, so 40 words overlap.
     expect(passages[1]!.text.startsWith('w160 ')).toBe(true)
     expect(passages.at(-1)!.text.endsWith(' w449')).toBe(true)
+  })
+})
+
+describe('finding a passage in its section', () => {
+  const page = { path: '/guide', title: 'Guide', description: '' }
+  const section = Array.from({ length: 450 }, (_, i) => `w${i}`)
+  const passages = chunkPage(page, [{ anchor: 'long', heading: 'Long', depth: 2, text: section.join(' ') }])
+    .filter((unit) => unit.anchor === 'long')
+    .map((unit) => tokenize(unit.text))
+
+  it('finds each passage by its first and last word', () => {
+    expect(passages.map((passage) => locatePassage(section, passage))).toEqual([
+      { first: 0, last: 199 },
+      { first: 160, last: 359 },
+      { first: 320, last: 449 },
+    ])
+  })
+
+  it('is not thrown by words the page shows and the index never saw, or the other way round', () => {
+    // The label of a code block and its copy button, in the middle of the passage.
+    const withLabels = [...section.slice(0, 200), 'ts', 'copy', ...section.slice(200)]
+    expect(locatePassage(withLabels, passages[1]!)).toEqual({ first: 160, last: 361 })
+    // A title before every tenth word, as a row of cards has.
+    const withTitles = section.flatMap((word, index) => (index % 10 === 0 ? ['card', 'title', word] : [word]))
+    expect(locatePassage(withTitles, passages[1]!)).toEqual({
+      first: withTitles.indexOf('w160'),
+      last: withTitles.indexOf('w359'),
+    })
+    // The code of a live sandbox, sixty words of it, which the page keeps in a text field where it is not text.
+    const withoutCode = [...section.slice(0, 220), ...section.slice(280)]
+    expect(locatePassage(withoutCode, passages[1]!)).toEqual({ first: 160, last: 299 })
+  })
+
+  it('tells a passage from an earlier one that opens with the same words', () => {
+    const refrain = tokenize('the same few words arranged in a slightly different order')
+    const before = Array.from({ length: 300 }, (_, i) => `before${i}`)
+    const after = Array.from({ length: 150 }, (_, i) => `after${i}`)
+    const words = [...refrain, ...before, ...refrain, ...after]
+    expect(locatePassage(words, [...refrain, ...after])).toEqual({ first: 310, last: 469 })
+  })
+
+  it('says so when the section does not hold the passage', () => {
+    expect(locatePassage(section, tokenize('none of these words are in the section at all'))).toBeNull()
+    // A few words in common are not a passage.
+    expect(locatePassage(section, [...tokenize('ten words that the section has never had in it'), 'w7', 'w8'])).toBeNull()
+    expect(locatePassage([], passages[0]!)).toBeNull()
+    expect(locatePassage(section, [])).toBeNull()
+  })
+
+  it('carries a passage of ordinary length whole, and cuts one that is far longer', () => {
+    const text = section.slice(0, 200).join(' ')
+    expect(passageTarget(text, ['w1'])).toEqual({ text, words: ['w1'] })
+    expect(passageTarget('x'.repeat(100_000), []).text.length).toBeLessThan(10_000)
   })
 })
