@@ -264,6 +264,93 @@ describe('markdown pipeline', () => {
   })
 })
 
+describe('HTML in a Markdown page', () => {
+  it('is rendered, where it used to be left out without a word', async () => {
+    const result = await compiler.compile(
+      page(
+        [
+          'Press <kbd>Ctrl</kbd> and <kbd>S</kbd>.',
+          '',
+          '<details>',
+          '<summary>More about saving</summary>',
+          '',
+          'The file is **written** at once.',
+          '',
+          '</details>',
+          '',
+          'H<sub>2</sub>O, and a line<br>break.',
+        ].join('\n'),
+      ),
+    )
+    const html = await renderCompiled(result.code)
+    expect(html).toContain('Press <kbd>Ctrl</kbd> and <kbd>S</kbd>.')
+    expect(html).toContain('<summary>More about saving</summary>')
+    // Markdown inside the block is still Markdown.
+    expect(html).toContain('<p>The file is <strong>written</strong> at once.</p>')
+    expect(html).toContain('H<sub>2</sub>O, and a line<br/>break.')
+    // What was in the tags is searched like the rest of the page.
+    expect(result.sections[0]?.text).toContain('More about saving')
+  })
+
+  it('is treated like the Markdown it stands in for: a heading gets its id, and a link is rewritten', async () => {
+    const result = await compiler.compile(
+      page('<h2>Written as a tag</h2>\n\n<a href="./other.md#part">Elsewhere</a> and <img src="/logo.svg" alt="The logo">\n'),
+    )
+    const html = await renderCompiled(result.code)
+    expect(html).toContain('<h2 id="written-as-a-tag">Written as a tag</h2>')
+    expect(html).toContain('<a href="/guide/other#part">Elsewhere</a>')
+    expect(result.toc).toEqual([{ depth: 2, id: 'written-as-a-tag', text: 'Written as a tag' }])
+    expect(result.links).toEqual(['/guide/other#part'])
+    // A picture written as a tag that has its alternative text is not one to report.
+    expect(result.unlabelled).toEqual([])
+  })
+
+  it('leaves a page\'s callouts, code options and sandboxes as they were, though the page is read again as HTML', async () => {
+    const result = await compiler.compile(
+      page(
+        [
+          'Press <kbd>Ctrl</kbd>.',
+          '',
+          '> [!WARNING] Back up first',
+          '> It rewrites files.',
+          '',
+          '```ts title="src/app.ts" {2} ins={1}',
+          'const a = 1',
+          'const b = 2',
+          '```',
+          '',
+          '```tsx live group="demo"',
+          '<button>Hi</button>',
+          '```',
+        ].join('\n'),
+      ),
+    )
+    const html = await renderCompiled(result.code)
+    expect(html).toContain('<kbd>Ctrl</kbd>')
+    // An HTML parser would put the component's name in lower case, where nothing answers to it.
+    expect(html).toContain('<aside data-callout="warning" data-title="Back up first">')
+    // What follows a fence's language is kept beside the tree, where an HTML parser would lose it.
+    expect(html).toContain('data-title="src/app.ts"')
+    expect(html).toContain('class="line sb-line-ins"')
+    expect(html).toContain('class="line sb-line-highlight"')
+    expect(html).toContain('<div data-sandbox="tsx" data-group="demo">')
+    // Nothing of the round trip is left on the page.
+    expect(html).not.toMatch(/sb-component|data-sb-/)
+  })
+
+  it('notes a tag written like a component, which a .md page cannot have', async () => {
+    const source = 'Text.\n\n<Tabs>\n<Tab label="npm">Use npm.</Tab>\n</Tabs>\n\nAnd `<Card>` in code is only code.\n'
+    const result = await compiler.compile(page(source))
+    expect(result.strays).toEqual([
+      { name: 'Tabs', line: 3 },
+      { name: 'Tab', line: 4 },
+    ])
+    // The same text in an .mdx page is components, and nothing is noted.
+    const mdx = await compiler.compile(page(source, { format: 'mdx', file: '/site/content/guide/page.mdx', id: 'guide/page.mdx' }))
+    expect(mdx.strays).toEqual([])
+  })
+})
+
 describe('code fence meta', () => {
   it('parses titles, line ranges, flags and attributes', () => {
     const meta = parseCodeMeta('title="a b.ts" {1,3-5} live group=cart showLineNumbers')

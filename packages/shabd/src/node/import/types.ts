@@ -46,7 +46,6 @@ export const MESSAGES = {
     `\`<${name}>\` is not a component Shabd has. The page does not render until it is replaced, or the component is registered under \`components:\` in shabd.config.yaml.`,
   imported: (from: string) =>
     `An import from ${from}, which the new site cannot resolve. Remove the line, and register the component under \`components:\` if the page still uses it.`,
-  html: 'HTML in a .md page, which Shabd does not render. Write the page as .mdx to keep it.',
   headingId: (id: string) => `The heading id \`${id}\` is not kept: Shabd names a heading after its text. Links to #${id} need the new name.`,
   collapsible: 'A block that opens and closes is written as a callout, which is always open.',
   container: (name: string) => `A \`:::${name}\` block has no counterpart in Shabd, and is left as it is.`,

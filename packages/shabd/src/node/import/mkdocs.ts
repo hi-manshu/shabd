@@ -14,7 +14,7 @@ import { parseDocument } from 'yaml'
 import { asString, isRecord } from './evaluate.js'
 import { convertPage } from './frontmatter.js'
 import { firstExisting, isPage, isUrl, listFiles, pathFrom, routeOf, socialName, splitUrl } from './site.js'
-import { alert, dropHeadingIds, makeMdxSafe, mapFences, markCode, noteHtml, spaceBlocks, tabs, type Alert, type Line } from './text.js'
+import { alert, dropHeadingIds, makeMdxSafe, mapFences, markCode, spaceBlocks, tabs, type Alert, type Line } from './text.js'
 import { MESSAGES, type Conversion, type FileNote, type NavItem, type Note, type Relink, type SiteInput, type SourcePage, type SourceSite } from './types.js'
 
 /* ──────────────────────────────── pages ─────────────────────────────── */
@@ -154,8 +154,6 @@ export function convertMkdocsPage(source: string, options: { links?: Relink | un
         const safe = makeMdxSafe(out)
         out = safe.lines
         for (let count = 0; count < safe.comments; count++) notes.push({ kind: 'converted', what: 'comment' })
-      } else {
-        noteHtml(out, notes)
       }
       out = convertBlocks(markCode(out), notes)
       out = mapFences(markCode(out), (info, line) => {

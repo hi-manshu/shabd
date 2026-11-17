@@ -27,7 +27,6 @@ import {
   containerAlert,
   convertContainers,
   filterImports,
-  noteHtml,
   rewriteTags,
   spaceBlocks,
   stringValue,
@@ -179,8 +178,6 @@ export function convertStarlightPage(source: string, format: 'md' | 'mdx', optio
               return undefined
           }
         })
-      } else {
-        noteHtml(out, notes)
       }
       out = convertContainers(out, (container) => containerAlert(container, ALERTS, PLAIN, notes))
       return { lines: spaceBlocks(out), mdx: format === 'mdx' }

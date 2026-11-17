@@ -58,6 +58,18 @@ describe('the rules a site sets', () => {
     ])
   })
 
+  it('warn about a component in a .md page, where it is an element the browser does not know', async () => {
+    const dir = await site({
+      'shabd.config.yaml': 'site:\n  title: Docs\n',
+      'content/index.md': '# Home\n\n<Tabs>\n<Tab label="npm">Use npm.</Tab>\n</Tabs>\n\nPress <kbd>Ctrl</kbd>.\n',
+    })
+    const { problems } = await collectProblems(await createContext(dir, { dev: false }))
+    expect(lines(problems)).toEqual([
+      'warning component content/index.md:3 <Tabs> is written like a component, and components only work in .mdx pages. Here it is an HTML element the browser does not know. Name the file .mdx.',
+      'warning component content/index.md:4 <Tab> is written like a component, and components only work in .mdx pages. Here it is an HTML element the browser does not know. Name the file .mdx.',
+    ])
+  })
+
   it('say where a broken link is written', async () => {
     const dir = await site({
       'shabd.config.yaml': 'site:\n  title: Docs\n',

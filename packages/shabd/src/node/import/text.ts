@@ -497,11 +497,6 @@ export function dropHeadingIds(lines: Line[], notes: Note[]): Line[] {
   })
 }
 
-/** One note for every line of a page that holds HTML: in a .md page Shabd leaves it out. */
-export function noteHtml(lines: Line[], notes: Note[]): void {
-  for (const line of linesWithMarkup(lines)) notes.push({ kind: 'manual', message: MESSAGES.html, line: line.number })
-}
-
 /* ───────────────────────── HTML and MDX safety ──────────────────────── */
 
 const HTML_TAGS = new Set(
@@ -516,16 +511,6 @@ const VOID_TAGS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'i
 
 /** A tag a browser or MDX would act on, as opposed to `<placeholder>` text in a sentence. */
 const isMarkup = (tag: Tag) => HTML_TAGS.has(tag.name.toLowerCase()) || /^[A-Z]/.test(tag.name)
-
-/** The lines of a page that hold HTML or a component, outside code. */
-export function linesWithMarkup(lines: Line[]): Line[] {
-  const found = new Set<Line>()
-  const seen = rewriteTags(lines, (tag, line) => {
-    if (isMarkup(tag)) found.add(line)
-    return undefined
-  })
-  return seen.filter((line) => found.has(line))
-}
 
 /** `color: red; font-size: 12px` as the object React asks for. */
 function styleObject(css: string): string {

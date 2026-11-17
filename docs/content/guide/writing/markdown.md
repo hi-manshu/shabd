@@ -126,6 +126,41 @@ things too: a template in a code sample, an expression in MDX. A name that is ne
 To keep a code sample as it is written, add `noVars` after its language. To write the braces themselves in prose,
 put a backslash before each one.
 
+## HTML
+
+HTML can stand among the Markdown of a `.md` page, as it can on GitHub: a key, a line break, a section that folds
+away.
+
+```md
+Press <kbd>Ctrl</kbd> + <kbd>S</kbd> to save.
+
+<details>
+<summary>What is saved?</summary>
+
+The page as it is in the editor. **Markdown** inside the block is still Markdown, as long as an empty line
+separates it from the tags.
+
+</details>
+```
+
+Press <kbd>Ctrl</kbd> + <kbd>S</kbd> to save.
+
+<details>
+<summary>What is saved?</summary>
+
+The page as it is in the editor. **Markdown** inside the block is still Markdown, as long as an empty line
+separates it from the tags.
+
+</details>
+
+A link or a picture written as a tag is treated like one written in Markdown: a link to another page is rewritten
+to the page's address, and a heading gets its id and its place in the outline.
+
+HTML is not [components](./components.mdx). `<Tabs>` in a `.md` page reaches the browser as an element it does not
+know, and the tabs are not drawn. `shabd check` warns about a tag that is written like a component in a `.md`
+page; the remedy is to name the file `.mdx`. In an `.mdx` page a tag is JSX, which is stricter than HTML: every tag
+has to be closed.
+
 ## Diagrams
 
 With `markdown.mermaid` on, a fenced block with the language `mermaid` is drawn as a diagram by

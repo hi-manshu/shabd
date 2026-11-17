@@ -78,6 +78,15 @@ export async function collectProblems(context: ShabdContext, options: CheckOptio
       anchors.set(page.path, new Set(compiled.anchors))
       compiled.links.forEach((target, index) => links.push({ file, target, ...at(compiled.linkLines[index]) }))
       for (const link of compiled.external) external.push({ file, ...link })
+      for (const stray of compiled.strays) {
+        problems.push({
+          level: 'warning',
+          rule: 'component',
+          file,
+          ...at(stray.line),
+          message: `<${stray.name}> is written like a component, and components only work in .mdx pages. Here it is an HTML element the browser does not know. Name the file .mdx.`,
+        })
+      }
       if (rules.altText !== 'off') {
         for (const image of compiled.unlabelled) {
           problems.push({

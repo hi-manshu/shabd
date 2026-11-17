@@ -31,9 +31,11 @@ import { cacheKey, SlotCache } from './cache.js'
 import { initPageData, type PageData } from './page-data.js'
 import { CodeHighlighter, rehypeCode, type CodeOptions } from './plugins/rehype-code.js'
 import { rehypeHeadings } from './plugins/rehype-headings.js'
+import { rehypeHtml } from './plugins/rehype-html.js'
 import { rehypeLinks } from './plugins/rehype-links.js'
 import { rehypeSplit } from './plugins/rehype-split.js'
 import { remarkCallouts } from './plugins/remark-callouts.js'
+import { remarkHtml } from './plugins/remark-html.js'
 import { remarkLiftTitle } from './plugins/remark-lift-title.js'
 import type { UserPlugins } from './user-plugins.js'
 
@@ -80,6 +82,8 @@ export interface CompiledPage {
   /** Links to other sites, and pictures with no alternative text: what `shabd check` asks about. */
   external: PageData['external']
   unlabelled: PageData['unlabelled']
+  /** Tags in a `.md` page that are written like components. */
+  strays: PageData['strays']
   /** Heading ids on this page. */
   anchors: string[]
   /** The colours of the page's code tokens, as a stylesheet. The page module exports it. */
@@ -180,6 +184,7 @@ export class MarkdownCompiler {
       linkLines: data.linkLines,
       external: data.external,
       unlabelled: data.unlabelled,
+      strays: data.strays,
       anchors: data.anchors,
       codeCss: data.codeCss,
     }
@@ -189,15 +194,21 @@ export class MarkdownCompiler {
     let processor = this.#processors.get(format)
     if (!processor) {
       const user = this.options.plugins
+      // HTML written in a .md page is text to the MDX compiler, which would leave it out of the page
+      // without a word. It is read as HTML here, before anything else looks at the page, so that a
+      // heading written as a tag gets its id and a link written as one is rewritten like any other.
+      // An .mdx page has none of it to read: there a tag is JSX from the start.
+      const html = format === 'md' ? { remark: [remarkHtml], rehype: [rehypeHtml] } : { remark: [], rehype: [] }
       processor = createProcessor({
         format,
         jsxImportSource: 'react',
         providerImportSource: MDX_COMPONENTS_ID,
         // The site's plugins are loaded by name, so all that is known of one is that it is a function.
-        remarkPlugins: [remarkFrontmatter, remarkGfm, remarkLiftTitle, remarkCallouts, ...(user?.remark ?? [])] as NonNullable<
+        remarkPlugins: [remarkFrontmatter, remarkGfm, remarkLiftTitle, remarkCallouts, ...html.remark, ...(user?.remark ?? [])] as NonNullable<
           Parameters<typeof createProcessor>[0]
         >['remarkPlugins'],
         rehypePlugins: [
+          ...html.rehype,
           // First, while the page is still as its author wrote it: the outline, what is searched, the links.
           rehypeHeadings,
           rehypeLinks,

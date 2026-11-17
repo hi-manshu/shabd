@@ -25,7 +25,6 @@ import {
   makeMdxSafe,
   mapFences,
   markCode,
-  noteHtml,
   rewriteTags,
   spaceBlocks,
   stringValue,
@@ -129,10 +128,24 @@ export function convertVitepressPage(source: string, options: { links?: Relink |
       const mdx = features.length > 0 || lines.some(isGroup)
       let out = options.links ? options.links(lines, notes) : lines
 
+      // A Vue page keeps its script and its styles in blocks of their own. Shabd renders the HTML of a
+      // page, so a block left in would reach the browser as a script it cannot run. They are left out.
+      let vueBlock: string | undefined
+      out = out.filter((line) => {
+        if (line.code) return true
+        if (vueBlock === undefined) {
+          const opening = /^<(script|style)[\s>]/.exec(line.text)?.[1]
+          if (opening === undefined) return true
+          notes.push({ kind: 'manual', message: 'A `<script>` or `<style>` block was left out: Vue code does not run in Shabd.', line: line.number })
+          vueBlock = opening
+        }
+        if (line.text.includes(`</${vueBlock}>`)) vueBlock = undefined
+        return false
+      })
+
       for (const line of out) {
         if (line.code) continue
-        if (/^<(script|style)[\s>]/.test(line.text)) notes.push({ kind: 'manual', message: 'A `<script>` or `<style>` block. Vue code does not run in Shabd, and the block is not drawn.', line: line.number })
-        else if (/\{\{.*\}\}/.test(line.text)) notes.push({ kind: 'manual', message: 'A Vue expression (`{{ … }}`) is written out as it is: Shabd does not evaluate it.', line: line.number })
+        if (/\{\{.*\}\}/.test(line.text)) notes.push({ kind: 'manual', message: 'A Vue expression (`{{ … }}`) is written out as it is: Shabd does not evaluate it.', line: line.number })
         else if (/^<<<\s|<!--\s*@include:/.test(line.text)) notes.push({ kind: 'manual', message: 'A file included from elsewhere is not included by Shabd. Paste the text in.', line: line.number })
       }
       out = dropHeadingIds(out, notes)
@@ -150,8 +163,6 @@ export function convertVitepressPage(source: string, options: { links?: Relink |
           if (/^[A-Z]/.test(tag.name) && tag.name !== 'Badge' && !tag.closing) notes.push({ kind: 'manual', message: MESSAGES.component(tag.name), line: line.number })
           return undefined
         })
-      } else {
-        noteHtml(out, notes)
       }
 
       out = convertContainers(markCode(out), (container) => {

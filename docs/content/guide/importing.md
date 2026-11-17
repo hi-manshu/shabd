@@ -159,7 +159,9 @@ Starlight's `<Card>`, `<CardGrid>`, `<LinkCard>`, `<Badge>` and `<Aside>` become
 Shabd has [components of those names](./writing/components.mdx#steps) that wrap the same lists.
 
 VitePress's `<Badge>` becomes Shabd's in a page that is written as `.mdx` for its tabs or its cards. In a page that
-stays `.md` it is HTML, and is listed as such.
+stays `.md` it is left as it is, where it is not a component: Shabd's check, which runs at the end, warns about it.
+
+HTML in a page that stays `.md` is kept as it is. Shabd [renders it](./writing/markdown.md#html).
 
 ## Navigation
 
@@ -200,17 +202,14 @@ Imported a MkDocs site into your-site-shabd
   Converted   1 tab group, 1 callout
   Navigation  From `nav:` in mkdocs.yml.
 
-Needs a hand (2 places)
-
-  HTML in a .md page, which Shabd does not render. Write the page as .mdx to keep it.
-    content/index.md:8
+Needs a hand (1 place)
 
   A block that opens and closes is written as a callout, which is always open.
     content/index.md:5
 
 What `shabd check` says about the new site
 
-  error  content/index.md  Broken link: no page at /missing
+  error  content/index.md:12  Broken link: no page at /missing
 
   2 pages checked: 1 error, 0 warnings
 ```
@@ -224,10 +223,8 @@ command exits with 1 when the check finds an error. The site has been written ei
 - **Components Shabd does not have.** They are left in the page and listed. A page with one does not render until
   the component is replaced, or registered under [`components:`](./writing/components.mdx#your-own-components).
   `import` lines for components of your own are left too, and the new site cannot resolve them.
-- **HTML in a `.md` page.** Shabd does not render it. Every line that has some is listed, so that you can write the
-  page as `.mdx` where it matters.
-- **Vue in VitePress pages.** `<script setup>`, `{{ expressions }}`, included files and `<<<` snippets are not
-  converted.
+- **Vue in VitePress pages.** A `<script>` or `<style>` block is left out, and listed. `{{ expressions }}`, included
+  files and `<<<` snippets are left as they are written.
 - **MkDocs extensions.** Snippets (`--8<--`) and macros are listed and not expanded. Icon shortcodes and attribute
   lists other than heading ids are left as text. What plugins add to a page is not imported.
 - **Heading ids.** `## Install {#setup}` loses its id, because Shabd names a heading after its text. Where that

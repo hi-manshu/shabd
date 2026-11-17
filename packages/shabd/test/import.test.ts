@@ -1291,14 +1291,12 @@ describe('converting pages', () => {
     await expect(compile(convertMkdocsPage(source).text)).resolves.toMatchObject({ cached: false })
     await expect(compile(source)).rejects.toThrow()
 
-    // A page that stays Markdown keeps its HTML, and each line of it is reported: Shabd would leave it out.
+    // A page that stays Markdown keeps its HTML as it is. Shabd renders it, so there is nothing to report.
     const kept = convertVitepressPage(page('# Plain', '', '<img src="./a.png" width="200">', '', 'Press <kbd>Ctrl</kbd>, or `<kbd>` in code, or <https://x.example>.'))
     expect(kept.mdx).toBe(false)
     expect(kept.text).toContain('<img src="./a.png" width="200">')
-    expect(manual(kept)).toEqual([
-      '3: HTML in a .md page, which Shabd does not render. Write the page as .mdx to keep it.',
-      '5: HTML in a .md page, which Shabd does not render. Write the page as .mdx to keep it.',
-    ])
+    expect(kept.text).toContain('Press <kbd>Ctrl</kbd>')
+    expect(manual(kept)).toEqual([])
   })
 
   it('reports the components and imports it cannot convert, and keeps the ones Shabd is to have', () => {
@@ -1370,14 +1368,20 @@ describe('converting pages', () => {
       '13: `<DocCardList>` is not a component Shabd has. The page does not render until it is replaced, or the component is registered under `components:` in shabd.config.yaml.',
     ])
 
-    const vitepress = convertVitepressPage(page('<script setup>', 'const n = 1', '</script>', '', 'Count: {{ n }}', '', '<<< @/snippets/a.js'))
+    const vitepress = convertVitepressPage(
+      page('<script setup>', 'const n = 1', '</script>', '', 'Count: {{ n }}', '', '<style scoped>', 'p { color: red }', '</style>', '', '<<< @/snippets/a.js'),
+    )
     expect(manual(vitepress).map((note) => note.replace(/^\d+: /, ''))).toEqual([
-      'A `<script>` or `<style>` block. Vue code does not run in Shabd, and the block is not drawn.',
+      'A `<script>` or `<style>` block was left out: Vue code does not run in Shabd.',
+      'A `<script>` or `<style>` block was left out: Vue code does not run in Shabd.',
       'A Vue expression (`{{ … }}`) is written out as it is: Shabd does not evaluate it.',
       'A file included from elsewhere is not included by Shabd. Paste the text in.',
-      'HTML in a .md page, which Shabd does not render. Write the page as .mdx to keep it.',
-      'HTML in a .md page, which Shabd does not render. Write the page as .mdx to keep it.',
     ])
+    // Shabd renders the HTML of a page. A block of Vue left in would reach the browser as a script it cannot run.
+    expect(vitepress.text).not.toContain('<script')
+    expect(vitepress.text).not.toContain('const n = 1')
+    expect(vitepress.text).not.toContain('color: red')
+    expect(vitepress.text).toContain('Count: {{ n }}')
   })
 })
 

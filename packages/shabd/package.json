@@ -68,6 +68,7 @@
     "@modelcontextprotocol/sdk": "^1.32.2",
     "@vitejs/plugin-react": "^6.3.0",
     "github-slugger": "^2.0.0",
+    "hast-util-raw": "^9.2.0",
     "hast-util-to-string": "^3.0.1",
     "mdast-util-to-string": "^4.0.0",
     "picocolors": "^1.1.1",

@@ -36,6 +36,8 @@ export interface PageData {
   external: ({ url: string } & Located)[]
   /** Pictures with no alternative text. */
   unlabelled: ({ src: string } & Located)[]
+  /** Tags in a `.md` page that are written like components, which only work in `.mdx`. */
+  strays: ({ name: string } & Located)[]
   /** The colours of the page's code tokens, as a stylesheet. Empty when the page has no highlighted code. */
   codeCss: string
   /** Every heading id on the page, for checking `#fragment` links that point here. */
@@ -54,6 +56,7 @@ export function initPageData(file: VFile, input: Pick<PageData, 'liftTitle' | 'r
     linkLines: [],
     external: [],
     unlabelled: [],
+    strays: [],
     anchors: [],
     codeCss: '',
   }
