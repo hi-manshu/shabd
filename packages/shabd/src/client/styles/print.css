@@ -107,6 +107,8 @@
      * is, where inline code starts and ends.
      */
     .sb-line-highlight,
+    .sb-line-ins,
+    .sb-line-del,
     .sb-callout,
     .sb-badge,
     .sb-api-param,

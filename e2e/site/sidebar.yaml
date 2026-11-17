@@ -12,6 +12,7 @@
 - category: Play
   items:
     - play/sandbox
+    - play/writing
 - link: https://example.com
   label: Elsewhere
 # content/api and content/extras are not mentioned, so they are generated.

@@ -58,10 +58,35 @@ export function greet(name: string) {
 | --- | --- |
 | `title="…"` | Shows a file name above the code |
 | `{2,4-6}` | Highlights those lines |
+| `ins={2,4-6}`, `del={3}` | Marks those lines as added, or as removed: see [below](#lines-that-changed) |
 | `showLineNumbers` | Numbers the lines |
 | `wrap` | Wraps long lines instead of scrolling |
 | `noLineNumbers`, `noWrap` | Turn either off for this block when [the theme](../../configuration/theme.md#code) turns it on for all |
 | `noVars` | Leaves [variables](#variables) in this block as they are written |
+
+### Lines that changed
+
+To show a change, mark the lines that were added and the lines that were removed.
+
+````md
+```ts ins={3} del={2}
+export function greet(name: string) {
+  return 'Hello, ' + name
+  return `Hello, ${name}`
+}
+```
+````
+
+```ts ins={3} del={2}
+export function greet(name: string) {
+  return 'Hello, ' + name
+  return `Hello, ${name}`
+}
+```
+
+A marked line has a bar at its edge and a plus or a minus beside it, so the mark does not depend on telling two
+colours apart. Nothing is laid behind the text: the colours of code are checked for contrast against the
+background they are drawn on, and a tint behind a changed line would be one they were not checked on.
 
 ## Links
 

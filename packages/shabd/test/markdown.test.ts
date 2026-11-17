@@ -272,6 +272,23 @@ describe('code fence meta', () => {
     expect([...meta.flags]).toEqual(['live', 'showLineNumbers'])
     expect(meta.attrs).toEqual({ group: 'cart' })
   })
+
+  it('reads the lines that were added and removed, apart from the lines that are marked', () => {
+    const meta = parseCodeMeta('{1} ins={3, 5-6} del=2 title="a.ts" wrap')
+    expect(meta.highlight).toEqual([1])
+    expect(meta.inserted).toEqual([3, 5, 6])
+    expect(meta.deleted).toEqual([2])
+    expect(meta.title).toBe('a.ts')
+    expect([...meta.flags]).toEqual(['wrap'])
+    expect(meta.attrs).toEqual({})
+  })
+
+  it('marks added and removed lines with a class and nothing else', async () => {
+    const result = await compiler.compile(page('```ts ins={2} del={1}\nconst a = 1\nconst a = 2\nconst b = 3\n```\n'))
+    const html = await renderCompiled(result.code)
+    const classes = [...html.matchAll(/<span class="(line[^"]*)"/g)].map((match) => match[1])
+    expect(classes).toEqual(['line sb-line-del', 'line sb-line-ins', 'line'])
+  })
 })
 
 describe('resolvePageLink', () => {

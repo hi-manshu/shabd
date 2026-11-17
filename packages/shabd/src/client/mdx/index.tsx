@@ -12,10 +12,13 @@ import { lazy, Suspense, useSyncExternalStore, type ComponentProps, type Compone
 import { useSite } from '../app/store.js'
 import { Badge } from '../ui/Badge.js'
 import { Link, useHref } from '../ui/Link.js'
+import { Accordion } from './Accordion.js'
 import { Callout } from './Callout.js'
 import { Card, CardGrid } from './Card.js'
 import { CodeBlock } from './CodeBlock.js'
+import { FileTree } from './FileTree.js'
 import { heading } from './Heading.js'
+import { Steps } from './Steps.js'
 import { Tab, Tabs } from './Tabs.js'
 
 /** Wide tables scroll inside their own box instead of stretching the page. */
@@ -85,4 +88,7 @@ export const components: Record<string, ComponentType<any>> = {
   CardGrid,
   Tabs,
   Tab,
+  Steps,
+  FileTree,
+  Accordion,
 }

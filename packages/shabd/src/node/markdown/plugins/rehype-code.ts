@@ -170,6 +170,8 @@ export class CodeHighlighter {
     const highlighter = await this.#get()
     const lang = await this.#language(highlighter, block.lang)
     const highlighted = new Set(block.meta.highlight)
+    const inserted = new Set(block.meta.inserted)
+    const deleted = new Set(block.meta.deleted)
     const { flags } = block.meta
     const numbered = flags.has('showLineNumbers') || (this.options.lineNumbers === true && !flags.has('noLineNumbers'))
     const wrapped = flags.has('wrap') || (this.options.wrap === true && !flags.has('noWrap'))
@@ -189,6 +191,10 @@ export class CodeHighlighter {
           name: 'shabd',
           line(node, line) {
             if (highlighted.has(line)) this.addClassToHast(node, 'sb-line-highlight')
+            // A line that was added or removed is marked at its edge and with a sign. Nothing is laid behind
+            // its text, so the colours of its tokens are still drawn on what they were made readable on.
+            if (inserted.has(line)) this.addClassToHast(node, 'sb-line-ins')
+            else if (deleted.has(line)) this.addClassToHast(node, 'sb-line-del')
           },
           // Shiki writes a token's colour in each theme as inline variables. Swap them for a class.
           // A token in the themes' own foreground is marked plain instead, so that a site's theme
