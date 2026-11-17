@@ -382,3 +382,10 @@ test.describe('for agents', () => {
     expect(body.result.content[0]?.text).toContain('path: /guide/setup#second-step')
   })
 })
+
+test.describe('the document', () => {
+  test('carries the tags from site.head', async ({ request }) => {
+    const html = await (await request.get(`${BUILT}/guide/intro`)).text()
+    expect(html).toContain('<meta name="fixture-head" content="written by site.head">')
+  })
+})

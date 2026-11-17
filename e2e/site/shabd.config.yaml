@@ -8,6 +8,8 @@ site:
   nav:
     - { label: Guide, link: /guide/intro }
     - { label: API, link: /api/ping }
+  head:
+    - { tag: meta, attrs: { name: fixture-head, content: written by site.head } }
 
 theme:
   # Readers may switch to any preset; the site's own palette is the default one with one colour changed.

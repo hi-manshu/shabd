@@ -194,6 +194,47 @@
         },
         "footer": {
           "type": "string"
+        },
+        "head": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string",
+                "enum": [
+                  "meta",
+                  "link",
+                  "script",
+                  "style",
+                  "noscript"
+                ]
+              },
+              "attrs": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_:][A-Za-z0-9_:.-]*$"
+                },
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ]
+                }
+              },
+              "content": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tag"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "required": [

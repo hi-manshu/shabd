@@ -178,8 +178,10 @@ export class ContentStore {
     for (const page of this.pages()) {
       pages[page.path] = { id: page.id, path: page.path, title: page.title, description: page.description }
     }
+    // The tags for <head> are written into each document. Leaving them out here keeps them out of the script.
+    const { head: _head, ...site } = config.site
     return {
-      site: config.site,
+      site,
       colorMode: config.theme.colorMode,
       palettes: paletteChoices(config.theme),
       defaults: config.defaults,

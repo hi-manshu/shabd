@@ -2,7 +2,7 @@
  * The HTML document around the app. Used by the dev server (empty body,
  * client renders) and by the static build (prerendered body, client hydrates).
  */
-import type { ShabdConfig } from '../../shared/schema.js'
+import type { HeadTag, ShabdConfig } from '../../shared/schema.js'
 import { withBase } from '../../shared/paths.js'
 import { colorModeScript, themeBaseCss, themeToCss } from '../config/theme-css.js'
 
@@ -30,6 +30,26 @@ export interface DocumentOptions {
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 export const escapeHtml = (text: string) => text.replace(/[&<>"']/g, (char) => ESCAPES[char]!)
+
+/** A path inside the site: it starts with one slash. Such a path gets the site's base. */
+const SITE_PATH = /^\/(?!\/)/
+
+/**
+ * One of the site's own tags from `site.head`. Attribute values are escaped.
+ * The content of a script or a style is written as it is, which is why the
+ * schema refuses content that could close its own tag.
+ */
+export function renderHeadTag(tag: HeadTag, base: string): string {
+  const attrs = Object.entries(tag.attrs).flatMap(([name, value]) => {
+    if (value === false) return []
+    if (value === true) return [name]
+    const text = String(value)
+    const isAddress = name === 'href' || name === 'src'
+    return [`${name}="${escapeHtml(isAddress && SITE_PATH.test(text) ? withBase(base, text) : text)}"`]
+  })
+  const opening = `<${[tag.tag, ...attrs].join(' ')}>`
+  return tag.tag === 'meta' || tag.tag === 'link' ? opening : `${opening}${tag.content ?? ''}</${tag.tag}>`
+}
 
 export function pageTitle(config: ShabdConfig, title: string): string {
   return title && title !== config.site.title ? `${title} | ${config.site.title}` : config.site.title
@@ -65,6 +85,7 @@ export function renderDocument(options: DocumentOptions): string {
       ? `<style id="sb-theme">${themeBaseCss(theme)}</style>\n    <link rel="stylesheet" href="${escapeHtml(options.paletteStylesheet)}">`
       : `<style id="sb-theme">${themeToCss(theme)}</style>`,
     options.head,
+    ...site.head.map((tag) => renderHeadTag(tag, site.base)),
   ]
     .filter(Boolean)
     .join('\n    ')

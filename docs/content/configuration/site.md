@@ -62,6 +62,7 @@ with Shabd:
 | `social` | none | `{ github: https://… }`, or a list of `{ icon, href, label }` |
 | `nav` | none | Header links: a list of `{ label, link, badge }` |
 | `footer` | none | Text for the page footer |
+| `head` | none | Tags for the `<head>` of every page: see [head tags](#head-tags) |
 
 ### Logo
 
@@ -87,6 +88,34 @@ site:
 | `replacesTitle` | `false` | Show the logo without the site title beside it. The title becomes the image's `alt` unless you set one |
 
 The files go in `public/`. Any format a browser shows as an image works, and an SVG may carry its own animation.
+
+### Head tags
+
+`head` is a list of tags that Shabd writes into the `<head>` of every page, after its own. It is where an analytics
+script, a search engine's verification tag or a preconnect goes.
+
+```yaml title="shabd.config.yaml"
+site:
+  head:
+    - tag: meta
+      attrs: { name: google-site-verification, content: abc123 }
+    - tag: script
+      attrs: { src: https://stats.example.com/script.js, defer: true, data-domain: docs.example.com }
+    - tag: script
+      content: window.queue = window.queue || []
+```
+
+| Key | Meaning |
+| --- | --- |
+| `tag` | `meta`, `link`, `script`, `style` or `noscript` |
+| `attrs` | The tag's attributes. `true` writes an attribute with no value, such as `defer`, and `false` leaves it out |
+| `content` | What goes inside a `script`, a `style` or a `noscript` |
+
+A `href` or `src` that starts with `/` is a path inside the site, and gets `site.base` in front of it like every
+other path in the config.
+
+The tags are written by `shabd dev` as well as by a build. An analytics script therefore counts your own visits
+while you write, unless the script leaves `localhost` out by itself.
 
 ## content
 

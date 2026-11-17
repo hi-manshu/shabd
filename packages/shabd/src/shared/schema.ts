@@ -147,6 +147,54 @@ const NavItemSchema = z.strictObject({
   badge: BadgeSchema.optional(),
 })
 
+export const HEAD_TAGS = ['meta', 'link', 'script', 'style', 'noscript'] as const
+
+/** Elements that have no closing tag, and so no content. */
+const VOID_HEAD_TAGS: ReadonlySet<string> = new Set(['meta', 'link'])
+
+/**
+ * One tag for the `<head>` of every page: an analytics script, a
+ * verification tag, a preconnect.
+ *
+ *   - { tag: meta, attrs: { name: google-site-verification, content: abc123 } }
+ *   - { tag: script, attrs: { src: https://example.com/a.js, defer: true } }
+ *   - { tag: script, content: "window.plausible = window.plausible || []" }
+ */
+const HeadTagSchema = z
+  .strictObject({
+    tag: z.enum(HEAD_TAGS),
+    /** `true` writes the attribute with no value, `false` leaves it out. */
+    attrs: z
+      .record(
+        z.string().regex(/^[A-Za-z_:][A-Za-z0-9_:.-]*$/, { error: 'An attribute name is letters, digits, "-", "_", ":" and "."' }),
+        z.union([z.string(), z.number(), z.boolean()]),
+      )
+      .default({}),
+    /** What goes between the opening and the closing tag. */
+    content: z.string().optional(),
+  })
+  .check((ctx) => {
+    const { tag, content } = ctx.value
+    if (content === undefined) return
+    if (VOID_HEAD_TAGS.has(tag)) {
+      ctx.issues.push({
+        code: 'custom',
+        path: ['content'],
+        message: `<${tag}> has no content. Write its values under \`attrs\``,
+        input: content,
+      })
+    } else if (content.toLowerCase().includes(`</${tag}`)) {
+      // The content is written into the page as it is, so it must not be able to end its own tag.
+      ctx.issues.push({
+        code: 'custom',
+        path: ['content'],
+        message: `The content of <${tag}> must not contain "</${tag}"`,
+        input: content,
+      })
+    }
+  })
+export type HeadTag = z.output<typeof HeadTagSchema>
+
 const SiteSchema = z.strictObject({
   title: z.string().min(1),
   description: z.string().default(''),
@@ -165,6 +213,8 @@ const SiteSchema = z.strictObject({
   /** Links shown in the header. */
   nav: z.array(NavItemSchema).default([]),
   footer: z.string().optional(),
+  /** Tags added to the `<head>` of every page, after Shabd's own. */
+  head: z.array(HeadTagSchema).default([]),
 })
 
 /* ──────────────────────────────── theme ───────────────────────────────── */

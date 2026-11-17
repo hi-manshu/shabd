@@ -91,7 +91,8 @@ export interface PaletteChoice {
 }
 
 export interface SiteData {
-  site: ShabdConfig['site']
+  /** `site:` from the config, without what only the HTML document needs. */
+  site: Omit<ShabdConfig['site'], 'head'>
   colorMode: ShabdConfig['theme']['colorMode']
   /** The site's own palette first. Empty when `theme.picker` is off. */
   palettes: PaletteChoice[]
