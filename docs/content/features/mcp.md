@@ -115,8 +115,18 @@ something that runs code.
 
 `shabd preview` is that for a local check: it serves `dist/` and the endpoint together.
 
-For a deployed site, the handler is exported for you to mount in a serverless or edge function. It is a function
-from a `Request` to a `Response`, it keeps no session, and it reads two JSON files that the build writes.
+For Cloudflare, Vercel and Netlify, an adapter writes the function along with the build:
+
+```sh
+npx shabd build --adapter cloudflare   # or vercel, or netlify
+```
+
+The host runs the function for the MCP route and for nothing else. It reads two JSON files that the build writes,
+`_shabd/docs.json` and `_shabd/search-index.json`, from the site's own files. [Deploying](../guide/deploying.md)
+says what each adapter writes and how to deploy it.
+
+On any other host, mount the handler yourself in a serverless or edge function. It is a function from a `Request`
+to a `Response`, it keeps no session, and it reads the same two files.
 
 ```ts
 import { createMcpHandler, staticDocsFrom } from '@himanshoe/shabd/mcp'
@@ -133,11 +143,12 @@ export default { fetch: (request: Request) => handle(request) }
 ```
 
 > [!WARNING] Not yet tested on a host
-> The handler is tested with the official MCP client, and `shabd preview` serves it. Deploying it to a particular
-> platform has not been tested, and there are no ready-made adapters yet.
+> The handler is tested with the official MCP client, and `shabd preview` serves it. The function each adapter
+> writes is tested by loading it and calling it the way its host does. None of them has been deployed to
+> Cloudflare, Vercel or Netlify, or to any other platform.
 
-Search through a deployed endpoint is keyword search. The semantic ranking needs the embedding model, which a small
-function should not have to load.
+Search through a deployed endpoint is keyword search, with an adapter and without. The semantic ranking needs the
+embedding model, which a small function should not have to load.
 
 ## Turning it off
 

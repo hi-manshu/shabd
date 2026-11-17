@@ -25,6 +25,7 @@
         - file: guide/writing/components
           label: Components in MDX
           badge: MDX
+    - guide/deploying
 
 - category: Configuration
   items:

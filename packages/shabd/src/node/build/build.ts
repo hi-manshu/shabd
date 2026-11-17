@@ -4,9 +4,10 @@
  *   1. bundle     Vite builds the browser app; each page becomes its own chunk
  *   2. prerender  Vite builds a server bundle, which renders every route to HTML
  *   3. extras     llms.txt, per-page Markdown, the search index, MCP data, sitemap
+ *   4. adapter    with `--adapter`, what one host needs beyond the files (src/node/adapters)
  *
- * All three steps share one context, so each page is compiled once (or not at
- * all, if the on-disk cache already holds it).
+ * The first three steps share one context, so each page is compiled once (or
+ * not at all, if the on-disk cache already holds it).
  */
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
@@ -15,9 +16,11 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import pc from 'picocolors'
 import { build as viteBuild } from 'vite'
+import type { AdapterName } from '../../shared/adapters.js'
 import { pageFile, siteHref, withBase } from '../../shared/paths.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
 import type { RenderedPage } from '../../shared/types.js'
+import { chooseAdapter, type MovedAddress } from '../adapters/index.js'
 import { collectProblems, formatProblem } from '../check.js'
 import { themePaletteCss } from '../config/theme-css.js'
 import { createContext, type ShabdContext } from '../context.js'
@@ -34,6 +37,8 @@ import { renderRobots, renderSitemap, wantsRobots } from './robots.js'
 export interface BuildOptions {
   /** Set false to skip embeddings and ship keyword search only. */
   semantic?: boolean
+  /** The host to write for, as `shabd build --adapter` takes it. Wins over `build.adapter` in the config. */
+  adapter?: AdapterName | undefined
 }
 
 /** One entry of Vite's build manifest. */
@@ -53,6 +58,8 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   const started = performance.now()
   const context = await createContext(root, { dev: false })
   const { config, store, compiler } = context
+  // First, so that a name that is not an adapter stops the build before it has done any work.
+  const adapter = chooseAdapter(options.adapter, config)
   const outDir = path.join(config.root, 'dist')
   const pages = store.pages()
 
@@ -140,10 +147,12 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   // An address that has moved gets a page that sends the reader on. A page that exists keeps its address:
   // the redirect over it is reported with the other problems.
   const redirects = config.redirects.filter((redirect) => !store.byPath(redirect.from))
-  for (const redirect of redirects) {
-    const target = siteHref(redirect.to, config.config.site, (route) => store.byPath(route) !== undefined)
-    await write(routeFile(redirect.from), renderRedirect(config.config, target))
-  }
+  const moved: MovedAddress[] = redirects.map((redirect) => ({
+    from: redirect.from,
+    to: siteHref(redirect.to, config.config.site, (route) => store.byPath(route) !== undefined),
+  }))
+  // The pages are written with an adapter too: they are what answers where the host's own rule does not.
+  for (const { from, to } of moved) await write(routeFile(from), renderRedirect(config.config, to))
   if (redirects.length) step(`${redirects.length} ${redirects.length === 1 ? 'redirect' : 'redirects'}`)
 
   /* ── for AI agents ── */
@@ -242,6 +251,20 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
         ),
       )
     }
+  }
+
+  /* ── for the host ── */
+
+  // Last: by now dist/ holds everything an adapter may copy or point at.
+  if (adapter) {
+    phase = performance.now()
+    const written = await adapter.write({ config, outDir, moved })
+    step(
+      written.files.length
+        ? `${adapter.name}: ${written.files.join(', ')} ${pc.dim(seconds(performance.now() - phase))}`
+        : `${adapter.name}: nothing to write. The site has no MCP endpoint and no redirects`,
+    )
+    for (const note of written.notes) console.log(pc.yellow(`    ${note}`))
   }
 
   await compiler.cache.prune()

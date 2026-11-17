@@ -15,6 +15,7 @@
  *     to one canonical shape here, so the rest of the codebase handles one form.
  */
 import { z } from 'zod'
+import { ADAPTERS } from './adapters.js'
 import { BADGE_VARIANTS, normalizeBadge, type Badge, type BadgeVariant } from './badge.js'
 import { REGIONS } from './blocks.js'
 import { URL_STYLES } from './paths.js'
@@ -657,6 +658,18 @@ const ContentSchema = z.strictObject({
   sidebar: z.string().min(1).default('sidebar.yaml'),
 })
 
+/* ───────────────────────────────── build ──────────────────────────────── */
+
+const BuildSchema = z.strictObject({
+  /**
+   * The host the site is deployed to: `cloudflare`, `vercel` or `netlify`.
+   * A build then also writes what that host needs to answer the MCP route
+   * and to redirect addresses that have moved. `shabd build --adapter`
+   * takes the same names, and wins over this.
+   */
+  adapter: z.enum(ADAPTERS).optional(),
+})
+
 /* ─────────────────────────────── redirects ────────────────────────────── */
 
 /** Where a redirect starts: a path on this site. */
@@ -748,6 +761,8 @@ export const ConfigSchema = z.strictObject({
   /** Override a built-in layout, or define a new one for `layout:` frontmatter. */
   layouts: z.record(z.string().min(1), LayoutSchema).default({}),
   features: FeaturesSchema.prefault({}),
+  /** What a build writes besides the static site. */
+  build: BuildSchema.prefault({}),
   /** Components available in every .mdx file without an import. Name → file path. */
   components: z.record(componentName, z.string().min(1)).default({}),
   /** Custom layout blocks. Name → file path. */

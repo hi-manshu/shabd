@@ -1615,6 +1615,21 @@
       },
       "additionalProperties": false
     },
+    "build": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "adapter": {
+          "type": "string",
+          "enum": [
+            "cloudflare",
+            "vercel",
+            "netlify"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "components": {
       "default": {},
       "type": "object",

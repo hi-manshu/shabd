@@ -11,6 +11,7 @@
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import pc from 'picocolors'
+import { ADAPTERS, isAdapterName, unknownAdapter } from '../shared/adapters.js'
 import { isShabdError } from './config/errors.js'
 import { packageVersion } from './paths.js'
 
@@ -34,6 +35,7 @@ ${pc.bold('Options')}
   --host [address]  Expose the server on the network
   --open            Open the browser when the server starts
   --no-semantic     Build without embeddings (keyword search only)
+  --adapter <host>  Build for a host as well: ${ADAPTERS.join(', ')}
   --external        check: also ask links to other sites whether they answer
   --format <name>   check: text ${pc.dim('(default)')}, json, or github for annotations in a pull request
   --out <folder>    Where import writes the new site ${pc.dim('(default: <site>-shabd)')}
@@ -53,6 +55,7 @@ export async function main(argv: string[]): Promise<void> {
       host: { type: 'string' },
       open: { type: 'boolean' },
       'no-semantic': { type: 'boolean' },
+      adapter: { type: 'string' },
       external: { type: 'boolean' },
       format: { type: 'string' },
       out: { type: 'string' },
@@ -79,6 +82,8 @@ export async function main(argv: string[]): Promise<void> {
     fail(`--port must be a number between 0 and 65535, got "${values.port}"`)
   }
   const host = values.host === undefined ? undefined : values.host === '' ? true : values.host
+  const adapter = values.adapter
+  if (adapter !== undefined && !isAdapterName(adapter)) fail(unknownAdapter(adapter))
 
   try {
     switch (command) {
@@ -91,7 +96,7 @@ export async function main(argv: string[]): Promise<void> {
       }
       case 'build': {
         const { build } = await import('./build/build.js')
-        await build(root, { semantic: !values['no-semantic'] })
+        await build(root, { semantic: !values['no-semantic'], adapter })
         break
       }
       case 'preview': {

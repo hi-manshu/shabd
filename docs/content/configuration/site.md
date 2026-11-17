@@ -242,6 +242,21 @@ Each feature has its own page: [Search](../features/search.md), [MCP and llms.tx
 [Studio](../features/studio.md), [Live sandboxes](../features/sandbox.mdx), [Feed](../features/feed.md) and
 [Social pictures](../features/social-images.md).
 
+## build
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `adapter` | none | The host the site is deployed to: `cloudflare`, `vercel` or `netlify` |
+
+```yaml title="shabd.config.yaml"
+build:
+  adapter: netlify
+```
+
+With an adapter, a build also writes what that host needs to answer the MCP endpoint, and the site's
+[redirects](#redirects) in the host's own format. `shabd build --adapter <name>` does the same for one build, and
+wins over this key. [Deploying](../guide/deploying.md) says what each adapter writes.
+
 ## redirects
 
 When a page moves, list its old address here. A reader who follows an old link or a bookmark then arrives at the
@@ -260,6 +275,9 @@ another site. One redirect may lead to another: the reader is sent straight to w
 A static host cannot answer with a redirect, so a build writes a small page at the old address that sends the
 reader on, with or without JavaScript. It tells search engines where the content went, and asks them not to list
 the old address. `shabd dev` answers with a redirect of its own.
+
+Cloudflare, Vercel and Netlify can answer with a redirect. With an [adapter](../guide/deploying.md), a build also
+writes the redirects as rules of that host, which answers them with a `301`. The pages are written all the same.
 
 Mistakes are reported in three places:
 

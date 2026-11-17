@@ -23,11 +23,15 @@ Every command but `import` takes the site folder as an optional argument. It def
 | `--host [address]` | `dev`, `preview` | Listen on the network, not only on localhost |
 | `--open` | `dev` | Open the browser when the server starts |
 | `--no-semantic` | `build` | Skip embeddings and build keyword search only |
+| `--adapter <name>` | `build` | Also write what one host needs for the MCP endpoint and for redirects: `cloudflare`, `vercel` or `netlify`. See [Deploying](../guide/deploying.md) |
 | `--external` | `check` | Also ask the links that lead to other sites whether they answer |
 | `--format <name>` | `check` | How the result is printed: `text`, `json` or `github` |
 | `--out <folder>` | `import` | Write the new site here. Without it, the folder is named after the site, with `-shabd` at the end |
 | `--from <tool>` | `import` | The tool that made the site: `docusaurus`, `vitepress`, `starlight` or `mkdocs`. Without it, the site's config file decides |
 | `--force` | `import` | Write into a folder that is not empty |
+
+`--adapter` wins over [`build.adapter`](../configuration/site.md#build) in the config. A name that is not an adapter
+is an error, and the message lists the three.
 
 ## What check looks for
 

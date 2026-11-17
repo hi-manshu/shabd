@@ -84,6 +84,10 @@ three places where the time grew with the square of the number of pages.
   so cached pages are rebuilt.
 - Anything that runs in the browser must not import `src/shared/schema.ts` except for types. It would pull Zod into
   every page.
+- A new host adapter needs a name in `src/shared/adapters.ts` and a module in `src/node/adapters/`. The registry's
+  type makes the compiler insist on both. The module's header says which page of the host's documentation each
+  detail comes from. What runs on the host is in `src/node/adapters/function/`. It is bundled into one file, so it
+  must not import anything from Node.
 
 ## Writing docs
 
@@ -151,6 +155,7 @@ shabd/
 │   │   │   ├── llms/               llms.txt, llms-full.txt, Markdown copies
 │   │   │   ├── mcp/                MCP server, HTTP handler, stdio
 │   │   │   ├── import/             shabd import: one module for each tool it reads
+│   │   │   ├── adapters/           what `shabd build --adapter` writes for a host, and the function it deploys
 │   │   │   └── cli.ts              dev, build, preview, check, mcp, import
 │   │   └── client/                 shipped as source, compiled by the site's build
 │   │       ├── app/                router, stores, hot-update hub
