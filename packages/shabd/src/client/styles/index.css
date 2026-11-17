@@ -11,13 +11,14 @@
  * edge and soft bottom corners, and "the current thing" (active page, active
  * heading) is marked by wearing that bar.
  */
-@layer shabd.base, shabd.layout, shabd.blocks, shabd.content, shabd.overlays, shabd.utilities;
+@layer shabd.base, shabd.layout, shabd.blocks, shabd.content, shabd.overlays, shabd.utilities, shabd.print;
 
 @import './base.css';
 @import './layout.css';
 @import './blocks.css';
 @import './content.css';
 @import './overlays.css';
+@import './print.css';
 
 @layer shabd.utilities {
   /* Elements that swap with the colour mode. Both are in the markup; CSS shows one. */

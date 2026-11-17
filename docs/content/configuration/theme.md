@@ -142,6 +142,15 @@ The menu is the `theme-menu` block, so a [layout](./layouts.md) can move it or l
 The reader's choice is remembered in their browser. The mode is applied before the first paint, so a page does not
 flash in the wrong colours.
 
+### On paper
+
+A page that is printed, or saved as a PDF, is the page alone: its title and content, without the header, the
+sidebar, the outline or any button. It takes the light colours whichever mode the reader has on, because paper is
+white. Long lines of code wrap, every tab of a set is printed under its label, and the address of a link to another
+site is printed after the link.
+
+To change what is printed, write rules for `@media print` in [your own CSS](#your-own-css).
+
 ## Colours
 
 Each colour is one value for both modes, or `{ light, dark }`. A preset defines these twelve:

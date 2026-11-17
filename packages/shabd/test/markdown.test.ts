@@ -166,7 +166,9 @@ describe('markdown pipeline', () => {
     expect(keyword).toBeDefined()
     expect(result.codeCss).toContain(`.${keyword}{--sb-tok:#d73a49}`)
     expect(result.codeCss).toMatch(new RegExp(`\\[data-theme=dark\\]\\{[^}]*(\\}[^}]*)*\\.${keyword}\\{--sb-tok:#9d7cd8\\}`))
-    expect(result.codeCss).toContain('@media (prefers-color-scheme:dark){:root:not([data-theme]){')
+    expect(result.codeCss).toContain('@media screen and (prefers-color-scheme:dark){:root:not([data-theme]){')
+    // The dark colours are for screens: a printed page is white.
+    expect(result.codeCss).toContain('@media screen{[data-theme=dark]{')
     // No theme menu, so no rules for other themes.
     expect(result.codeCss).not.toContain('data-code')
 

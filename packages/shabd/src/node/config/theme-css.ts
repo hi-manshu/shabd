@@ -109,6 +109,13 @@ function declarations(vars: Record<string, string>): string {
 
 const rule = (selector: string, body: string, scheme: Mode) => `${selector} {\n${body}\n  color-scheme: ${scheme};\n}`
 
+/**
+ * The dark mode is for screens. Paper is white whatever the reader's device
+ * is set to, so a printed page takes the light colours: every rule that
+ * brings dark ones is wrapped in this.
+ */
+const onScreen = (rules: string, and = '') => `@media screen${and} {\n${rules}\n}`
+
 /** The site's own colours in one mode. In the light mode every optional colour is set, to its fallback if need be. */
 function siteColors(colors: ThemeConfig['colors'], mode: Mode): Record<string, string> {
   const vars: Record<string, string> = {}
@@ -208,10 +215,10 @@ export function themeBaseCss(theme: ThemeConfig): string {
   // shell. The media query covers visitors with JavaScript disabled.
   return [
     rule(':root', `${base}\n${light}`, 'light'),
-    rule(`:root[data-theme='dark']`, dark, 'dark'),
+    onScreen(rule(`:root[data-theme='dark']`, dark, 'dark')),
     theme.colorMode.default === 'light'
       ? ''
-      : `@media (prefers-color-scheme: dark) {\n${rule(':root:not([data-theme])', dark, 'dark')}\n}`,
+      : onScreen(rule(':root:not([data-theme])', dark, 'dark'), ' and (prefers-color-scheme: dark)'),
   ]
     .filter(Boolean)
     .join('\n')
@@ -234,7 +241,7 @@ export function themePaletteCss(theme: ThemeConfig): string {
         declarations({ ...lookTokens(THEME_PRESETS[name].look ?? {}), ...presetColors(name, 'light') }),
         'light',
       ),
-      rule(`:root[data-palette='${name}'][data-theme='dark']`, declarations(presetColors(name, 'dark')), 'dark'),
+      onScreen(rule(`:root[data-palette='${name}'][data-theme='dark']`, declarations(presetColors(name, 'dark')), 'dark')),
     ])
     .join('\n')
 }

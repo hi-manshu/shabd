@@ -59,6 +59,8 @@ export function Tabs({ children }: { children?: ReactNode }) {
           aria-labelledby={`${id}-tab-${index}`}
           hidden={index !== selected}
           className="sb-tab-panel"
+          // On paper every panel is printed, and this is the heading it is printed under.
+          data-label={tab.props.label}
         >
           {tab.props.children}
         </div>

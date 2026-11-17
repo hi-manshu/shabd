@@ -417,6 +417,38 @@ test.describe('the document', () => {
   })
 })
 
+test.describe('on paper', () => {
+  test('a printed page is the page alone, in the light colours, with nothing left to scroll', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' })
+    await open(page, `${BUILT}/guide/hosting`)
+    const ink = () => page.evaluate(() => getComputedStyle(document.body).color)
+    const lightInk = await ink()
+
+    // The reader has the dark mode on, and the page has a banner, a header, a sidebar and an outline.
+    await page.locator('.sb-theme-toggle').click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    expect(await ink()).not.toBe(lightInk)
+    for (const region of ['banner', 'header', 'sidebar', 'aside']) await expect(page.locator(`.sb-region-${region}`)).toBeVisible()
+
+    await page.emulateMedia({ media: 'print' })
+    for (const region of ['banner', 'header', 'sidebar', 'aside']) await expect(page.locator(`.sb-region-${region}`)).toBeHidden()
+    await expect(page.locator('h1.sb-page-title')).toBeVisible()
+    await expect(page.locator('.sb-code-copy').first()).toBeHidden()
+    await expect(page.locator('.sb-pagination')).toBeHidden()
+    // Paper is white whatever the device is set to.
+    expect(await ink()).toBe(lightInk)
+
+    // A long line of code wraps instead of running off the sheet.
+    const code = page.locator('figure.sb-code pre').first()
+    expect(await code.evaluate((pre) => pre.scrollWidth <= pre.clientWidth)).toBe(true)
+    // Where a link leads is printed after it.
+    const after = await page
+      .getByRole('link', { name: 'this list' })
+      .evaluate((link) => getComputedStyle(link, '::after').content)
+    expect(after).toContain('https://example.com/hosts')
+  })
+})
+
 test.describe('for search engines', () => {
   test('robots.txt names the sitemap, and a page that says noindex is left out of it', async ({ request }) => {
     const text = (path: string) => request.get(`${BUILT}${path}`).then((response) => response.text())
