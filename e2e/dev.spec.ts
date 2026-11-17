@@ -241,7 +241,10 @@ test.describe('studio', () => {
     await expect(page.locator('.sb-studio-editor')).toHaveValue('# Setting up\n\nChanged by something else.\n')
   })
 
-  test('two editors connect peer to peer and share a draft', async ({ page, browser, site }) => {
+  test('two editors connect peer to peer and share a draft', async ({ page, browser, browserName, site }) => {
+    // On GitHub's Linux machines, Playwright's Firefox and WebKit connect two pages only some of the time: the
+    // same commit passed and failed there. Chromium connects every time, and all three do on macOS.
+    test.skip(process.platform === 'linux' && browserName !== 'chromium', 'peer connections between two pages are not dependable in this browser on Linux')
     await site.track('content/guide/setup.md')
     const host = page
     // Not every browser build can open a peer connection on every machine: WebKit as built for Linux

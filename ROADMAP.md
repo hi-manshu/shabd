@@ -1,55 +1,17 @@
 # Roadmap
 
-Three parts: what is left of putting this project on GitHub and npm, where version 0.1 stands, and what to build
+Three parts: where the project lives and what is left to set up there, where version 0.1 stands, and what to build
 next.
 
-## Part 1: Bootstrap on GitHub
+## Part 1: Where the project lives
 
-Done so far: the project is its own Git repository, pushed to <https://github.com/hi-manshu/shabd> as a private
-repository, with the repository's address filled in where the docs and the package refer to it. Version 0.1.0 is
-on npm (step 5).
-
-What is left, in order:
-
-### 1. Watch the first CI run
-
-`.github/workflows/ci.yml` runs on every push and pull request. One job builds, typechecks, runs the unit tests,
-checks the docs and builds them with keyword search. A second job runs the browser tests in Chromium, Firefox and
-WebKit.
-
-Both run on Ubuntu. Shabd had only been run on macOS before the first push, so expect to fix something. Add
-`macos-latest` and `windows-latest` to a matrix after that; file paths are the likely trouble on Windows.
-
-### 2. Decide when to make it public
-
-```sh
-gh repo edit hi-manshu/shabd --visibility public --accept-visibility-change-consequences
-```
-
-Before that, check `LICENSE` names the copyright holder you want. It says "Shabd contributors".
-
-### 3. Protect `main`
-
-In the repository: **Settings → Rules → Rulesets → New branch ruleset**, targeting `main`:
-
-- Require a pull request before merging
-- Require status checks to pass: the `test` and `browsers` jobs
-
-### 4. Publish the documentation
-
-`.github/workflows/docs.yml` builds `docs/` and deploys it to GitHub Pages. It has not been run, and it only starts
-by hand until you turn it on:
-
-1. **Settings → Pages → Source: GitHub Actions**
-2. In `docs/shabd.config.yaml`, set `site.url` to `https://hi-manshu.github.io` and `site.base` to `/shabd/`
-3. In the workflow, add `push: { branches: [main] }` under `on:`
-
-The MCP endpoint will not exist on GitHub Pages, which serves static files only. `llms.txt` and the Markdown copies
-will.
-
-### 5. Publish to npm
-
-Done: version 0.1.0 went out on 17 November 2026, and is tagged `v0.1.0`. What follows is how, for the next one.
+| | State |
+| --- | --- |
+| Repository | Public, at <https://github.com/hi-manshu/shabd>, under the MIT licence |
+| Tests on GitHub | `ci.yml` runs on every push and pull request, on Linux: one job builds, typechecks and runs the unit tests, another runs the browser tests in Chromium, Firefox and WebKit. First green on 17 November 2026 |
+| Documentation | <https://hi-manshu.github.io/shabd/>, on GitHub Pages. `docs.yml` deploys it again whenever `main` changes |
+| npm | Version 0.1.0, published on 17 November 2026 and tagged `v0.1.0`, under two names (below) |
+| Releases | `release.yml`, started by hand with a version, by the repository's owner only. It has been run as a dry run; no release has gone out through it yet. `npm run release` does the same from a machine |
 
 npm refused the name `shabd` as too similar to `sha1` and `sharp`, and the scope `@shabd` belongs to another
 account. So Shabd is published under two names, each with its starter:
@@ -60,36 +22,23 @@ account. So Shabd is published under two names, each with its starter:
 | `shabd-docs` | `create-shabd-docs` | `npm create shabd-docs@latest my-docs` |
 
 `@himanshoe/shabd` is what the package is called in this repository. `shabd-docs` is the same files with the name
-changed wherever it is written; `scripts/release/publish.mjs` makes that copy.
+changed wherever it is written; `scripts/release/publish.mjs` makes that copy. [CONTRIBUTING.md](./CONTRIBUTING.md)
+says how to release, under "Releasing".
 
-```sh
-npm login
-npm run release -- --dry-run
-npm run release
-```
+What is left to set up:
 
-The account needs two-factor authentication, and npm asks for it before each package goes out, so run the release
-in a terminal of your own. A version that is already on npm is skipped: run it again after a failure and it picks
-up where it stopped. A published version cannot be published again, so read what the dry run lists first.
-
-After a release, run both `npm create` commands in an empty folder outside this repository: inside it, npm would
-run the local copy. For 0.1.0 both were run that way, and each site installed, passed `shabd check`, built and was
-served.
-
-The four pages on npm link to this repository, which nobody else can open while it is private.
-
-After the first release, switch to trusted publishing so no token is stored: on npmjs.com, open the package's
-settings, add a trusted publisher for this repository, and publish from a workflow that runs on version tags with
-`id-token: write` permission and `npm publish -w packages/shabd --provenance --access public`.
-
-### 6. Add the community files
-
-`CONTRIBUTING.md` is written. Still to add:
-
-- `SECURITY.md`, with a private way to report vulnerabilities. This matters here: the dev server can write files.
-- `CODE_OF_CONDUCT.md`
-- Issue forms and a pull request template under `.github/`
-- A changelog. [Changesets](https://github.com/changesets/changesets) suits a monorepo with one published package.
+1. **Trusted publishers on npm**, before the first release from GitHub. Each of the four packages has to name
+   `release.yml` as a trusted publisher. npm drops one that has not published within two days, so add them when a
+   release is due.
+2. **Protect `main`.** In the repository: Settings → Rules → Rulesets → New branch ruleset, targeting `main`, with
+   the `test` and `browsers` jobs required. The release workflow pushes the commit that sets the version straight
+   to `main`: if pull requests become required, let the owner bypass that, or release from a machine.
+3. **Tests on macOS and Windows.** `ci.yml` runs on Linux only. File paths are the likely trouble on Windows.
+4. **The copyright holder.** `LICENSE` says "Shabd contributors". Check that this is the name you want.
+5. **Community files:** `SECURITY.md` with a private way to report vulnerabilities, which matters here because the
+   dev server can write files; `CODE_OF_CONDUCT.md`; issue forms and a pull request template; a changelog.
+6. **A host for the MCP endpoint.** GitHub Pages serves files only, so `/mcp` answers 405 there. `llms.txt` and
+   the Markdown copy of each page are served.
 
 ## Part 2: Where 0.1 stands
 
@@ -97,7 +46,7 @@ settings, add a trusted publisher for this repository, and publish from a workfl
 | --- | --- |
 | YAML config, sidebar and frontmatter: schemas, loader, source-mapped errors | Built, tested |
 | Sidebar resolver with automatic fallback | Built, tested |
-| Layout engine: regions, blocks, `extends`, per-page switches, custom blocks | Built, tested in three browser engines |
+| Layout engine: regions, blocks, `extends`, per-page switches, custom blocks | Built, tested in three browser engines, down to a phone-size screen with a banner above the header |
 | Markdown/MDX pipeline, compile cache | Built, tested |
 | Dev server with hot updates for pages and YAML | Built, tested in three browser engines |
 | Static build, prerendering, hydration | Built, tested in three browser engines |
@@ -114,21 +63,24 @@ settings, add a trusted publisher for this repository, and publish from a workfl
 | Readable code: every syntax colour at 4.5:1 or more against what is behind it | Built, tested for all 23 presets in both modes on a sample of code in eight languages |
 | Contrast of every preset | Tested: colour against colour for all 23, and text against every pixel of the rendered page for the ten themes, in three browser engines |
 | The starter, under both names | Built, tested, published. Both `npm create` commands were run from the registry: each site installed, passed `shabd check`, built and was served |
+| A site served from a sub-path, as GitHub Pages serves one | Built. Checked on the deployed docs: every page, the links between them, search, the theme menu, the 404 page |
 
-"Three browser engines" means the Chromium, Firefox and WebKit builds that Playwright drives, on macOS. It does not
-mean Chrome, Firefox and Safari as people install them, and it does not cover Linux or Windows.
+"Three browser engines" means the Chromium, Firefox and WebKit builds that Playwright drives, on macOS and, on
+GitHub, on Linux. It does not mean Chrome, Firefox and Safari as people install them, and it does not cover
+Windows.
 
 ### What has been checked
 
 On one machine (macOS 26, Node 22.16), with the docs site and a small test site in this repository:
 
-- 226 unit and integration tests pass. They cover config and sidebar validation, the sidebar resolver, the Markdown
+- 227 unit and integration tests pass. They cover config and sidebar validation, the sidebar resolver, the Markdown
   pipeline, layout resolution, the theme presets and their contrast, search ranking, both search stores, the
   content store, the starter, and the MCP endpoint driven by the official MCP client.
-- 116 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
-  JavaScript, hydration, navigation, every layout, the sidebar, search, the theme menu, text contrast on every
-  theme's rendered page, sandboxes, hot updates of pages and YAML, the Studio including conflicts and its folder
-  backend, and two editors connecting peer to peer. Sixteen more are skipped where an engine lacks what they need.
+- 119 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
+  JavaScript, hydration, navigation, every layout, the sidebar, the phone-size layout, search, the theme menu, text
+  contrast on every theme's rendered page, sandboxes, hot updates of pages and YAML, the Studio including conflicts
+  and its folder backend, and two editors connecting peer to peer. Sixteen more are skipped where an engine lacks
+  what they need.
 - The search tests also pass with the index held in SQLite, and semantic search with the real embedding model
   finds a section by meaning in all three engines on both stores.
 - Version 0.1.0 was installed from npm into an empty folder under both names. Each site passed `shabd check`,
@@ -137,8 +89,14 @@ On one machine (macOS 26, Node 22.16), with the docs site and a small test site 
 - A saved edit to a page reached the DOM in a median of 42 ms (10 saves, 35 to 49 ms after the first, which took
   116 ms). That was measured in Chromium for the first commit, and not again since.
 
-On GitHub's Linux machines the unit tests pass. Two browser tests fail there: the error overlay clearing after a
-mistake in the YAML is fixed, and two editors connecting peer to peer.
+On GitHub's Linux machines the same tests pass, except that two editors connecting peer to peer runs in Chromium
+only there. Playwright's Firefox and WebKit connected two pages on Linux only some of the time.
+
+On the deployed docs site, on 17 November 2026, in Chromium: all 18 pages open with nothing in the console, the 36
+links between them lead somewhere, and each of these worked when tried as a reader would: search by keyword and
+by meaning, the theme menu's 23 presets and code that follows them, light and dark mode, the copy button, tabs,
+cards and callouts, a custom component, the live sandboxes, the outline, previous and next, the edit link, the
+files for AI agents, the sitemap, the 404 page, and the phone-size layout.
 
 Not yet checked:
 
@@ -153,7 +111,12 @@ Not yet checked:
 
 ### 0.2: Make what exists dependable
 
-- Run the browser tests on Linux and Windows. The CI workflow has a job for Linux that has never run.
+- Run the tests on Windows and macOS on GitHub. They run on Linux there today.
+- On Linux, a file saved twice within 50 ms is seen once: the dev server's file watcher drops the second change.
+  An editor that saves in two writes could leave the server one save behind. Reading the file again a moment
+  after each change would close that. It was found because a test did exactly this.
+- A setting for the colour of the header's text, so that a theme can have a dark header. The Windows XP theme
+  would use it for a blue taskbar.
 - Try the real browsers by hand, Safari above all. WebKit under test did not offer its private file system to the
   search worker; whether Safari does needs checking.
 - Peer editing between two machines on different networks.
