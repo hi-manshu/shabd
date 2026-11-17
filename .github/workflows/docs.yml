@@ -1,14 +1,14 @@
-# Publishes docs/ to GitHub Pages. A starting point: it has not been run yet.
+# Publishes docs/ to GitHub Pages, at https://hi-manshu.github.io/shabd/.
 #
-# It only runs when started by hand, so that pushes do not fail before Pages
-# is set up. To turn it on:
+# It runs when main changes, and can be started by hand. What it needs:
 #   1. Repository settings → Pages → Source: GitHub Actions
-#   2. In docs/shabd.config.yaml set `site.url` to the Pages origin and, for a
-#      project site, `site.base` to "/<repository name>/"
-#   3. Add `push: { branches: [main] }` under `on:` below
+#   2. In docs/shabd.config.yaml, `site.url` is the Pages origin and
+#      `site.base` is "/<repository name>/"
 name: Docs
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

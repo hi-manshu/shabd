@@ -6,9 +6,10 @@
 site:
   title: Shabd
   description: Documentation sites configured in YAML, with on-device search and an MCP endpoint for AI agents.
-  # Replace with the address the site is deployed to. Used for canonical URLs, llms.txt and MCP.
-  url: https://docs.example.com
-  base: /
+  # Where the site is deployed: GitHub Pages serves a repository's site under the repository's name.
+  # Used for canonical URLs, the sitemap, llms.txt and MCP.
+  url: https://hi-manshu.github.io
+  base: /shabd/
   lang: en
   logo:
     light: /logo-light.svg
