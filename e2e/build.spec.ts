@@ -188,6 +188,53 @@ test.describe('search', () => {
       .toEqual(['Pelicans'])
   })
 
+  test('finds words in scripts written without spaces, and marks them', async ({ page }) => {
+    await open(page, `${BUILT}/guide/intro`)
+    await page.locator('.sb-search-button').click()
+    const dialog = page.locator('dialog.sb-search')
+    const input = dialog.getByRole('combobox')
+    const hits = dialog.locator('.sb-search-hit')
+    /** What is marked in the first result's excerpt, run together: a word can be marked as two. */
+    const markedInExcerpt = async () => (await hits.first().locator('.sb-search-hit-snippet mark').allTextContents()).join('')
+
+    // [what is typed, the heading of the section it is in]
+    const cases = [
+      ['浏览器', '中文'],
+      ['主题配置', '中文'],
+      ['ブラウザー', '日本語'],
+      ['設定', '日本語'],
+      // Playwright's Firefox cuts these three otherwise than Node does: サイドバー as one word where Node has
+      // サイド and バー, ทำ and งาน where Node has ทำงาน, ติดตั้ง where Node has ติด and ตั้ง. On the SQLite
+      // store the index was cut by Node when the site was built, and Firefox has to find them all the same.
+      ['サイドバー', '日本語'],
+      ['ทำงาน', 'ภาษาไทย'],
+      ['ติดตั้ง', 'ภาษาไทย'],
+      // Firefox leaves this whole in its sentence and cuts it in two, เบราว์ and เซอร์, when it is typed alone.
+      ['เบราว์เซอร์', 'ภาษาไทย'],
+    ] as const
+    for (const [query, heading] of cases) {
+      await input.fill(query)
+      await expect(hits.first().locator('.sb-search-hit-where'), query).toContainText(`Other scripts${heading}`)
+      await expect.poll(markedInExcerpt, query).toBe(query)
+    }
+    await expect(dialog).toHaveAttribute('data-store', process.env.SHABD_E2E_STORE ?? 'memory')
+
+    // A word still being typed is found from its first letter.
+    await input.fill('浏')
+    await expect(hits.first().locator('.sb-search-hit-where')).toContainText('中文')
+    await expect.poll(markedInExcerpt).toBe('浏览')
+
+    // Going to a result marks the word on the page, under its heading.
+    await input.fill('サイドバー')
+    await expect(hits.first().locator('.sb-search-hit-where')).toContainText('日本語')
+    await input.press('Enter')
+    await expect(page).toHaveURL(`${BUILT}/guide/scripts#${encodeURIComponent('日本語')}`)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Other scripts')
+    await expect
+      .poll(() => page.evaluate(() => [...(CSS.highlights.get('sb-search') ?? [])].map((range) => String(range)).join('')))
+      .toBe('サイドバー')
+  })
+
   test('moves through results with the arrow keys', async ({ page }) => {
     await open(page, `${BUILT}/`)
     await page.locator('.sb-search-button').click()

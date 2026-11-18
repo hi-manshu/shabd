@@ -50,7 +50,39 @@ finds the section on callouts.
   filler word such as "for" or "from".
 - In a result, the word that is marked is the one the site has, not the one that was typed.
 
-Both stores pick the close words with the same code, and the MCP endpoint does it too.
+Both stores pick the close words with the same code, from the same list of words, and the MCP endpoint does it
+too.
+
+## Languages written without spaces
+
+Elsewhere a word is what stands between spaces and punctuation. Chinese, Japanese and Thai are written without
+spaces, so there words are found with a dictionary: the one behind `Intl.Segmenter`, which Node and current
+browsers carry. 搜索功能 is indexed as 搜索 and 功能, and typing either finds it.
+
+- The in-memory store cuts the text into words in the reader's browser, when search opens. The SQLite store's
+  index is cut by Node when the site is built, and the browser cuts only what is typed.
+- Two engines do not always cut a text in the same places, and one engine cuts a word differently alone and in a
+  sentence. Playwright's Firefox takes サイドバー for one word where Node takes it for サイド and バー. So a word
+  that is not found is tried twice more: as the start of a longer word, and cut again along the words the index
+  does have.
+- That was measured on 59 words and phrases in the three languages, each typed alone and looked for in sentences
+  cut by Node. As Chromium and WebKit cut them, every word of 58 was in the index. As Firefox cut them, every
+  word of 51 was, and 6 found nothing. With the two further tries all 59 found their sentence in all three
+  engines, and 58 had it as the first result.
+- A browser without `Intl.Segmenter` takes every pair of neighbouring letters for a word: 搜索功能 becomes 搜索,
+  索功 and 功能. That is how the in-memory store then cuts its index too. This path was run in the unit tests,
+  with the segmenter taken away, and not in a browser that lacks it.
+- Cutting by dictionary takes time, and the in-memory store does it each time search opens. In Node, 2,000
+  sections of Chinese, about 270 characters each, took 486 ms to open, where 2,000 sections of English of 120
+  words took 84 ms. For 20,000 sections it was 4.9 s against 0.8 s. The SQLite store's index is cut when the site
+  is built, so it opens as it does for any other text: it is the one to use for a large site in these languages.
+- A passage is about 200 of these words, as it is 200 words elsewhere.
+- Searching a page in the three languages is part of the browser tests: in Chromium, Firefox and WebKit, on both
+  stores.
+- Lao, Khmer and Burmese are cut the same way. They were not tried. Korean puts spaces between words and is
+  left as it was.
+
+Semantic search needs a model that knows the language: see [Things to know](#things-to-know).
 
 ## Where a result leads
 
@@ -177,11 +209,10 @@ If the package is missing, or the database cannot be opened, search uses the mem
   and the same ranking. There the query is embedded by that process, not in a browser.
 - The default model was trained mostly on English. For other languages, set `model` to a multilingual embedding
   model that Transformers.js supports. The build and the browser always use the same one.
-- Keyword search splits text on letters and digits. Languages written without spaces between words, such as
-  Chinese and Japanese, are matched by meaning but poorly by keyword.
 - A misspelt word is compared with whole words. While it is still being typed it is too far from any of them, so
   results can go away in the middle of a word and come back when it is finished.
-- Misspellings are counted in letters, which suits an alphabet. They were tried in English only.
+- Misspellings are counted in letters, which suits an alphabet. They were tried in English, and on one word of
+  Hindi.
 - The SQLite store reads the list of its words the first time a word is not found. That happens once per visit,
   and takes longer the larger the index is.
 - Vectors are compared with a plain scan in both stores, not an approximate index. At 20,000 sections that is 19 ms

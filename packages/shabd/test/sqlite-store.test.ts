@@ -4,8 +4,15 @@
  * bytes the way the browser opens it.
  */
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm'
-import { beforeAll, describe, expect, it } from 'vitest'
-import { MemoryStore, type SearchDoc, type SearchHit, type SearchIndexFile } from '../src/shared/search-core.js'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import {
+  MemoryStore,
+  setSegmenter,
+  tokenize,
+  type SearchDoc,
+  type SearchHit,
+  type SearchIndexFile,
+} from '../src/shared/search-core.js'
 import {
   openSearchDatabase,
   readSearchMeta,
@@ -225,5 +232,102 @@ describe('the two stores', () => {
     }
     // The cases above are not all empty on both sides.
     expect(headings(memory.search('server instaler ', null, 5))).toEqual(['Install', 'Hosting'])
+  })
+
+  it('hold the same terms, cut by the same tokeniser', () => {
+    const database = openSearchDatabase(sqlite3, bytes)
+    database.exec("CREATE VIRTUAL TABLE temp.terms USING fts5vocab('main', 'sections_fts', 'row')")
+    const inSqlite = database.selectValues('SELECT term FROM temp.terms').map(String).sort()
+    database.close()
+    const inMemory = [...new Set(docs.flatMap((d) => tokenize(`${d.title} ${d.heading} ${d.text}`)))].sort()
+    expect(inSqlite).toEqual(inMemory)
+    // FTS5's own tokenisers cut a Devanagari word at its marks, and leave an accent on.
+    expect(inSqlite).toEqual(expect.arrayContaining(['शब्द', 'अर्थ', 'cafe']))
+  })
+
+  it('take a misspelt word for the same words in a script with combining marks', () => {
+    // थ for त: one edit from अर्थ, which is four characters long.
+    expect(headings(store.search('अर्त ', null, 5))).toEqual(['शब्द'])
+    expect(headings(memory.search('अर्त ', null, 5))).toEqual(['शब्द'])
+  })
+})
+
+describe('text in a script without spaces, which FTS5 does not cut into words', () => {
+  afterEach(() => setSegmenter(undefined))
+
+  const pages = [
+    doc('/zh', '搜索', '搜索功能在读者的浏览器中运行，不需要任何搜索服务。侧边栏的宽度可以在主题配置中修改。'),
+    doc('/ja', 'サイドバー', 'サイドバーの幅はテーマの設定で変更できます。検索は読者のブラウザーで実行されます。'),
+    doc('/th', 'การค้นหา', 'การค้นหาทำงานในเบราว์เซอร์ของผู้อ่าน ติดตั้งแพ็กเกจแล้วเริ่มเซิร์ฟเวอร์สำหรับนักพัฒนา'),
+    doc('/en', 'Install', 'Run the installer, then start the dev server.'),
+  ]
+  const file: SearchIndexFile = { version: 1, docs: pages, semantic: null }
+  const inMemory = new MemoryStore(file, null)
+  let inSqlite: SqliteStore
+  beforeAll(() => {
+    inSqlite = new SqliteStore(openSearchDatabase(sqlite3, writeSearchDatabase(sqlite3, file, null, 'scripts')))
+  })
+  const found = (hits: SearchHit[]) => hits.map((hit) => [hit.doc.path, hit.marks])
+  const queries = [
+    '浏览器',
+    '读者',
+    '侧边栏',
+    '主题配置 ',
+    '搜索功能',
+    '浏',
+    'サイドバー',
+    'ブラウザー',
+    '設定 ',
+    'ブラウ',
+    'ทำงาน',
+    'เบราว์เซอร์ ',
+    'ติดตั้ง',
+    'แพ็กเกจ',
+    '读者 読者 ',
+    'installer 浏览器',
+    '没有这个词 ',
+  ]
+
+  it('is found by its words', () => {
+    expect(found(inSqlite.search('浏览器', null, 5)).map(([path]) => path)).toEqual(['/zh'])
+    expect(found(inSqlite.search('ブラウザー', null, 5)).map(([path]) => path)).toEqual(['/ja'])
+    expect(found(inSqlite.search('เบราว์เซอร์', null, 5)).map(([path]) => path)).toEqual(['/th'])
+    expect(found(inSqlite.search('浏', null, 5)).map(([path]) => path)).toEqual(['/zh'])
+  })
+
+  it('is found the same way in both stores', () => {
+    for (const query of queries) {
+      expect(found(inSqlite.search(query, null, 5)), query).toEqual(found(inMemory.search(query, null, 5)))
+    }
+  })
+
+  it('is found the same way in both stores when the browser cuts a word otherwise than the build did', () => {
+    const own = new Intl.Segmenter('en', { granularity: 'word' })
+    const cuts: Record<string, string[]> = {
+      サイドバー: ['サイドバー'],
+      ทำงาน: ['ทำ', 'งาน'],
+      เบราว์เซอร์: ['เบราว์', 'เซอร์'],
+      ติดตั้ง: ['ติดตั้ง'],
+    }
+    const segment = (text: string) => {
+      const pieces = cuts[text]
+      if (!pieces) return own.segment(text)
+      let index = 0
+      return pieces.map((piece) => ({ segment: piece, index: (index += piece.length) - piece.length, input: text }))
+    }
+    setSegmenter({ segment } as unknown as Intl.Segmenter)
+    for (const query of Object.keys(cuts)) {
+      const hits = found(inSqlite.search(`${query} `, null, 5))
+      expect(hits, query).toEqual(found(inMemory.search(`${query} `, null, 5)))
+      expect(hits.length, query).toBe(1)
+    }
+  })
+
+  it('is found the same way in both stores when the browser has no dictionary to cut by', () => {
+    setSegmenter(null)
+    for (const query of queries) {
+      expect(found(inSqlite.search(query, null, 5)), query).toEqual(found(inMemory.search(query, null, 5)))
+    }
+    expect(found(inSqlite.search('サイドバー', null, 5)).map(([path]) => path)).toEqual(['/ja'])
   })
 })

@@ -2,16 +2,23 @@
  * The search index as a SQLite database.
  *
  * The same file is written at build time (in Node) and read in the reader's
- * browser, both through SQLite compiled to WebAssembly, so the full-text
- * tokenizer and the file format are identical on both sides by construction.
+ * browser, both through SQLite compiled to WebAssembly, so the file format
+ * is identical on both sides by construction.
  *
  *   sections      one row per searchable section, with its vector as a BLOB
- *   sections_fts  an FTS5 index over title, heading and text
+ *   sections_fts  an FTS5 index over the words of title, heading and text
  *   meta          schema version, content fingerprint, embedding model
  *
  * Keyword ranking is FTS5's BM25. Semantic ranking is a scan of the vector
  * column through a SQL function implemented here. Both feed the same rank
  * fusion as the in-memory store (src/shared/search-core.ts).
+ *
+ * The words are Shabd's, not FTS5's. FTS5's tokenisers split on spaces and
+ * punctuation, which finds no words in Chinese, Japanese or Thai, and one of
+ * them splits a Devanagari word at its combining marks. So the text is cut
+ * into words by the tokeniser the in-memory store uses, here when the
+ * database is written and again when it is asked, and FTS5 is handed the
+ * words with spaces between them. The two stores then hold the same terms.
  *
  * FTS5 finds a word or the start of one. It has nothing for a misspelt word,
  * so that part is done here: the index's terms are read out once, the ones
@@ -23,12 +30,13 @@
  */
 import {
   candidatePool,
-  correctedWord,
   fuseHits,
   makeSnippet,
   MIN_SIMILARITY,
+  planQuery,
   queryTerms,
   soughtWords,
+  tokenize,
   wordsToMark,
   type QueryWord,
   type SearchDoc,
@@ -38,7 +46,7 @@ import {
 } from './search-core.js'
 
 /** Bump when the tables change. A database with another version is rebuilt, not read. */
-export const SQLITE_SCHEMA_VERSION = 1
+export const SQLITE_SCHEMA_VERSION = 2
 
 /** Column weights for BM25, in table order: title, heading, text. They mirror the in-memory index. */
 const BM25_WEIGHTS = '2.0, 3.0, 1.0'
@@ -90,16 +98,23 @@ const SCHEMA = `
     text TEXT NOT NULL,
     vector BLOB
   );
-  -- External content: the index points at the rows above instead of storing the text a second time.
+  -- Contentless: the index holds no text of its own. What it is given is not the text of the rows
+  -- above but their words (see the top of this file), and the text itself is read from those rows.
+  -- The "ascii" tokeniser takes every character above ASCII as part of a word, so the words it is
+  -- given, which have spaces between them and nothing else that is not a letter or a digit, come
+  -- out as they went in.
   -- No prefix index and full detail, chosen by measurement on 20,000 sections:
   -- a prefix index made as-you-type queries 0.9 ms faster and the file 60% larger,
   -- and dropping positional detail made the file smaller but ranking five times slower.
   CREATE VIRTUAL TABLE sections_fts USING fts5(
     title, heading, text,
-    content = 'sections', content_rowid = 'id',
-    tokenize = 'unicode61 remove_diacritics 2'
+    content = '',
+    tokenize = 'ascii'
   );
 `
+
+/** A text as FTS5 is given it: its words, with spaces between them. */
+const asWords = (text: string) => tokenize(text).join(' ')
 
 /* ───────────────────────────── writing ───────────────────────────── */
 
@@ -124,15 +139,17 @@ export function writeSearchDatabase(
     const insert = db.prepare(
       'INSERT INTO sections (id, path, anchor, title, heading, text, vector) VALUES (?, ?, ?, ?, ?, ?, ?)',
     )
+    const insertWords = db.prepare('INSERT INTO sections_fts (rowid, title, heading, text) VALUES (?, ?, ?, ?)')
     index.docs.forEach((doc, position) => {
       const vector = hasVectors
         ? new Uint8Array(vectors!.buffer, vectors!.byteOffset + position * dims, dims).slice()
         : null
       // Row ids start at 1; a section's id is its position in the index plus one.
       insert.bind([position + 1, doc.path, doc.anchor, doc.title, doc.heading, doc.text, vector]).stepReset()
+      insertWords.bind([position + 1, asWords(doc.title), asWords(doc.heading), asWords(doc.text)]).stepReset()
     })
     insert.finalize()
-    db.exec('INSERT INTO sections_fts (rowid, title, heading, text) SELECT id, title, heading, text FROM sections')
+    insertWords.finalize()
 
     const meta = db.prepare('INSERT INTO meta (key, value) VALUES (?, ?)')
     const entries: Record<string, string> = {
@@ -266,33 +283,39 @@ export class SqliteStore implements SearchStore {
     return this.#terms
   }
 
+  /** Whether FTS5 finds anything for a word, or for the words that start with it. */
+  #finds(term: string, asPrefix: boolean): boolean {
+    const asked = phrase(term, asPrefix)
+    return this.#db.selectValue('SELECT 1 FROM sections_fts WHERE sections_fts MATCH ? LIMIT 1', [asked]) !== undefined
+  }
+
   /**
-   * How each word of a query is looked up. A word that FTS5 finds, as itself
-   * or as the start of a longer word while it is being typed, is left to
-   * FTS5. One it does not find is taken for the words close to it.
+   * How each word of a query is looked up: see `planQuery`. A word that FTS5
+   * finds, as itself or as the start of longer words, is left to FTS5, which
+   * takes a prefix whole where the in-memory store lists the words under it.
    */
-  #plan(query: string, typing: boolean): QueryWord[] {
-    const words = queryTerms(query)
-    return words.map((word, position) => {
-      const asked = phrase(word, typing && position === words.length - 1)
-      const found = this.#db.selectValue('SELECT 1 FROM sections_fts WHERE sections_fts MATCH ? LIMIT 1', [asked]) !== undefined
-      return found ? { word, terms: [{ term: word, weight: 1 }], corrected: false } : correctedWord(word, this.#vocabulary())
+  #plan(query: string): QueryWord[] {
+    return planQuery(query, {
+      find: (word, asPrefix) =>
+        this.#finds(word, asPrefix) ? [{ term: word, weight: 1, ...(asPrefix ? { prefix: true as const } : {}) }] : [],
+      has: (term) => this.#finds(term, false),
+      all: () => this.#vocabulary(),
     })
   }
 
   /** Section ids for a looked-up query, best first. */
-  #rank(plan: readonly QueryWord[], typing: boolean, limit: number): number[] {
+  #rank(plan: readonly QueryWord[], limit: number): number[] {
     // FTS5's BM25 cannot weigh one word of a query against another. But it adds the words of a query up, so the
     // words are asked for in groups, one per weight, and the groups are added up here.
     const groups = new Map<number, string[]>()
-    plan.forEach(({ terms, corrected }, position) => {
-      for (const { term, weight } of terms) {
-        const asked = phrase(term, typing && !corrected && position === plan.length - 1)
+    for (const { terms } of plan) {
+      for (const { term, weight, prefix } of terms) {
+        const asked = phrase(term, prefix === true)
         const group = groups.get(weight)
         if (group) group.push(asked)
         else groups.set(weight, [asked])
       }
-    })
+    }
     if (groups.size === 0) return []
 
     const scored = `bm25(sections_fts, ${BM25_WEIGHTS})`
@@ -321,10 +344,8 @@ export class SqliteStore implements SearchStore {
     const pool = candidatePool(limit)
     const ids = (rows: Record<string, unknown>[]) => rows.map((row) => Number(row.id) - 1)
 
-    // While someone is typing, the last word is probably unfinished.
-    const typing = !/\s$/.test(query)
-    const plan = this.#plan(query, typing)
-    const keywordIds = this.#rank(plan, typing, pool)
+    const plan = this.#plan(query)
+    const keywordIds = this.#rank(plan, pool)
 
     let meaningIds: number[] = []
     if (this.semantic && queryVector) {

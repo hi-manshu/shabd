@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { chunkPage, embeddingInput } from '../src/node/search/chunk.js'
 import { editDistance } from '../src/shared/edit-distance.js'
 import { locatePassage, passageTarget } from '../src/shared/passage.js'
@@ -11,7 +11,9 @@ import {
   queryTerms,
   rankBySimilarity,
   search,
+  setSegmenter,
   similarities,
+  spansToMark,
   tokenize,
   typoBudget,
   wordSpans,
@@ -61,6 +63,148 @@ describe('tokenize', () => {
   it('marks the words of a query that say why a result matched, not the very short ones', () => {
     expect(wordsToMark(index.plan('how do I change the colours'))).toEqual(['change', 'colours'])
     expect(wordsToMark(index.plan('go to it'))).toEqual([])
+  })
+})
+
+describe('text in a script without spaces', () => {
+  afterEach(() => setSegmenter(undefined))
+
+  /** Words are held decomposed, as accents are: ブ is フ and a mark. Put back together, they can be read here. */
+  const cut = (text: string) => tokenize(text).map((word) => word.normalize('NFC'))
+
+  it('is cut into words by a dictionary', () => {
+    expect(cut('搜索功能')).toEqual(['搜索', '功能'])
+    expect(cut('検索は読者のブラウザーで実行されます')).toEqual(expect.arrayContaining(['検索', '読者', 'ブラウザー', '実行']))
+    expect(cut('การค้นหาทำงานในเบราว์เซอร์')).toEqual(expect.arrayContaining(['ค้นหา', 'เบราว์เซอร์']))
+    // Punctuation and spaces are not words here either.
+    expect(cut('搜索，功能。 搜索')).toEqual(['搜索', '功能', '搜索'])
+    // Written composed or decomposed, a word is the same word.
+    expect(tokenize('ブラウザー')).toEqual(tokenize('ブラウザー'.normalize('NFD')))
+  })
+
+  it('is cut apart from letters and digits of other scripts that run into it', () => {
+    expect(tokenize('Node18以上')).toEqual(['node18', '以上'])
+    expect(tokenize('Shabd搜索 café 2 cups')).toEqual(['shabd', '搜索', 'cafe', '2', 'cups'])
+  })
+
+  it('leaves every other text cut exactly as it was before', () => {
+    // The tokeniser as it was before any text was cut by dictionary.
+    const before = (text: string) =>
+      text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').match(/[\p{L}\p{N}\p{M}]+/gu) ?? []
+    const texts = [
+      'Café-au-lait, 2 cups! Don’t e-mail naïve_coöperation@example.com',
+      'शब्द का अर्थ है word. हिन्दी में खोज',
+      'Ελληνικά άλφα, Русский язык: поиск ёж',
+      'العربية بحث في المستندات',
+      '한국어 검색 기능은 띄어쓰기를 씁니다',
+      'İstanbul ǅ ½ x² ℃ Ⅷ é́',
+      '',
+    ]
+    for (const text of texts) expect(tokenize(text), text).toEqual(before(text))
+  })
+
+  it('says where each of its words is', () => {
+    const text = 'Node18以上が必要です。'
+    const spans = wordSpans(text)
+    expect(spans.map((span) => text.slice(span.start, span.end))).toEqual(['Node18', '以上', 'が', '必要', 'です'])
+    expect(spans.map((span) => span.token)).toEqual(tokenize(text))
+  })
+
+  it('is cut into pairs of letters where there is no dictionary to cut it by', () => {
+    setSegmenter(null)
+    expect(tokenize('搜索功能')).toEqual(['搜索', '索功', '功能'])
+    expect(tokenize('読')).toEqual(['読'])
+    // A letter keeps the marks that sit on it: ค้ is one letter of two characters.
+    expect(tokenize('ค้นหา')).toEqual(['ค้น', 'นห', 'หา'])
+    // Other scripts need no dictionary, and are not touched.
+    expect(tokenize('Node18以上 café')).toEqual(['node18', '以上', 'cafe'])
+  })
+})
+
+describe('keyword search in a script without spaces', () => {
+  afterEach(() => setSegmenter(undefined))
+
+  const pages = [
+    doc('/zh', '搜索', '搜索功能在读者的浏览器中运行，不需要任何搜索服务。侧边栏的宽度可以在主题配置中修改。'),
+    doc('/ja', 'サイドバー', 'サイドバーの幅はテーマの設定で変更できます。検索は読者のブラウザーで実行されます。'),
+    doc('/th', 'การค้นหา', 'การค้นหาทำงานในเบราว์เซอร์ของผู้อ่าน ติดตั้งแพ็กเกจแล้วเริ่มเซิร์ฟเวอร์สำหรับนักพัฒนา'),
+    doc('/en', 'Install', 'Run the installer, then start the dev server.'),
+  ]
+  const words = new KeywordIndex(pages)
+  const found = (query: string) => words.search(query, 5).map((hit) => pages[hit.doc]!.path)
+
+  it('finds a section by a word of its text', () => {
+    expect(found('浏览器')).toEqual(['/zh'])
+    expect(found('主题配置')).toEqual(['/zh'])
+    expect(found('ブラウザー')).toEqual(['/ja'])
+    expect(found('設定')).toEqual(['/ja'])
+    expect(found('เบราว์เซอร์')).toEqual(['/th'])
+    expect(found('ค้นหา')).toEqual(['/th'])
+    // A word shared by two languages finds both, and a word of another script is as it was.
+    expect(found('读者 読者').sort()).toEqual(['/ja', '/zh'])
+    expect(found('installer')).toEqual(['/en'])
+  })
+
+  it('matches the word still being typed from its first letter', () => {
+    expect(found('浏')).toEqual(['/zh'])
+    expect(found('ブラウ')).toEqual(['/ja'])
+  })
+
+  /** A segmenter that cuts some words as Playwright's Firefox was seen to, and the rest as this runtime does. */
+  const cutAs = (cuts: Record<string, string[]>): Intl.Segmenter => {
+    const own = new Intl.Segmenter('en', { granularity: 'word' })
+    const segment = (text: string) => {
+      const pieces = cuts[text]
+      if (!pieces) return own.segment(text)
+      let index = 0
+      return pieces.map((piece) => ({ segment: piece, index: (index += piece.length) - piece.length, input: text }))
+    }
+    return { segment } as unknown as Intl.Segmenter
+  }
+
+  it('finds a word that the reader’s browser cut otherwise than the build did', () => {
+    // The index was cut by this runtime: サイド and バー, ทำงาน, เบราว์เซอร์, ติด and ตั้ง.
+    setSegmenter(cutAs({ サイドバー: ['サイドバー'], ทำงาน: ['ทำ', 'งาน'], เบราว์เซอร์: ['เบราว์', 'เซอร์'], ติดตั้ง: ['ติดตั้ง'] }))
+
+    // Terms are held decomposed (ド as ト and its mark), so they are put back together to be read here.
+    const terms = (query: string) =>
+      words.plan(query).map((word) => word.terms.map(({ term, weight }) => `${term.normalize('NFC')} ${weight}`))
+
+    // One word where the index has two: it is cut again along the index's words.
+    expect(found('サイドバー ')).toEqual(['/ja'])
+    expect(terms('サイドバー ')).toEqual([['サイド 1', 'バー 1']])
+    expect(words.plan('サイドバー ')[0]?.corrected).toBe(true)
+    expect(found('ติดตั้ง ')).toEqual(['/th'])
+    expect(terms('ติดตั้ง ')).toEqual([['ติด 1', 'ตั้ง 1']])
+    // Two words where the index has one: the first is found as the start of the longer word.
+    expect(found('ทำงาน ')).toEqual(['/th'])
+    expect(terms('ทำงาน ')).toEqual([['ทำงาน 0.6'], []])
+    expect(found('เบราว์เซอร์ ')).toEqual(['/th'])
+  })
+
+  it('finds text by pairs of letters where the reader’s browser has no dictionary', () => {
+    setSegmenter(null)
+    expect(found('浏览器')).toEqual(['/zh'])
+    expect(found('搜索功能')).toEqual(['/zh'])
+    expect(found('サイドバー')).toEqual(['/ja'])
+    expect(found('ブラウザー')).toEqual(['/ja'])
+    expect(found('เบราว์เซอร์')).toEqual(['/th'])
+    expect(found('installer')).toEqual(['/en'])
+  })
+
+  it('marks single letters only where they belong to what was typed', () => {
+    const text = pages[0]!.text
+    const marked = (marks: string[]) =>
+      spansToMark(wordSpans(text), marks).map((span) => `${text.slice(span.start, span.end)}@${span.start}`)
+    // A word of two letters is a word: the rule that leaves "to" unmarked is for alphabets.
+    expect(wordsToMark(words.plan('搜索 的 a to'))).toEqual(['搜索', '的'])
+    expect(marked(['搜索'])).toEqual(['搜索@0', '搜索@20'])
+    // 的 is grammar. It is in the text twice, and beside neither 搜索 nor 功能.
+    expect(marked(['搜索', '的', '功能'])).toEqual(['搜索@0', '功能@2', '搜索@20'])
+    // A term the dictionary does not know comes as its letters. They are marked where they stand together.
+    expect(marked(['侧', '边', '栏', '中'])).toEqual(['侧边@25', '栏@27'])
+    // A query that is one letter and no more is marked wherever it is.
+    expect(marked(['的'])).toEqual(['的@7', '的@28'])
   })
 })
 
@@ -262,6 +406,34 @@ describe('chunking', () => {
     // Each passage starts 160 words after the previous one, so 40 words overlap.
     expect(passages[1]!.text.startsWith('w160 ')).toBe(true)
     expect(passages.at(-1)!.text.endsWith(' w449')).toBe(true)
+  })
+
+  it('counts words, and not runs of letters, where a text has no spaces', () => {
+    const sentence = '搜索功能在读者的浏览器中运行，不需要任何搜索服务。'
+    const text = sentence.repeat(40)
+    const total = tokenize(text).length
+    expect(total).toBeGreaterThan(400)
+
+    // Counted by its spaces the whole section is one word, and so one passage.
+    const section = { anchor: 'long', heading: '搜索', depth: 2, text }
+    const passages = chunkPage(page, [section]).filter((unit) => unit.anchor === 'long')
+    expect(passages).toHaveLength(Math.ceil((total - 200) / 160) + 1)
+    // About 200 words each. Cut on its own, a passage can come out a word more or less at its ends.
+    expect(Math.abs(tokenize(passages[0]!.text).length - 200)).toBeLessThan(5)
+    // A passage is the text as it was written: no spaces are put in, and punctuation stays where it was.
+    for (const passage of passages) expect(text).toContain(passage.text)
+    expect(text.startsWith(passages[0]!.text)).toBe(true)
+    expect(text.endsWith(passages.at(-1)!.text)).toBe(true)
+  })
+
+  it('keeps the spaces of a text that has both kinds of script', () => {
+    const text = `${'word '.repeat(150)}${'搜索功能在读者的浏览器中运行。'.repeat(20)} ${'tail '.repeat(100)}`.trim()
+    const section = { anchor: 'mixed', heading: 'Mixed', depth: 2, text }
+    const passages = chunkPage(page, [section]).filter((unit) => unit.anchor === 'mixed')
+    expect(passages.length).toBeGreaterThan(1)
+    for (const passage of passages) expect(text).toContain(passage.text)
+    expect(passages[0]!.text.startsWith('word word ')).toBe(true)
+    expect(passages.at(-1)!.text.endsWith(' tail tail')).toBe(true)
   })
 })
 

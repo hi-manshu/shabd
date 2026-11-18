@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { passageTarget } from '../../shared/passage.js'
-import type { SearchHit } from '../../shared/search-core.js'
+import { isUnspaced, spansToMark, wordSpans, type SearchHit } from '../../shared/search-core.js'
 import { Icon } from '../app/icons.js'
 import { useRouter } from '../app/router.js'
 import { useSite, useStore } from '../app/store.js'
@@ -8,18 +8,35 @@ import { setUi } from '../app/ui.js'
 import { useHref } from '../ui/Link.js'
 import { openSearch, runSearch, searchStatus, type SearchResults, type SearchStatus } from './client.js'
 
-const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
 /**
  * `text` with the words that were searched for marked. Words are matched
  * from their first letter. The words come with the result, because they are
  * not always the ones typed: a misspelt word is marked as what it was taken for.
+ *
+ * The text is cut into words the way the index is, so a word is found
+ * whatever its case and accents, and in a script that has no spaces to find
+ * a word by.
  */
 function Highlighted({ text, words }: { text: string; words: string[] }) {
-  if (words.length === 0) return <>{text}</>
-  const pattern = new RegExp(`(?<![\\p{L}\\p{N}])(${words.map(escapeRegExp).join('|')})`, 'giu')
-  const parts = text.split(pattern)
-  return <>{parts.map((part, index) => (index % 2 === 1 ? <mark key={index}>{part}</mark> : part))}</>
+  const parts: ReactNode[] = []
+  let at = 0
+  spansToMark(wordSpans(text), words).forEach((span, index) => {
+    // Of a word that is still being typed, only what was typed is marked. That takes counting letters off,
+    // which works where the word as it is written and as it is indexed are the same length. It is not done in
+    // a script without spaces, where a word of the text can start with a whole word of the query.
+    const typed = Math.max(...words.filter((word) => span.token.startsWith(word)).map((word) => word.length))
+    const written = span.end - span.start
+    const counted = written === span.token.length && !isUnspaced(span.token)
+    const end = span.start + (counted ? Math.min(typed, written) : written)
+    parts.push(text.slice(at, span.start), <mark key={index}>{text.slice(span.start, end)}</mark>)
+    at = end
+  })
+  return (
+    <>
+      {parts}
+      {text.slice(at)}
+    </>
+  )
 }
 
 function statusLine(status: SearchStatus, semanticEnabled: boolean): string {

@@ -15,7 +15,7 @@
  * API still goes to the passage; it shows no marks.
  */
 import { locatePassage, type PassageTarget } from '../../shared/passage.js'
-import { tokenize, wordSpans } from '../../shared/search-core.js'
+import { spansToMark, tokenize, wordSpans } from '../../shared/search-core.js'
 
 /** The name the marks are registered under. The stylesheet has the same one. */
 const HIGHLIGHT = 'sb-search'
@@ -127,14 +127,13 @@ export function showPassage(target: PassageTarget, anchor: string, onDismiss: ()
   const { first, last } = located ?? { first: 0, last: words.length - 1 }
   const fromHeading = first < NEAR_HEADING
 
-  const wanted = (token: string) => target.words.some((word) => token.startsWith(word))
   const marks: Range[] = []
   if (fromHeading && section.heading) {
     const title = readText([section.heading])
-    for (const word of wordSpans(title.text)) if (wanted(word.token)) marks.push(rangeOf(title, word.start, word.end))
+    for (const word of spansToMark(wordSpans(title.text), target.words)) marks.push(rangeOf(title, word.start, word.end))
   }
-  for (const word of words.slice(first, last + 1)) {
-    if (wanted(word.token)) marks.push(rangeOf(body, word.start, word.end))
+  for (const word of spansToMark(words.slice(first, last + 1), target.words)) {
+    marks.push(rangeOf(body, word.start, word.end))
   }
 
   // The start of the passage goes where a heading would: just under the header.
