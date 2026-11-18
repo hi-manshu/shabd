@@ -20,7 +20,8 @@ const readAll = (source: string, mdx = false) =>
 function pagesUnder(folder: string): string[] {
   return readdirSync(folder).flatMap((name) => {
     const file = path.join(folder, name)
-    if (statSync(file).isDirectory()) return name === 'node_modules' || name.startsWith('.') ? [] : pagesUnder(file)
+    // Sources only. A build leaves a Markdown copy of each page in `dist`, on a machine that has built.
+    if (statSync(file).isDirectory()) return name === 'node_modules' || name === 'dist' || name.startsWith('.') ? [] : pagesUnder(file)
     return /\.mdx?$/.test(name) ? [file] : []
   })
 }
@@ -29,7 +30,7 @@ describe('the pieces of a line', () => {
   // The colours are drawn behind the text being typed. A character more or less would put them under the wrong letters.
   it('are the line, character for character, in every page of this repository', () => {
     const files = [...pagesUnder(path.join(REPO, 'docs')), ...pagesUnder(path.join(REPO, 'e2e', 'site')), path.join(REPO, 'README.md'), path.join(REPO, 'ROADMAP.md')]
-    expect(files.length).toBeGreaterThan(30)
+    expect(files.length).toBeGreaterThanOrEqual(25)
     let coloured = 0
     for (const file of files) {
       const source = readFileSync(file, 'utf8')
@@ -43,7 +44,7 @@ describe('the pieces of a line', () => {
       })
     }
     // And it found something to colour: the check above would also pass if every line came back plain.
-    expect(coloured).toBeGreaterThan(1000)
+    expect(coloured).toBeGreaterThan(800)
   })
 
   it('are the line for text that is not well-formed', () => {
