@@ -34,8 +34,7 @@ What is left to set up:
    the `test` and `browsers` jobs required. The release workflow pushes the commit that sets the version straight
    to `main`: if pull requests become required, let the owner bypass that, or release from a machine.
 3. **Browser tests on macOS and Windows.** `ci.yml` runs the unit tests, the docs check and a build on Linux,
-   macOS and Windows. A failure on Windows is reported and does not turn the check red yet. The browser tests run
-   on Linux only.
+   macOS and Windows, and all three have to pass. The browser tests run on Linux only.
 4. **The copyright holder.** `LICENSE` says "Shabd contributors". Check that this is the name you want.
 5. **Community files:** `SECURITY.md` with a private way to report vulnerabilities, which matters here because the
    dev server can write files; `CODE_OF_CONDUCT.md`; issue forms and a pull request template; a changelog.

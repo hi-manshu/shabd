@@ -7,14 +7,12 @@ on:
 
 jobs:
   test:
-    # Linux and macOS have to pass. Windows is run to see what it says: Shabd has never been run there, so
-    # until it passes, a failure on Windows is reported and does not turn the check red.
+    # The unit tests, the docs check and a build, on Linux, macOS and Windows. All three have to pass.
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
