@@ -908,6 +908,10 @@ const ApiSchema = z.strictObject({
   baseUrl: z.string().optional(),
   auth: z.string().optional(),
   deprecated: z.boolean().default(false),
+  /** Let a reader send the request from the page, and see what the API answers. */
+  try: z.boolean().default(false),
+  /** A body for the request to start from, for a reader who tries it: any value, written as YAML. */
+  body: z.unknown().optional(),
 })
 
 const PageSidebarSchema = z

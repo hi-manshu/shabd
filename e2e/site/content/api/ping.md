@@ -7,6 +7,7 @@ api:
   path: /v1/ping/{region}
   baseUrl: https://api.fixture.test
   auth: none
+  try: true
 ---
 
 Returns `pong`.

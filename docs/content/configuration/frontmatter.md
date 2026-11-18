@@ -117,8 +117,53 @@ Used by `layout: api` to draw the request line. The [MCP endpoint](../reference/
 layout: api
 api:
   method: POST
-  path: /v1/users/{id}
+  path: /v1/users/{id}/notes
   baseUrl: https://api.example.com
   auth: Bearer token
   deprecated: false
+  try: true
+  body:
+    text: Hello
 ```
+
+| Key | What it does |
+| --- | --- |
+| `method` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` or `OPTIONS`. Required |
+| `path` | The path of the request. Required. A part in braces, `{id}`, is a parameter and is marked as one. So is a segment that starts with a colon, `:id` |
+| `baseUrl` | The address of the API, shown in front of the path |
+| `auth` | How a caller signs in, in words: `Bearer token`, `none` |
+| `deprecated` | `true` marks the request as one not to use any more |
+| `try` | `true` lets a reader [send the request](#trying-a-request) from the page |
+| `body` | A body for the reader's request to start from, written as YAML |
+
+### Trying a request
+
+With `try: true` the request line has a **Try it** button. It opens a form with the address of the API, a field for
+each parameter of the path, a query, headers and, for a request that carries one, a body. **Send** sends the request
+and shows what the API answered: the status, how long it took, and the answer itself. The
+[llms.txt endpoint](../reference/endpoints/llms-txt.md) page has one that fetches this site's own file.
+
+The request is sent by the reader's browser, straight to the API. A Shabd site is static files, so there is no
+server of its own for a request to pass through, and nothing the reader types reaches the docs site. That decides
+what works:
+
+- **The API has to allow requests from other sites.** A browser only gives a page the answer when the API sends
+  `Access-Control-Allow-Origin` for the address of the docs. Before a request with a body, or with a header such as
+  `Authorization`, the browser first asks the API with an `OPTIONS` request, and the API has to answer that too. When
+  it does not, the form says the request got no answer. A browser does not tell a page why.
+- **The requests are real.** A `DELETE` deletes. Offer `try` where a reader can do no harm, or point `baseUrl` at
+  a sandbox.
+- **A body is sent as JSON.** `body` is written as YAML and shown to the reader as JSON, to change before sending.
+  One that is not JSON is not sent, and the form says what is wrong with it. Form fields and file uploads are not
+  supported.
+- **Headers are typed one to a line**, as `Authorization: Bearer …`. A browser does not let a page set some of
+  them, `Cookie` and `Origin` among them, and leaves those out without saying so.
+- **The answer is shown when it is text.** JSON is laid out to be read. Up to 100,000 characters are shown. For
+  anything else the form gives its type and its size. The headers of the answer are not shown. A request that is
+  not answered in 30 seconds is given up.
+
+The address and the headers a reader types are kept while they move between the pages of one API, so a token is
+typed once. They are held in memory and never stored: reloading the page forgets them. Pages share them when they
+have the same `baseUrl`, so a token typed for one API is not offered to another.
+
+Without `baseUrl` the reader types the address of the API themselves.

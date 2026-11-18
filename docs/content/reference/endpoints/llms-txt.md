@@ -5,12 +5,16 @@ layout: api
 api:
   method: GET
   path: /llms.txt
+  # This site's own address, so that "Try it" has a file to fetch.
+  baseUrl: https://hi-manshu.github.io/shabd
   auth: none
+  try: true
 sidebar:
   order: 1
 ---
 
-Returns a Markdown file that follows the [llms.txt convention](https://llmstxt.org).
+Returns a Markdown file that follows the [llms.txt convention](https://llmstxt.org). **Try it**, above, fetches the
+one this site serves.
 
 The file has the site title as its heading, the site description as a quote, and one section per top-level sidebar
 group. Each section lists its pages as links to their Markdown copies.

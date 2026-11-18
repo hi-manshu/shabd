@@ -49,7 +49,7 @@ A page has up to six regions. A region with no blocks is not rendered, and the p
 | `breadcrumbs` | main | The sidebar groups above this page |
 | `page-header` | main | Title, badges and description |
 | `page-actions` | main | [The page as Markdown](../features/mcp.md#on-the-page): copy it, open it, hand it to an assistant |
-| `api-endpoint` | main | The request line from `api:` frontmatter |
+| `api-endpoint` | main | The request line from `api:` frontmatter, and the form to [try the request](./frontmatter.md#trying-a-request) when the page offers it |
 | `hero` | main | The opening of a splash page, from `hero:` frontmatter |
 | `content` | main | The Markdown body |
 | `page-footer` | main | "Edit this page", and the day the page was [last changed](./site.md#when-a-page-was-last-changed) |

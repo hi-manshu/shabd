@@ -31,6 +31,8 @@
     .sb-anchor,
     .sb-code-copy,
     .sb-tab-list,
+    .sb-api-try-toggle,
+    .sb-api-try,
     .sb-search,
     .sb-studio {
       display: none;

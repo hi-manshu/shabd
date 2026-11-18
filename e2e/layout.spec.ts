@@ -44,7 +44,9 @@ test.describe('prose beside code', () => {
   test('and under it on a narrow one', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 800 })
     const { prose, code } = await cells(page)
-    expect(code.y).toBeGreaterThanOrEqual(prose.y + prose.height)
+    // Under it: the code starts where the text ends. Positions are fractions of a pixel, and the two
+    // sums can differ in their last digits, so "where it ends" is given half a pixel.
+    expect(code.y).toBeGreaterThan(prose.y + prose.height - 0.5)
     expect(Math.abs(code.x - prose.x)).toBeLessThan(2)
   })
 })
