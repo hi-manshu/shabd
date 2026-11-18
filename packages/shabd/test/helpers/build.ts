@@ -10,7 +10,7 @@ import { build, type BuildOptions } from '../../src/node/build/build.js'
  * Inside the package, so that `react` and Shabd's browser code resolve from
  * the repository's node_modules. The folder is ignored by Git.
  */
-const WORK = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.tmp')
+export const WORK = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '.tmp')
 
 /**
  * For a test site's config. Without it a build would find Transformers.js in

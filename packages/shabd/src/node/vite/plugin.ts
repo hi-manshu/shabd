@@ -48,6 +48,7 @@ import { HMR_RUNTIME_ID, PAGE_ERROR_ID, toErrorModule, toPageModule } from '../m
 import { hasMermaid, mathStylesheet } from '../markdown/user-plugins.js'
 import { CLIENT_DIR, CLIENT_ENTRY, PACKAGE_ROOT, packageName, resolveFromPackage, SERVER_ENTRY } from '../paths.js'
 import { devMiddlewares } from './dev-middleware.js'
+import { SecondLook } from './second-look.js'
 
 export interface ShabdPluginOptions {
   /** Folder containing shabd.config.yaml. Defaults to Vite's root. */
@@ -83,6 +84,8 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
   /** Pages with a hot update in flight: when the change was seen and how long compiling took. */
   const hotFiles = new Map<string, { at: number; compileMs?: number }>()
   let contentWatcher: FSWatcher | undefined
+  /** Reads a changed file once more, in case a second save followed the first too closely to be reported. */
+  let secondLook: SecondLook | undefined
 
   const ctx = (): ShabdContext => {
     if (!context) throw new Error('shabd: plugin used before its config hook ran')
@@ -301,8 +304,17 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
         if (module) void client.reloadModule(module)
       }
       const same = (a: string, b: string) => normalizePath(a) === normalizePath(b)
+      /** What the file holds as this change is handled, for the look that follows. */
+      const lookAgain = async () => {
+        try {
+          secondLook?.after(file, await read())
+        } catch {
+          // The file is gone: there is nothing to look at again.
+        }
+      }
 
       if (same(file, config.configFile)) {
+        await lookAgain()
         await reloadConfig(server, context, {
           data: () => reload(VIRTUAL.data),
           // Every page the browser has loaded is compiled again and swapped in, as after an edit to it.
@@ -316,6 +328,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       }
 
       if (same(file, config.sidebarFile)) {
+        await lookAgain()
         try {
           store.setSidebar(await loadSidebar(config))
           logSidebarWarnings(server, context)
@@ -345,6 +358,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
         throw error
       }
+      secondLook?.after(file, source)
       const { page, change } = await store.upsert(file, source)
       // Same bytes as before (a save without edits, or the second of two
       // watchers reporting one save): nothing to update.
@@ -374,6 +388,8 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
     closeBundle() {
       contentWatcher?.close()
       contentWatcher = undefined
+      secondLook?.close()
+      secondLook = undefined
     },
 
     configureServer(server) {
@@ -387,6 +403,8 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
 
       contentWatcher?.close()
       contentWatcher = watchContent(server, ctx)
+      secondLook?.close()
+      secondLook = new SecondLook({ report: (file) => server.watcher.emit('change', normalizePath(file)) })
 
       // Installed after Vite's own middlewares, so requests have passed its
       // host check and CORS policy. First the dev endpoints (llms.txt, MCP,
