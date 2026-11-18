@@ -87,6 +87,7 @@ export class ContentStore {
   #pages = new Map<string, PageRecord>()
   #sidebarSource: LoadedSidebar
   #sidebar: ResolvedSidebars | undefined
+  #published: { list: readonly PageRecord[]; byPath: ReadonlyMap<string, PageRecord> } | undefined
   #revision = 0
   /** File → the day of its last commit. Empty unless `defaults.lastUpdated` is on. */
   #commitDays = new Map<string, string>()
@@ -131,11 +132,28 @@ export class ContentStore {
     return this.#revision
   }
 
-  /** Published pages, in route order. */
-  pages(): PageRecord[] {
-    return [...this.#pages.values()]
-      .filter((page) => this.options.drafts || !page.frontmatter.draft)
-      .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+  /**
+   * The published pages in route order, and the same pages by route. They are
+   * worked out when first asked for and kept until a page changes: a build
+   * asks for a page by its route for every link and every page it writes, and
+   * sorting the whole site each time made a large site slow to build.
+   */
+  #view(): { list: readonly PageRecord[]; byPath: ReadonlyMap<string, PageRecord> } {
+    if (!this.#published) {
+      const list = [...this.#pages.values()]
+        .filter((page) => this.options.drafts || !page.frontmatter.draft)
+        .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+      const byPath = new Map<string, PageRecord>()
+      // Two files with one route are an error that is reported elsewhere. Until it is fixed, the first one answers.
+      for (const page of list) if (!byPath.has(page.path)) byPath.set(page.path, page)
+      this.#published = { list, byPath }
+    }
+    return this.#published
+  }
+
+  /** Published pages, in route order. The list is the store's own: copy it before changing it. */
+  pages(): readonly PageRecord[] {
+    return this.#view().list
   }
 
   byId(id: string): PageRecord | undefined {
@@ -147,7 +165,7 @@ export class ContentStore {
   }
 
   byPath(routePath: string): PageRecord | undefined {
-    return this.pages().find((page) => page.path === routePath)
+    return this.#view().byPath.get(routePath)
   }
 
   /** Pages whose frontmatter failed validation. */
@@ -224,6 +242,7 @@ export class ContentStore {
 
     const page = this.#read(id, file, text, hash, previous)
     this.#pages.set(id, page)
+    this.#published = undefined
     this.#revision++
 
     const change: PageChange = !previous ? 'added' : metaKey(previous) === metaKey(page) ? 'body' : 'meta'
@@ -237,6 +256,7 @@ export class ContentStore {
     if (page) {
       this.#pages.delete(id)
       this.#sidebar = undefined
+      this.#published = undefined
       this.#revision++
     }
     return page

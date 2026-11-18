@@ -162,7 +162,9 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
         // worker; and worker bundles get their own plugin list.
         worker: { format: 'es', plugins: () => [workerModules(ctx)] },
         server: { fs: { allow: [searchForWorkspaceRoot(config.root), PACKAGE_ROOT] } },
-        build,
+        // Vite compresses every file it wrote to report its size, and `shabd build` does not print that
+        // report. On a site of thousands of pages the compressing took seconds.
+        build: { reportCompressedSize: false, ...build },
       }
     },
 

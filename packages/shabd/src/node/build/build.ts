@@ -258,6 +258,8 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
 class AssetResolver {
   #manifest: Manifest
   #entry: ManifestChunk
+  /** The app's own chunks, which every page needs. They are found once, not once for each page. */
+  #shared: { chunks: ManifestChunk[]; keys: Set<string> }
   #base: string
   #root: string
 
@@ -265,9 +267,11 @@ class AssetResolver {
     this.#manifest = manifest
     this.#base = context.config.config.site.base
     this.#root = context.config.root
-    const entry = Object.values(manifest).find((chunk) => chunk.isEntry)
-    if (!entry) throw new Error('shabd: the build manifest has no entry chunk')
-    this.#entry = entry
+    const entryKey = Object.keys(manifest).find((key) => manifest[key]!.isEntry)
+    if (entryKey === undefined) throw new Error('shabd: the build manifest has no entry chunk')
+    this.#entry = manifest[entryKey]!
+    const keys = new Set<string>()
+    this.#shared = { chunks: this.#closure(entryKey, keys), keys }
   }
 
   #url(file: string): string {
@@ -285,12 +289,10 @@ class AssetResolver {
 
   /** Stylesheets, plus preloads for the app and for this page's own chunk, so the first render needs no waterfall. */
   headTags(pageFile?: string): string {
-    const entryKey = Object.keys(this.#manifest).find((key) => this.#manifest[key] === this.#entry)!
-    const seen = new Set<string>()
-    const chunks = this.#closure(entryKey, seen)
+    const chunks = [...this.#shared.chunks]
     if (pageFile) {
       const key = path.relative(this.#root, pageFile).split(path.sep).join('/')
-      chunks.push(...this.#closure(key, seen))
+      chunks.push(...this.#closure(key, new Set(this.#shared.keys)))
     }
     const styles = [...new Set(chunks.flatMap((chunk) => chunk.css ?? []))]
     const scripts = [...new Set(chunks.map((chunk) => chunk.file))].filter((file) => file !== this.#entry.file)

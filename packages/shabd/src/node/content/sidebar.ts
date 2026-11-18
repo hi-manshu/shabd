@@ -74,14 +74,17 @@ export interface ResolveOptions {
   owns?: (page: SidebarPageInfo) => boolean
 }
 
-export function resolveSidebar(input: SidebarInput, pages: SidebarPageInfo[], options: ResolveOptions = {}): ResolvedSidebar {
-  const collator = new Intl.Collator(options.lang ?? 'en', { numeric: true, sensitivity: 'base' })
-  const warnings: SidebarWarning[] = []
-  const bySlug = new Map(pages.map((page) => [page.slug, page]))
-  const owns = options.owns ?? (() => true)
+/** The pages of a site, by slug and by the folder they are in. It is the same for every sidebar of the site. */
+interface ContentTree {
+  pages: readonly SidebarPageInfo[]
+  bySlug: Map<string, SidebarPageInfo>
+  directories: Map<string, Directory>
+}
 
-  /* ── index the content tree by directory ── */
+/** The folder a page lives in. An index page lives in the folder it stands for. */
+const directoryOf = (page: SidebarPageInfo) => (page.isIndex ? page.slug : parentDir(page.slug))
 
+function contentTree(pages: readonly SidebarPageInfo[]): ContentTree {
   const directories = new Map<string, Directory>([['', { pages: [], subdirs: new Set() }]])
   const ensureDirectory = (dir: string): Directory => {
     let directory = directories.get(dir)
@@ -92,9 +95,18 @@ export function resolveSidebar(input: SidebarInput, pages: SidebarPageInfo[], op
     }
     return directory
   }
-  /** The folder a page lives in. An index page lives in the folder it stands for. */
-  const directoryOf = (page: SidebarPageInfo) => (page.isIndex ? page.slug : parentDir(page.slug))
   for (const page of pages) ensureDirectory(directoryOf(page)).pages.push(page)
+  return { pages, bySlug: new Map(pages.map((page) => [page.slug, page])), directories }
+}
+
+export function resolveSidebar(input: SidebarInput, pages: readonly SidebarPageInfo[], options: ResolveOptions = {}): ResolvedSidebar {
+  return resolveIn(contentTree(pages), input, options)
+}
+
+function resolveIn({ pages, bySlug, directories }: ContentTree, input: SidebarInput, options: ResolveOptions): ResolvedSidebar {
+  const collator = new Intl.Collator(options.lang ?? 'en', { numeric: true, sensitivity: 'base' })
+  const warnings: SidebarWarning[] = []
+  const owns = options.owns ?? (() => true)
 
   /* ── track which folders sidebar.yaml accounts for ── */
 
@@ -158,6 +170,13 @@ export function resolveSidebar(input: SidebarInput, pages: SidebarPageInfo[], op
       if (items.length === 0) continue
       const label = titleize(subdir.slice(subdir.lastIndexOf('/') + 1))
       const index = bySlug.get(subdir)
+      const [only] = items
+      // A folder that holds nothing but its own index page is that page: `terms/cache/index.md` is the
+      // page "Cache", not a group called Cache with one entry called Cache.
+      if (items.length === 1 && only?.type === 'page' && index?.isIndex && only.path === index.path) {
+        entries.push({ node: only, label: only.label, order: index.sidebar.order ?? Number.POSITIVE_INFINITY, isIndex: false })
+        continue
+      }
       entries.push({
         node: { type: 'group', kind: 'folder', label, collapsed, items, auto: true },
         label,
@@ -256,12 +275,26 @@ export function resolveSidebar(input: SidebarInput, pages: SidebarPageInfo[], op
 
     /* ── fallback: folders sidebar.yaml never mentions ── */
 
+    // The folders that hold a page of this sidebar's own, in them or below them. Worked out once:
+    // asking every page about every folder is what made a large site with many sidebars slow.
+    let own: Set<string> | undefined
+    if (options.owns) {
+      own = new Set()
+      for (const page of pages) {
+        if (!owns(page)) continue
+        for (let dir = directoryOf(page); !own.has(dir); dir = parentDir(dir)) {
+          own.add(dir)
+          if (dir === '') break
+        }
+      }
+    }
+
     const uncovered = [...directories.keys()]
       .filter((dir) => dir !== '' && !isCovered(dir))
       // Keep only the top of each unmentioned subtree; its children nest inside it.
       .filter((dir) => parentDir(dir) === '' || isCovered(parentDir(dir)))
       // On a site with several sidebars, a folder goes to the sidebar its pages belong to.
-      .filter((dir) => directories.get(dir)!.pages.some(owns) || hasOwnedPagesBelow(dir))
+      .filter((dir) => own === undefined || own.has(dir))
       .sort(collator.compare)
 
     for (const dir of uncovered) {
@@ -285,10 +318,6 @@ export function resolveSidebar(input: SidebarInput, pages: SidebarPageInfo[], op
     .sort(collator.compare)
 
   return { sidebar, warnings, unlisted }
-
-  function hasOwnedPagesBelow(dir: string): boolean {
-    return pages.some((page) => owns(page) && page.slug.startsWith(`${dir}/`))
-  }
 }
 
 /* ─────────────────────────── more than one sidebar ───────────────────── */
@@ -325,7 +354,7 @@ export function inSection(path: string, prefix: string): boolean {
  */
 export function resolveSidebars(
   input: SidebarInput | Record<string, SidebarInput>,
-  pages: SidebarPageInfo[],
+  pages: readonly SidebarPageInfo[],
   options: { lang?: string } = {},
 ): ResolvedSidebars {
   if (Array.isArray(input)) {
@@ -335,10 +364,25 @@ export function resolveSidebars(
 
   const keys = Object.keys(input)
   const prefixOf = (key: string) => (key.length > 1 ? key.replace(/\/+$/, '') : key)
-  // The longest first, so that /guide/advanced is asked before /guide.
-  const prefixes = keys.map(prefixOf).filter((prefix) => prefix !== '/').sort((a, b) => b.length - a.length)
-  const sectionOf = (page: SidebarPageInfo) => prefixes.find((prefix) => inSection(page.path, prefix)) ?? '/'
+  const prefixes = new Set(keys.map(prefixOf).filter((prefix) => prefix !== '/'))
 
+  // Which part each page is in, and which parts have a page at all. Each page is asked once, by walking
+  // up its own path, so a site with many parts costs no more to sort out than a site with few.
+  const section = new Map<SidebarPageInfo, string>()
+  const peopled = new Set<string>()
+  for (const page of pages) {
+    let nearest: string | undefined
+    // From the page's own route upwards, so the longest key is met first: /guide/advanced before /guide.
+    for (let route = page.path; route !== '' && route !== '/'; route = route.slice(0, route.lastIndexOf('/'))) {
+      if (!prefixes.has(route)) continue
+      nearest ??= route
+      peopled.add(route)
+    }
+    section.set(page, nearest ?? '/')
+  }
+  const sectionOf = (page: SidebarPageInfo) => section.get(page) ?? '/'
+
+  const tree = contentTree(pages)
   const warnings: SidebarWarning[] = []
   const unlisted: string[] = []
   const sections: SidebarSection[] = []
@@ -347,7 +391,7 @@ export function resolveSidebars(
 
   for (const key of keys) {
     const prefix = prefixOf(key)
-    const resolved = resolveSidebar(input[key]!, pages, { ...options, owns: (page) => sectionOf(page) === prefix })
+    const resolved = resolveIn(tree, input[key]!, { ...options, owns: (page) => sectionOf(page) === prefix })
     // A warning says where in the file it is about, and the file now has the key above the list.
     warnings.push(...resolved.warnings.map((warning) => ({ ...warning, path: [key, ...(warning.path ?? [])] })))
     unlisted.push(...resolved.unlisted)
@@ -355,7 +399,7 @@ export function resolveSidebars(
     if (prefix === '/') fallback = resolved.sidebar
     else {
       sections.push({ prefix, sidebar: resolved.sidebar })
-      if (!pages.some((page) => inSection(page.path, prefix))) {
+      if (!peopled.has(prefix)) {
         warnings.push({ message: `No page is under ${prefix}, so this sidebar is never shown`, path: [key] })
       }
     }

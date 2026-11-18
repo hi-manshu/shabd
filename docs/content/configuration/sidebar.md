@@ -72,6 +72,10 @@ A page left out of a folder you *did* mention is not added for you, because that
 2. Then pages with `sidebar.order` in their frontmatter, lowest first.
 3. Then everything else, alphabetically by label. Numbers sort as numbers, so "Item 2" comes before "Item 10".
 
+A folder inside a generated group becomes a group the reader can open and close, named after the folder. A folder
+that holds nothing but its own `index` page is listed as that page instead: `glossary/cache/index.md` is the entry
+"Cache", not a group with one entry in it.
+
 A page controls its own generated entry from its frontmatter:
 
 ```yaml
@@ -87,8 +91,10 @@ sidebar:
 
 ## More than one sidebar
 
-On a large site, one sidebar for everything gets long. Written as a map instead of a list, `sidebar.yaml` gives
-each part of the site a sidebar of its own. Each key is the part of the site a sidebar belongs to, and under it is
+On a large site, one sidebar for everything gets long. It is also carried by every page that shows it: each entry
+puts its label and its address in the page's HTML. On a site that was measured that was 95 bytes an entry, so a
+sidebar of 633 pages added 60 KB to each of them. Written as a map instead of a list, `sidebar.yaml` gives each
+part of the site a sidebar of its own. Each key is the part of the site a sidebar belongs to, and under it is
 a list like any other.
 
 ```yaml title="sidebar.yaml"

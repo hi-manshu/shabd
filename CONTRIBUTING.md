@@ -49,6 +49,31 @@ A new feature that has something to click belongs in these tests. They have caug
 a hydration error, a hot update that reloaded into a blank page, and a watcher that reported deleted files as
 changed.
 
+## Large sites
+
+`npm run bench` measures Shabd on sites far larger than its own docs. It writes a site of 1,000 pages and one of
+5,000 under `.shabd/bench/`, which Git ignores, and times reading the site, a build with nothing cached, the same
+build again, `shabd check`, `shabd dev` (the first page, a page not seen before, an edit) and, on the built site,
+a page and a search. It reports the most memory each took and what the build wrote. Build the package first, and
+install Playwright's Chromium: two of the measurements open the site in a browser.
+
+```sh
+npm run bench                                    # 1,000 and 5,000 made-up pages
+npm run bench -- 200 2000                        # other sizes
+npm run bench -- 5000 --corpus path/to/markdown  # real pages, from a folder of Markdown
+npm run bench -- 1000 --only build,check         # some of the measurements
+npm run bench -- 1000 --semantic                 # with embeddings, which take far longer than the rest
+```
+
+The made-up pages are shaped like reference documentation, and the same number always gives the same site. They
+cannot show what real Markdown does to the pipeline, so run it on real pages as well. `--corpus` copies the first
+pages of any folder of Markdown, with the files beside them, and cuts their frontmatter down to a title and a
+description. The numbers in the roadmap came from [MDN's content](https://github.com/mdn/content): thousands of
+pages of plain Markdown, each in a folder of its own with its pictures.
+
+Run it before and after a change to the content store, the sidebar resolver or the build. The first run found
+three places where the time grew with the square of the number of pages.
+
 ## Where things go
 
 - A new config key starts in `src/shared/schema.ts`. Types and the editor JSON Schemas follow from it.
@@ -140,6 +165,7 @@ shabd/
 │   ├── src/create.js               writes a new site; no dependencies
 │   └── template/                   the files it copies, laid out as the site they become
 ├── scripts/logo/                   draws the logo files
+├── scripts/bench/                  measures Shabd on sites of thousands of pages
 ├── e2e/                            browser tests, and the small site they run against
 └── docs/                           the documentation site, built with Shabd
     ├── shabd.config.yaml
