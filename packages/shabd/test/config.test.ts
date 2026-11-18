@@ -78,7 +78,7 @@ features:
     expect(config.theme.colors.accent).toEqual({ light: '#ff0000', dark: '#ff0000' })
     expect(config.features.search.enabled).toBe(false)
     expect(config.features.search.model).toBe('Xenova/all-MiniLM-L6-v2')
-    expect(config.features.mcp).toEqual({ enabled: true, route: '/agents' })
+    expect(config.features.mcp).toEqual({ enabled: true, route: '/agents', semantic: true })
   })
 
   it('points at the line and column of a typo and suggests the fix', () => {

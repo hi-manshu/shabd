@@ -9,7 +9,7 @@
  *   static.ts  the files a build wrote to dist/_shabd (`shabd preview`)
  */
 import { normalizePath } from '../../shared/paths.js'
-import { KeywordIndex, search, SEARCH_FILES, type SearchHit, type SearchIndexFile } from '../../shared/search-core.js'
+import { MemoryStore, SEARCH_FILES, type SearchHit, type SearchIndexFile } from '../../shared/search-core.js'
 
 export interface DocsPage {
   /** Route path, e.g. `/guide/install`. */
@@ -49,14 +49,54 @@ export const DOCS_FILE = '_shabd/docs.json'
 export const SEARCH_INDEX_FILE = SEARCH_FILES.index
 export const SEARCH_VECTORS_FILE = SEARCH_FILES.vectors
 
-export function staticDocsFrom(docs: DocsFile, searchIndex: SearchIndexFile | null): DocsSource {
+/**
+ * What `staticDocsFrom` needs to rank by meaning as well as by keyword: the
+ * vectors a build wrote, and something that turns a query into one.
+ *
+ * Nothing here loads a model. Where the endpoint runs decides whether it can
+ * afford one: a Node process gets Transformers.js from `staticDocs`
+ * (static.ts), and a function on a host is given nothing and searches by
+ * keyword.
+ */
+export interface SemanticSearch {
+  /** `_shabd/search-vectors.bin`: one signed byte per dimension, per section. */
+  vectors: Int8Array
+  /**
+   * The query as a unit vector from `model`, the one the index was built
+   * with. Null, or an error, makes this one search a keyword search.
+   */
+  embed(query: string, model: string): Promise<ArrayLike<number> | null>
+  /** `features.search.minSimilarity`. */
+  minSimilarity?: number | undefined
+}
+
+export function staticDocsFrom(
+  docs: DocsFile,
+  searchIndex: SearchIndexFile | null,
+  semantic?: SemanticSearch,
+): DocsSource {
   const byPath = new Map(docs.pages.map((page) => [page.path, page]))
-  const keywords = searchIndex ? new KeywordIndex(searchIndex.docs) : null
+  // The store the reader's browser searches with, so an agent is ranked what a reader is ranked.
+  // It leaves out vectors that do not belong to this index.
+  const store = searchIndex ? new MemoryStore(searchIndex, semantic?.vectors ?? null) : null
+
+  const queryVector = async (query: string): Promise<ArrayLike<number> | null> => {
+    if (!semantic || !store?.semantic) return null
+    try {
+      const vector = await semantic.embed(query, store.semantic.model)
+      // A vector of another length is from another model, and says nothing about these sections.
+      return vector && vector.length === store.semantic.dims ? vector : null
+    } catch {
+      return null
+    }
+  }
+
   return {
     name: docs.name,
     description: docs.description,
     pages: () => docs.pages,
     page: (routePath) => byPath.get(toRoutePath(routePath)),
-    search: async (query, limit) => (keywords ? search(keywords, null, null, query, limit) : []),
+    search: async (query, limit) =>
+      store ? store.search(query, await queryVector(query), limit, semantic?.minSimilarity) : [],
   }
 }

@@ -597,6 +597,13 @@ const McpFeatureSchema = z.strictObject({
     .string()
     .regex(/^\/[\w\-/]*$/, { error: 'route must be an absolute path such as /mcp' })
     .default('/mcp'),
+  /**
+   * Let `search_docs` rank by meaning as well as by keyword where a Node process serves the endpoint:
+   * `shabd dev`, `shabd preview` and `shabd mcp`. It takes effect when `search.semantic` is on and
+   * `@huggingface/transformers` is installed. `false` keeps the endpoint to keywords, and that process
+   * never loads the embedding model.
+   */
+  semantic: z.boolean().default(true),
 })
 
 const LlmsFeatureSchema = z.strictObject({

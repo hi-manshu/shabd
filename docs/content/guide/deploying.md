@@ -62,8 +62,8 @@ reader on are still written: they answer wherever a rule does not.
 Both follow `site.base` and `site.urls`. A site without an MCP endpoint (`features.mcp: false`) gets the redirects
 alone.
 
-Search through the function matches keywords. It does not rank by meaning: see
-[MCP and llms.txt](../features/mcp.md#in-production).
+Search through the function matches keywords. It does not rank by meaning, which `shabd preview`, `shabd dev` and
+`shabd mcp` do: see [MCP and llms.txt](../features/mcp.md#search-by-meaning).
 
 ## Cloudflare
 
@@ -165,7 +165,8 @@ request for an address that is not the MCP route.
 
 ## Limits
 
-- **Search is keyword search.** The function does not load the embedding model.
+- **Search is keyword search.** The function does not load the embedding model: it starts and stops with its
+  requests, and would load the model again each time.
 - **A site behind a login.** On Vercel and Netlify the function fetches its two files over HTTP from the address
   the request came to, and passes on the caller's cookie and `Authorization` header. A deployment that answers
   with a login page all the same cannot be read, and the endpoint's answer says so. On Cloudflare the function

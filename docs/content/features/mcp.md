@@ -147,8 +147,57 @@ export default { fetch: (request: Request) => handle(request) }
 > writes is tested by loading it and calling it the way its host does. None of them has been deployed to
 > Cloudflare, Vercel or Netlify, or to any other platform.
 
-Search through a deployed endpoint is keyword search, with an adapter and without. The semantic ranking needs the
-embedding model, which a small function should not have to load.
+Search through a function on a host is keyword search, with an adapter and without. The next section says why.
+
+### Search by meaning
+
+`search_docs` ranks the way the site's own [search](./search.md) does. With semantic search on, a question finds
+the section that answers it without sharing a word with it.
+
+That takes the embedding model, so it depends on what serves the endpoint.
+
+| Served by | `search_docs` matches |
+| --- | --- |
+| `shabd dev` | Keywords and meaning |
+| `shabd mcp` | Keywords and meaning |
+| `shabd preview` | Keywords and meaning, when the build wrote vectors |
+| A function on a host, from an adapter or your own | Keywords |
+
+The three commands are processes that stay, so they can hold the model. Each loads it once, the first time
+something searches, and uses the one the index was built with. A function on a host starts and stops with its
+requests, and would have to load the 22 MB model again each time it starts.
+
+Nothing more has to be set up. It works where the reader's semantic search does: `features.search.semantic` is on
+and `@huggingface/transformers` is installed, and for `shabd preview` the build was not run with `--no-semantic`.
+When one of those is missing, the endpoint searches by keyword. When the model is wanted and cannot be loaded, it
+searches by keyword too, and says why once in the terminal. No request fails for it.
+
+What it costs, measured with `shabd preview` on a laptop, on this site's build of 130 sections: the first search
+took 0.7 seconds and later ones about 15 milliseconds, and the process grew from 148 MB to 254 MB. `shabd dev` and
+`shabd mcp` read the content folder, so their first search also embeds the sections that the cache does not hold
+yet. After a build that is none of them. On a site that has never been built it is all of them.
+
+To keep the endpoint to keywords and leave the reader's search as it is:
+
+```yaml
+features:
+  mcp: { semantic: false }
+```
+
+`shabd mcp` and `shabd preview` then never load the model. `shabd dev` still loads it, for the reader's search.
+
+A Node server of your own can do what `shabd preview` does. `staticDocs` reads a build, and with `semantic` it
+reads the vectors as well and loads the model when the first search arrives:
+
+```ts
+import { staticDocs } from '@himanshoe/shabd'
+import { createMcpHandler } from '@himanshoe/shabd/mcp'
+
+const docs = await staticDocs('dist', { semantic: { root: process.cwd() } })
+const handle = createMcpHandler(docs)
+```
+
+`root` is the site folder, where `@huggingface/transformers` is installed.
 
 ## Turning it off
 

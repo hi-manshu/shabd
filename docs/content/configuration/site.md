@@ -225,7 +225,7 @@ Each feature takes `true`, `false`, or an object of options.
 | Key | Options | Default |
 | --- | --- | --- |
 | `search` | `enabled`, `semantic`, `model`, `maxResults`, `minSimilarity`, `store` | on, with semantic search, in memory |
-| `mcp` | `enabled`, `route` | on, at `/mcp` |
+| `mcp` | `enabled`, `route`, `semantic` | on, at `/mcp`, searching by meaning [where it can](../features/mcp.md#search-by-meaning) |
 | `llms` | `enabled`, `full` | on, with `llms-full.txt` |
 | `studio` | `enabled`, `sync` (`off`, `tabs` or `peers`) | on, syncing between tabs |
 | `sandbox` | `enabled` | on |

@@ -137,6 +137,9 @@ If the package is missing, or the database cannot be opened, search uses the mem
 
 - Queries never leave the device. The model itself is downloaded from Hugging Face by Transformers.js, which is a
   request to a third party. Serving the model from your own site is on the roadmap.
+- An agent is ranked what a reader is ranked. Where `shabd dev`, `shabd preview` or `shabd mcp` serves the
+  [MCP endpoint](./mcp.md#search-by-meaning), `search_docs` matches by keyword and by meaning, with the same model
+  and the same ranking. There the query is embedded by that process, not in a browser.
 - The default model was trained mostly on English. For other languages, set `model` to a multilingual embedding
   model that Transformers.js supports. The build and the browser always use the same one.
 - Keyword search splits text on letters and digits. Languages written without spaces between words, such as

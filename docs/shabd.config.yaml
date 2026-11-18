@@ -87,6 +87,7 @@ features:
   mcp:
     enabled: true
     route: /mcp
+    semantic: true # search_docs by meaning too, in shabd dev, shabd preview and shabd mcp
   llms: true # llms.txt and llms-full.txt
   studio: true # in-browser editor, dev server only
   sandbox: true # ```tsx live code fences

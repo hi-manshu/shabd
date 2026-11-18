@@ -1,6 +1,10 @@
 /**
  * `shabd preview`: serve dist/ the way a production host would, including
  * the MCP route, which a plain static file server cannot answer.
+ *
+ * Unlike a function on a host, this is a process that stays, so its MCP
+ * route can afford the embedding model: where the build wrote vectors,
+ * `search_docs` ranks by meaning as well as by keyword (see mcp/static.ts).
  */
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -10,7 +14,7 @@ import { ShabdError } from '../config/errors.js'
 import { loadConfig } from '../config/load.js'
 import { sendWebResponse, toWebRequest } from '../http.js'
 import { createMcpHandler } from '../mcp/http.js'
-import { staticDocs } from '../mcp/static.js'
+import { latestStaticDocs } from '../mcp/static.js'
 
 export interface PreviewOptions {
   port?: number | undefined
@@ -45,7 +49,16 @@ export async function preview(root: string, options: PreviewOptions = {}): Promi
   const host: Plugin = {
     name: 'shabd:preview',
     configurePreviewServer(server) {
-      const mcp = features.mcp.enabled ? createMcpHandler(() => staticDocs(outDir)) : null
+      // By meaning too only where the site's search is, and where the endpoint has not been kept to keywords.
+      const semantic =
+        features.search.semantic && features.mcp.semantic
+          ? {
+              root: config.root,
+              minSimilarity: features.search.minSimilarity,
+              log: (message: string) => server.config.logger.warn(`shabd: ${message}`),
+            }
+          : undefined
+      const mcp = features.mcp.enabled ? createMcpHandler(latestStaticDocs(outDir, { semantic })) : null
 
       server.middlewares.use((req, res, next) => {
         const [pathname = '/', query = ''] = (req.url ?? '/').split('?')
