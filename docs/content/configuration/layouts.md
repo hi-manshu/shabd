@@ -204,6 +204,10 @@ export default function Announcement({ message }: { message?: string }) {
 `useSite()` returns the site data and `usePage()` returns the current page: its path, title, frontmatter and outline.
 A block registered under a built-in block's name replaces it.
 
+What `@himanshoe/shabd/client` exports has type declarations, so a site that checks its own TypeScript can check its
+blocks and components against them. Add `@types/react` to the site for that. Shabd compiles a `.tsx` file whether
+or not anything checks it.
+
 ## What a page can switch off
 
 A layout says what a kind of page has. A single page can still remove parts of it from its frontmatter:
