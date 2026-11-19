@@ -180,6 +180,16 @@ describe('markdown pipeline', () => {
     expect(html).toContain('data-lang="nonsense"')
   })
 
+  it('takes a word for a language only when it is one, whatever else the word names', async () => {
+    // Its own compiler: a fence like these, taken for a language, would leave a compiler unable to load any language after it.
+    const fresh = new MarkdownCompiler({ themes: { light: 'github-light', dark: 'tokyo-night' }, sandbox: false, fingerprint: 'odd-languages' })
+    const odd = await fresh.compile(page('```constructor\nplain\n```\n\n```__proto__\nplain\n```\n\n```toString\nplain\n```\n'))
+    expect((await renderCompiled(odd.code)).match(/<span class="sb-plain">plain<\/span>/g)).toHaveLength(3)
+
+    const after = await fresh.compile(page('```ts\nconst a = 1\n```\n'))
+    expect(await renderCompiled(after.code)).toMatch(/<span class="sbk-[a-z0-9]+">const<\/span>/)
+  })
+
   it('turns live fences into sandboxes and leaves other fences alone', async () => {
     const source = '```tsx live group="demo"\n<button>Hi</button>\n```\n\n```tsx\nconst x = <b />\n```\n'
     const html = await renderCompiled((await compiler.compile(page(source))).code)

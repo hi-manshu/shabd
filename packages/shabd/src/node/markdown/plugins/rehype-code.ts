@@ -241,7 +241,9 @@ export class CodeHighlighter {
   }
 
   async #language(highlighter: Highlighter, lang: string): Promise<string> {
-    if (PLAIN_LANGUAGES.has(lang) || !(lang in bundledLanguages)) return 'text'
+    // Its own names only. `in` is also true of what every object has, and a fence that says `constructor`
+    // would have Shiki load that as a grammar: no language loads after it, on this page or any other.
+    if (PLAIN_LANGUAGES.has(lang) || !Object.hasOwn(bundledLanguages, lang)) return 'text'
     if (!highlighter.getLoadedLanguages().includes(lang)) {
       await highlighter.loadLanguage(lang as BundledLanguage)
     }
