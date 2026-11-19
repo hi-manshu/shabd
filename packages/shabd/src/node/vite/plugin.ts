@@ -474,19 +474,15 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
               res.end()
               return
             }
-            const entry = `${site.base}@fs/${normalizePath(CLIENT_ENTRY).replace(/^\//, '')}`
-            const html = await server.transformIndexHtml(
-              url,
-              renderDocument({
-                config: config.config,
-                title: page?.title ?? 'Page not found',
-                description: page?.description ?? '',
-                path: route,
-                noindex: !page || page.frontmatter.noindex,
-                image: page?.frontmatter.image,
-                scripts: `<script type="module" src="${entry}"></script>`,
-              }),
-            )
+            const html = renderDocument({
+              config: config.config,
+              title: page?.title ?? 'Page not found',
+              description: page?.description ?? '',
+              path: route,
+              noindex: !page || page.frontmatter.noindex,
+              image: page?.frontmatter.image,
+              ...(await devTags(server, url)),
+            })
             res.statusCode = page ? 200 : 404
             res.setHeader('Content-Type', 'text/html; charset=utf-8')
             res.end(html)
@@ -509,6 +505,24 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
  * everything else (curl, health checks) a path without a file extension is
  * taken to be a page.
  */
+/**
+ * What the dev server adds to a page: its own client and React's refresh
+ * preamble for the head, and the app's entry for the end of the body.
+ *
+ * Vite is given a page that holds the entry and nothing else, and not Shabd's
+ * document. It puts the site's base in front of every address in a page that
+ * starts with a slash, and the addresses in Shabd's document have the base
+ * already, as a build needs them: given the document, a site with a base got
+ * `/base/base/…` for its entry, and a page with nothing on it.
+ */
+async function devTags(server: ViteDevServer, url: string): Promise<{ head: string; scripts: string }> {
+  // Without the base: Vite adds it.
+  const entry = `/@fs/${normalizePath(CLIENT_ENTRY).replace(/^\//, '')}`
+  const shell = await server.transformIndexHtml(url, `<html><head></head><body><script type="module" src="${entry}"></script></body></html>`)
+  const inside = (tag: string) => new RegExp(`<${tag}>([\\s\\S]*)</${tag}>`).exec(shell)?.[1]?.trim() ?? ''
+  return { head: inside('head'), scripts: inside('body') }
+}
+
 function isPageRequest(headers: Record<string, string | string[] | undefined>, url: string): boolean {
   const destination = headers['sec-fetch-dest']
   if (typeof destination === 'string') return destination === 'document' || destination === 'iframe'
