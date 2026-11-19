@@ -4,9 +4,11 @@
  * The stylesheet in src/client/styles never names a colour or a size; it only
  * reads these variables. Changing the look of a site is a YAML edit.
  */
+import { luminanceOf, parseColor } from '../../shared/color.js'
 import {
   COLOR_MODE_KEY,
   COLOR_TOKENS,
+  HEADER_MUTED,
   OPTIONAL_COLOR_TOKENS,
   PALETTE_KEY,
   THEME_PRESETS,
@@ -29,6 +31,7 @@ const OPTIONAL_COLOR_FALLBACKS: Record<OptionalColorToken, string> = {
   bar: 'var(--sb-text)',
   button: 'var(--sb-text)',
   header: 'var(--sb-background)',
+  headerText: 'var(--sb-text)',
   sidebar: 'var(--sb-background)',
   main: 'transparent',
   code: 'var(--sb-surface)',
@@ -116,6 +119,48 @@ const rule = (selector: string, body: string, scheme: Mode) => `${selector} {\n$
  */
 const onScreen = (rules: string, and = '') => `@media screen${and} {\n${rules}\n}`
 
+/**
+ * What follows from the header's ink (`colors.headerText`).
+ *
+ * A header with an ink of its own is a bar of another colour than the page,
+ * and the page's quieter colours were not chosen to be read on it. So the
+ * quiet text, the tint behind a button under the pointer, the focus ring and
+ * the badges in the header are all made from the ink itself. Without an ink
+ * of its own the header is part of the page and uses the page's.
+ *
+ * The values are written in terms of `--sb-header-text`, so they follow it
+ * from the light mode into the dark one without being written again.
+ */
+function headerInk(own: boolean): Record<string, string> {
+  return own
+    ? {
+        // See-through, so that the quiet text is right on a header of any colour, a gradient included.
+        'header-muted': `color-mix(in oklab, var(--sb-header-text) ${HEADER_MUTED * 100}%, transparent)`,
+        'header-hover': 'color-mix(in oklab, var(--sb-header-text) 14%, transparent)',
+        'header-focus': 'var(--sb-header-text)',
+        'header-badge': 'var(--sb-header-text)',
+      }
+    : {
+        'header-muted': 'var(--sb-muted)',
+        'header-hover': 'var(--sb-surface)',
+        'header-focus': 'var(--sb-accent)',
+        // No value: a badge in the header keeps the colour of its kind.
+        'header-badge': 'initial',
+      }
+}
+
+/**
+ * Which of a logo's two pictures the header shows. One was drawn for a light
+ * page and one for a dark page, and a header with a light ink is a dark bar
+ * whatever the page is: it gets the picture drawn for the dark.
+ */
+function headerLogo(ink: string | undefined, mode: Mode): Record<string, string> {
+  const colour = ink === undefined ? undefined : parseColor(ink)
+  // An ink that cannot be read here (a variable, `oklch()`) says nothing, and the logo follows the page.
+  const dark = colour ? luminanceOf(colour) > 0.5 : mode === 'dark'
+  return { 'header-logo-light': dark ? 'none' : 'inline-block', 'header-logo-dark': dark ? 'inline-block' : 'none' }
+}
+
 /** The site's own colours in one mode. In the light mode every optional colour is set, to its fallback if need be. */
 function siteColors(colors: ThemeConfig['colors'], mode: Mode): Record<string, string> {
   const vars: Record<string, string> = {}
@@ -125,7 +170,8 @@ function siteColors(colors: ThemeConfig['colors'], mode: Mode): Record<string, s
     if (value !== undefined) vars[cssName(token)] = value
     else if (mode === 'light') vars[cssName(token)] = OPTIONAL_COLOR_FALLBACKS[token]
   }
-  return vars
+  if (mode === 'light') Object.assign(vars, headerInk(colors.headerText !== undefined))
+  return { ...vars, ...headerLogo(colors.headerText?.[mode], mode) }
 }
 
 /**
@@ -141,7 +187,10 @@ function presetColors(name: PresetName, mode: Mode): Record<string, string> {
   for (const token of OPTIONAL_COLOR_TOKENS) {
     vars[cssName(token)] = preset.look?.colors?.[token]?.[mode] ?? OPTIONAL_COLOR_FALLBACKS[token]
   }
-  return vars
+  const ink = preset.look?.colors?.headerText
+  // Set again for every preset: the site's own header may have an ink, and this one's may not.
+  if (mode === 'light') Object.assign(vars, headerInk(ink !== undefined))
+  return { ...vars, ...headerLogo(ink?.[mode], mode) }
 }
 
 /**

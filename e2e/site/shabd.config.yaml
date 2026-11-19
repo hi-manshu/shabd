@@ -4,6 +4,11 @@ site:
   description: A site for Shabd's browser tests.
   url: https://fixture.test
   favicon: /favicon.svg
+  # Two pictures: one drawn for a light page and one for a dark page.
+  logo:
+    light: /logo-light.svg
+    dark: /logo-dark.svg
+    alt: ""
   repo: https://github.com/example/fixture
   nav:
     - { label: Guide, link: /guide/intro }

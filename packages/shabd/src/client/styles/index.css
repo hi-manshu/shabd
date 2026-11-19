@@ -26,4 +26,18 @@
   :root:not([data-theme='dark']) .sb-only-dark {
     display: none;
   }
+
+  /*
+   * The logo in the header follows the header, which follows the page unless
+   * it has an ink of its own (`colors.headerText`): a dark bar on a light
+   * page shows the logo drawn for the dark. The theme says which, in these
+   * two tokens, for each mode.
+   */
+  :root .sb-region-header .sb-logo.sb-only-light {
+    display: var(--sb-header-logo-light);
+  }
+
+  :root .sb-region-header .sb-logo.sb-only-dark {
+    display: var(--sb-header-logo-dark);
+  }
 }

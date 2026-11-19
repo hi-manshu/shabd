@@ -47,7 +47,9 @@ export type ColorToken = (typeof COLOR_TOKENS)[number]
  * set. `backdrop` is the odd one out: it takes any CSS background, such as a
  * gradient, and shows only through panels whose own colour is translucent.
  * `codeText` is the colour of code the syntax theme leaves uncoloured; left
- * unset, that code keeps the syntax theme's own foreground.
+ * unset, that code keeps the syntax theme's own foreground. `headerText` is
+ * the ink of the header, for a header that is darker or lighter than the
+ * page; left unset, the header is written in the page's own `text`.
  */
 export const OPTIONAL_COLOR_TOKENS = [
   'link',
@@ -55,6 +57,7 @@ export const OPTIONAL_COLOR_TOKENS = [
   'bar',
   'button',
   'header',
+  'headerText',
   'sidebar',
   'main',
   'code',
@@ -223,7 +226,7 @@ export const THEME_PRESETS = {
   ),
   xp: preset(
     'Windows XP',
-    'After the look of Windows XP: code in windows with a blue title bar and its three buttons, cream panels, a pale blue side pane, a green button and Tahoma.',
+    'After the look of Windows XP: a blue bar across the top, code in windows with a blue title bar and its three buttons, cream panels, a pale blue side pane, a green button and Tahoma.',
     { accent: '#0046d5', highlight: '#f59b00', background: '#ffffff', surface: '#ece9d8', text: '#000000', muted: '#555555', border: '#7f9db9', note: '#0046d5', tip: '#00695c', success: '#1a6b2c', caution: '#8f4700', danger: '#b3171f' },
     { accent: '#8fc0ff', highlight: '#ffb84a', background: '#101a30', surface: '#1b2942', text: '#f1f5ff', muted: '#a9b6d2', border: '#40598a', ...CALLOUTS_DARK },
     // The colours of Visual Studio, which is where most people read code on that desktop.
@@ -247,11 +250,14 @@ export const THEME_PRESETS = {
         // The green of the button in the corner of that desktop.
         button: { light: '#2b7a2b', dark: '#86d886' },
         selection: { light: '#b9d1f7', dark: '#2f5fa8' },
-        // A toolbar above, and a task pane down the side. Both are solid: there is no wallpaper behind them.
+        // The blue of the taskbar above, written in white, and a task pane down the side. Both are solid:
+        // there is no wallpaper behind them. The blue is deeper than the original's, which white text
+        // does not reach 7:1 on.
         header: {
-          light: 'linear-gradient(180deg, #fdfcf7, #ece9d8)',
+          light: 'linear-gradient(180deg, #1c4bbd, #143a94)',
           dark: 'linear-gradient(180deg, #1f2f4d, #17243d)',
         },
+        headerText: { light: '#ffffff', dark: '#eef3ff' },
         sidebar: {
           light: 'linear-gradient(180deg, #dbe8fb, #c3d6f5)',
           dark: 'linear-gradient(180deg, #152748, #101d38)',
@@ -587,6 +593,14 @@ type AnyColors = Partial<Record<ColorToken | OptionalColorToken, ModeColor>>
  * the two numbers equal.
  */
 export const LINE_HIGHLIGHT_STRENGTH = 0.3
+
+/**
+ * How much of the header's own ink (`colors.headerText`) its quieter text
+ * keeps; the rest is the header showing through. It is written into the
+ * theme's CSS from here, and the contrast tests lay the same share over the
+ * header to see what a reader sees.
+ */
+export const HEADER_MUTED = 0.76
 
 /** What code is drawn on, for each syntax theme of a plan and in the same order. */
 export interface CodeBackgrounds {

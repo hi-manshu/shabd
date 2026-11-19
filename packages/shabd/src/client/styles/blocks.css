@@ -222,6 +222,62 @@
     }
   }
 
+  /*
+   * In the header these are written in the header's ink. A site that gives
+   * the header a colour of its own gives it an ink too (`colors.headerText`),
+   * and the quieter tones are made from that. Without one, the four tokens
+   * are the page's own and these rules change nothing. The same blocks in
+   * another region keep the page's colours.
+   */
+  .sb-region-header :is(.sb-nav a, .sb-icon-button, .sb-studio-toggle) {
+    color: var(--sb-header-muted);
+  }
+
+  .sb-region-header
+    :is(
+      .sb-nav a:hover,
+      .sb-nav a[aria-current],
+      .sb-icon-button:hover,
+      .sb-studio-toggle:hover,
+      .sb-studio-toggle[aria-pressed='true']
+    ) {
+    color: var(--sb-header-text);
+  }
+
+  .sb-region-header .sb-icon-button:hover {
+    background: var(--sb-header-hover);
+  }
+
+  .sb-region-header :focus-visible {
+    outline-color: var(--sb-header-focus);
+  }
+
+  .sb-region-header .sb-badge {
+    --sb-badge-ink: var(--sb-header-badge, var(--sb-badge-color, var(--sb-muted)));
+    color: var(--sb-badge-ink);
+    background: color-mix(in oklab, var(--sb-badge-ink) 13%, transparent);
+  }
+
+  /* On a small screen the search field is its icon alone, drawn straight on the header. */
+  @media (max-width: 39.99rem) {
+    .sb-region-header .sb-search-button {
+      color: var(--sb-header-muted);
+    }
+
+    .sb-region-header .sb-search-button:hover {
+      color: var(--sb-header-text);
+    }
+  }
+
+  /* The palette menu opens from the header and is a panel of the page: its text and its focus ring are the page's. */
+  .sb-region-header .sb-theme-menu-list {
+    color: var(--sb-text);
+  }
+
+  .sb-region-header .sb-theme-menu-list :focus-visible {
+    outline-color: var(--sb-accent);
+  }
+
   /* ───────────── sidebar ───────────── */
 
   .sb-sidebar-nav {

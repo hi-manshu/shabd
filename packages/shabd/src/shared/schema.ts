@@ -287,6 +287,11 @@ const ColorsSchema = z.strictObject({
   button: modeColor.optional(),
   /** Background of the header. Defaults to `background`. A translucent colour blurs the page behind it. */
   header: modeColor.optional(),
+  /**
+   * The colour of the title, the links and the buttons in the header, for a
+   * header that is darker or lighter than the page. Defaults to `text`.
+   */
+  headerText: modeColor.optional(),
   /** Background of the sidebar. Defaults to `background`. A translucent colour blurs what is behind it. */
   sidebar: modeColor.optional(),
   /** Background of the content area, the outline beside it and the footer. See-through by default. */
