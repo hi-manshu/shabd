@@ -104,6 +104,13 @@ markdown:
 vars:
   node: 22
 
+# An API reference made from an OpenAPI description. This one describes the files a built site serves
+# for programs; its pages are under Reference, each with a form that sends the request to this site.
+openapi:
+  spec: ./openapi.yaml
+  path: /reference/files
+  try: true
+
 # The host to build for, when it is Cloudflare, Vercel or Netlify: the build then also writes what that
 # host needs to answer the MCP endpoint. This site is on GitHub Pages, which serves files only, so it names none.
 # build:

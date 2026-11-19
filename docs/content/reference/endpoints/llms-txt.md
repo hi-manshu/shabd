@@ -39,3 +39,6 @@ Pages that are not in the sidebar are listed last, under `Optional`.
 | `/<page>.md` | One page as Markdown |
 | `/_shabd/search-index.json` | The search index: every section's text |
 | `/_shabd/docs.json` | Every page's Markdown as JSON, for [hosting the MCP endpoint](../../features/mcp.md#in-production) |
+
+[Files for programs](/reference/files) has a page for each of these, with what is in the two JSON files field by
+field.

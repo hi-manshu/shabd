@@ -11,6 +11,9 @@ they came from. So search finds them, `llms.txt` lists them, each has a Markdown
 It reads OpenAPI 3.0 and 3.1, in YAML or JSON. A description in OpenAPI 2.0, which is also called Swagger, is
 refused with a message that says to convert it first.
 
+This site has one: [Files for programs](/reference/files), under Reference, is made from a description of the
+files a built site serves, and each of its pages can send its request.
+
 ## Turning it on
 
 Name the description in the config, and say where on the site its pages go:
