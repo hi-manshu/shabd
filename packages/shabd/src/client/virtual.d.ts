@@ -38,6 +38,11 @@ declare module 'virtual:shabd/mermaid' {
   export default mermaid
 }
 
+declare module 'virtual:shabd/sandbox-modules' {
+  /** What a live snippet may import (`features.sandbox.modules`), each loaded when a snippet first asks for it. */
+  export const modules: Record<string, () => Promise<Record<string, unknown>>>
+}
+
 declare module 'virtual:shabd/embedder' {
   /** False when semantic search is off or @huggingface/transformers is not installed. */
   export const available: boolean

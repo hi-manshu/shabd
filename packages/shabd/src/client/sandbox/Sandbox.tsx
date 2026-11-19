@@ -18,6 +18,7 @@
  */
 import { Component, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from 'react'
 import { useMDXComponents } from 'virtual:shabd/mdx-components'
+import { modules as declared } from 'virtual:shabd/sandbox-modules'
 import { compileSnippet } from './compile.js'
 import { sharedGroup, SharedGroupContext, useShared, type SharedGroup } from './shared-state.js'
 
@@ -53,8 +54,9 @@ export default function Sandbox({ code: authored, title, group: groupName }: San
         for (const [name, value] of Object.entries(components)) if (/^[A-Z]/.test(name)) scope[name] = value
 
         // A snippet may import what it uses. `shabd/client` is the short name, good on any site; the other
-        // is what this package is called on npm, for a snippet copied from a component file.
-        compileSnippet(code, scope, { 'shabd/client': { useShared }, '@himanshoe/shabd/client': { useShared } }).then(
+        // is what this package is called on npm, for a snippet copied from a component file. After those
+        // come the modules the site's config names, each fetched when a snippet asks for it.
+        compileSnippet(code, scope, { 'shabd/client': { useShared }, '@himanshoe/shabd/client': { useShared } }, declared).then(
           (Example) => {
             if (!current) return
             setBuilt({ Example, version: ++version.current })

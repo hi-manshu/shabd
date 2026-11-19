@@ -228,7 +228,7 @@ Each feature takes `true`, `false`, or an object of options.
 | `mcp` | `enabled`, `route`, `semantic` | on, at `/mcp`, searching by meaning [where it can](../features/mcp.md#search-by-meaning) |
 | `llms` | `enabled`, `full` | on, with `llms-full.txt` |
 | `studio` | `enabled`, `sync` (`off`, `tabs` or `peers`) | on, syncing between tabs |
-| `sandbox` | `enabled` | on |
+| `sandbox` | `enabled`, `modules` | on, with [nothing more to import](../features/sandbox.mdx#modules-a-snippet-may-import) |
 | `feed` | `enabled`, `title`, `directory`, `limit` | off |
 | `socialImages` | `enabled`, `font` | off |
 | `offline` | `enabled` | off |

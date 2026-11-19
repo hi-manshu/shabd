@@ -630,8 +630,25 @@ const StudioFeatureSchema = z.strictObject({
   sync: z.enum(['off', 'tabs', 'peers']).default('tabs'),
 })
 
+/** `date-fns`, or `{ name: charts, file: ./components/charts.ts }` for a file of the site's own. */
+const SandboxModuleSchema = z
+  .union([z.string().min(1), z.strictObject({ name: z.string().min(1), file: z.string().min(1) })])
+  .transform((module): SandboxModule => (typeof module === 'string' ? { name: module } : module))
+
+export interface SandboxModule {
+  /** What a snippet writes after `from`. */
+  name: string
+  /** A file of the site that the name stands for. Left out, the name is a package the site has installed. */
+  file?: string | undefined
+}
+
 const SandboxFeatureSchema = z.strictObject({
   enabled: z.boolean().default(true),
+  /**
+   * What a live snippet may import, besides React and Shabd's own client:
+   * packages the site has installed, and files of its own under a name.
+   */
+  modules: z.array(SandboxModuleSchema).default([]),
 })
 
 const FeedFeatureSchema = z.strictObject({

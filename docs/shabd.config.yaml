@@ -90,7 +90,10 @@ features:
     semantic: true # search_docs by meaning too, in shabd dev, shabd preview and shabd mcp
   llms: true # llms.txt and llms-full.txt
   studio: true # in-browser editor, dev server only
-  sandbox: true # ```tsx live code fences
+  sandbox: # ```tsx live code fences
+    modules:
+      # A file of this site's, which a snippet on the page about sandboxes imports as `docs/units`.
+      - { name: docs/units, file: ./components/units.ts }
   feed: true # rss.xml: the pages newest first, by the day each was last changed
   offline: true # a reader's browser keeps the site after a first visit, to read without a connection
   socialImages: true # a picture for each page, shown where it is shared; needs @resvg/resvg-js

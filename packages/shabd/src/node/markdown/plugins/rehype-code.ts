@@ -56,6 +56,8 @@ interface Block {
   lang: string
   meta: CodeMeta
   rawMeta: string
+  /** The line the fence opens on. */
+  line: number | undefined
 }
 
 /** A highlighter plus a memo of blocks it has already rendered. Create one per site and reuse it. */
@@ -288,6 +290,7 @@ export function rehypeCode(highlighter: CodeHighlighter) {
         lang,
         meta: parseCodeMeta(rawMeta),
         rawMeta,
+        line: node.position?.start.line,
       })
       return SKIP
     })
@@ -298,6 +301,7 @@ export function rehypeCode(highlighter: CodeHighlighter) {
         const live = highlighter.options.sandbox && block.meta.flags.has('live') && SANDBOX_LANGUAGES.has(block.lang)
         if (live) {
           block.parent.children[block.index] = sandboxElement(block)
+          pageData(file).snippets.push({ code: block.code, ...(block.line ? { line: block.line } : {}) })
           return
         }
         if (highlighter.options.mermaid && block.lang === 'mermaid') {

@@ -1,47 +1,52 @@
 /**
  * Turns the text of a live snippet into a React component, in the browser.
  *
- * Sucrase strips TypeScript and JSX (it is a fast syntax transform, not a
- * type checker) and is loaded on first use, so pages without a sandbox never
- * download it.
- *
- * A snippet is either a module that `export default`s a component, or a bare
- * JSX element, which is wrapped into one.
+ * The text is made into a script by src/shared/snippet.ts, which `shabd check`
+ * uses too. Here the script is given what it imports, and run.
  */
 import * as React from 'react'
 import type { ComponentType } from 'react'
+import { transformSnippet } from '../../shared/snippet.js'
 
 export type Scope = Record<string, unknown>
 
-/** Modules a snippet may `import` from. Everything else is refused with a clear message. */
+/** Modules every snippet may `import` from, already here. */
 export type Modules = Record<string, unknown>
+
+/**
+ * Modules a site lets its snippets import (`features.sandbox.modules`). Each
+ * is fetched when a snippet first names it, and not before.
+ */
+export type Loaders = Record<string, () => Promise<Record<string, unknown>>>
 
 const HOOKS = ['useState', 'useEffect', 'useMemo', 'useRef', 'useReducer', 'useCallback', 'useId'] as const
 
-let sucrase: Promise<typeof import('sucrase')> | undefined
-
-export async function compileSnippet(source: string, scope: Scope, modules: Modules): Promise<ComponentType> {
-  const code = source.trim()
-  if (!code) throw new Error('The snippet is empty.')
-
-  const isModule = /^\s*export\s+default\b/m.test(code)
-  if (!isModule && !code.startsWith('<')) {
-    throw new Error('A live snippet is either a single JSX element, or a module with `export default` for its component.')
-  }
-  const module = isModule ? code : `export default function Example() {\n  return (<>${code}</>)\n}`
-
-  sucrase ??= import('sucrase')
-  const { transform } = await sucrase
-  const compiled = transform(module, {
-    transforms: ['typescript', 'jsx', 'imports'],
-    jsxRuntime: 'classic',
-    production: true,
-  }).code
+export async function compileSnippet(source: string, scope: Scope, modules: Modules, loaders: Loaders = {}): Promise<ComponentType> {
+  const { code, needs } = await transformSnippet(source)
 
   const available: Modules = { react: React, ...modules }
+  await Promise.all(
+    needs
+      .filter((name) => !Object.hasOwn(available, name) && Object.hasOwn(loaders, name))
+      .map(async (name) => {
+        try {
+          // The mark is how the script knows to take `default` from among the exports, and not to
+          // take the whole module for it.
+          available[name] = { ...(await loaders[name]!()), __esModule: true }
+        } catch (error) {
+          throw new Error(`"${name}" could not be loaded: ${error instanceof Error ? error.message : String(error)}`)
+        }
+      }),
+  )
+
+  const offered = [...new Set([...Object.keys(available), ...Object.keys(loaders)])]
   const require = (name: string) => {
-    if (name in available) return available[name]
-    throw new Error(`Live snippets cannot import "${name}". Available: ${Object.keys(available).join(', ')}.`)
+    if (Object.hasOwn(available, name)) return available[name]
+    if (Object.hasOwn(loaders, name)) {
+      // It was not fetched, because no `import` named it: the snippet called `require` itself.
+      throw new Error(`Import "${name}" with an \`import\` at the top of the snippet, so that it can be fetched before the snippet runs.`)
+    }
+    throw new Error(`Live snippets cannot import "${name}". Available: ${offered.join(', ')}.`)
   }
 
   const names: Scope = { ...scope }
@@ -50,7 +55,7 @@ export async function compileSnippet(source: string, scope: Scope, modules: Modu
   const exports: { default?: unknown } = {}
   // The snippet runs with the page's own privileges, like any other script on it.
   // It is the author's code, or the reader's own edits to it in their own browser.
-  const run = new Function('React', 'require', 'exports', ...Object.keys(names), compiled)
+  const run = new Function('React', 'require', 'exports', ...Object.keys(names), code)
   run(React, require, exports, ...Object.values(names))
 
   if (typeof exports.default !== 'function') {

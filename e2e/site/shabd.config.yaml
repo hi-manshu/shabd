@@ -45,6 +45,11 @@ features:
   search: { semantic: false }
   studio: { sync: peers }
   feed: true
+  # What a live snippet may import: a package, and a file of the site's own under a name.
+  sandbox:
+    modules:
+      - github-slugger
+      - { name: fixture/gauge, file: ./components/Gauge.tsx }
 
 markdown:
   mermaid: true

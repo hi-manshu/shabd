@@ -69,6 +69,7 @@ const VIRTUAL = {
   mermaid: 'virtual:shabd/mermaid',
   embedder: 'virtual:shabd/embedder',
   sqlite: 'virtual:shabd/sqlite',
+  sandboxModules: 'virtual:shabd/sandbox-modules',
 } as const
 
 const VIRTUAL_IDS = new Set<string>(Object.values(VIRTUAL))
@@ -151,6 +152,9 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
             'react/jsx-dev-runtime',
             // Loaded lazily, so Vite would only discover them mid-session and reload the page.
             ...(config.config.features.sandbox.enabled ? [`${packageName()} > sucrase`] : []),
+            // The packages snippets may import are only named in a generated module, where Vite would find
+            // them when the first snippet runs, and reload the page to take them in.
+            ...(config.config.features.sandbox.enabled ? config.sandboxModules.filter((module) => !path.isAbsolute(module.from)).map((module) => module.from) : []),
             ...(config.config.markdown.mermaid && hasMermaid(config.root) ? ['mermaid'] : []),
             ...(config.config.features.search.semantic && hasPackage(config.root, TRANSFORMERS) ? [TRANSFORMERS] : []),
           ],
@@ -207,6 +211,15 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
             `export const customBlocks = { ${user.map(([name], i) => `${JSON.stringify(name)}: B${i}`).join(', ')} }`,
             '',
           ].join('\n')
+        }
+
+        case VIRTUAL.sandboxModules: {
+          // What a live snippet may import (`features.sandbox.modules`). Each is behind an import of its
+          // own, so that a page fetches a module only when one of its snippets asks for it.
+          const modules = config.sandboxModules.map(
+            ({ name, from }) => `  ${JSON.stringify(name)}: () => import(${path.isAbsolute(from) ? importPath(from) : JSON.stringify(from)}),`,
+          )
+          return `export const modules = {\n${modules.join('\n')}\n}\n`
         }
 
         case VIRTUAL.fonts:
@@ -655,7 +668,7 @@ async function reloadConfig(
     // The days pages were last changed are read from Git once, when the server starts.
     next.config.defaults.lastUpdated !== previous.config.defaults.lastUpdated ||
     // Which descriptions pages are made from, and where they go: the pages are made when the server starts.
-    JSON.stringify([next.components, next.blocks, next.stylesheets, bundledFonts(next), next.config.features.search, next.openapi]) !==
+    JSON.stringify([next.components, next.blocks, next.stylesheets, bundledFonts(next), next.config.features.search, next.openapi, next.sandboxModules]) !==
       JSON.stringify([
         previous.components,
         previous.blocks,
@@ -663,6 +676,7 @@ async function reloadConfig(
         bundledFonts(previous),
         previous.config.features.search,
         previous.openapi,
+        previous.sandboxModules,
       ])
 
   if (structural) {

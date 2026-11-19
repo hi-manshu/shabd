@@ -1570,7 +1570,6 @@
           ]
         },
         "sandbox": {
-          "default": true,
           "anyOf": [
             {
               "type": "boolean"
@@ -1581,6 +1580,35 @@
                 "enabled": {
                   "default": true,
                   "type": "boolean"
+                },
+                "modules": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "file": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "file"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
                 }
               },
               "additionalProperties": false

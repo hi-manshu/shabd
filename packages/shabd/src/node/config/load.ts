@@ -16,13 +16,14 @@ import path from 'node:path'
 import { resolveLayouts } from '../../shared/layout.js'
 import { isExternal, normalizePath } from '../../shared/paths.js'
 import { ConfigSchema, SidebarsSchema, type ShabdConfig, type SidebarsInput } from '../../shared/schema.js'
+import { SNIPPET_MODULES } from '../../shared/snippet.js'
 import type { ResolvedLayout } from '../../shared/types.js'
 import { flattenVars } from '../content/vars.js'
 import { ShabdError, type SourceIssue } from './errors.js'
 import { locateIssues, parseYamlWithSchema } from './yaml.js'
 
 /** Bump when compiled page output changes shape, to invalidate on-disk caches. */
-export const PIPELINE_VERSION = 11
+export const PIPELINE_VERSION = 12
 
 export const CONFIG_FILE_NAMES = ['shabd.config.yaml', 'shabd.config.yml'] as const
 
@@ -69,6 +70,12 @@ export interface ResolvedConfig {
    * in the site folder and never under `node_modules`: see src/node/openapi/site.ts.
    */
   generatedDir: string
+  /**
+   * What a live snippet may import (`features.sandbox.modules`): the name a
+   * snippet writes, and what stands behind it, a package or the absolute path
+   * of a file.
+   */
+  sandboxModules: { name: string; from: string }[]
   /** Where a key of the config is written, for problems found after it has loaded. */
   locate(path: (string | number)[]): { line: number; column: number } | undefined
   /** Changes whenever a setting that affects compiled pages changes. Part of every cache key. */
@@ -165,6 +172,25 @@ export function resolveConfig(root: string, configFile: string, source: string):
     return absolute
   })
 
+  // What a live snippet may import. A name that leads nowhere is found here, and not by a reader of the page.
+  const sandboxModules = config.features.sandbox.modules.map((module, index) => {
+    const at = ['features', 'sandbox', 'modules', index]
+    if (SNIPPET_MODULES.includes(module.name)) {
+      issues.push({ path: at, message: `"${module.name}" is there for every snippet already, and cannot be given another meaning` })
+    } else if (config.features.sandbox.modules.findIndex((other) => other.name === module.name) < index) {
+      issues.push({ path: at, message: `"${module.name}" is listed twice` })
+    }
+    if (module.file !== undefined) {
+      const absolute = path.resolve(root, module.file)
+      if (!existsSync(absolute)) issues.push({ path: at, message: `File not found: ${module.file} (looked in ${absolute})` })
+      return { name: module.name, from: absolute }
+    }
+    if (!isInstalled(root, module.name)) {
+      issues.push({ path: at, message: `The package "${module.name}" is not installed where this site can find it. Add it with: npm install ${packageOf(module.name)}` })
+    }
+    return { name: module.name, from: module.name }
+  })
+
   // One description is written as a mapping and several as a list, and a problem is reported where it is written.
   const listed = Array.isArray((yaml.data as { openapi?: unknown } | null)?.openapi)
   const openapi = config.openapi.map((api, index) => {
@@ -229,9 +255,23 @@ export function resolveConfig(root: string, configFile: string, source: string):
     vars,
     openapi,
     generatedDir: path.join(root, '.shabd', 'openapi'),
+    sandboxModules,
     locate: (path) => yaml.locate(path, 'key'),
     compileFingerprint,
     structureFingerprint,
+  }
+}
+
+/** The package a name belongs to: `date-fns/locale` is in `date-fns`, and `@acme/ui/button` in `@acme/ui`. */
+function packageOf(name: string): string {
+  return name.split('/').slice(0, name.startsWith('@') ? 2 : 1).join('/')
+}
+
+/** Is the package in a `node_modules` of the site's folder, or of a folder above it? */
+function isInstalled(root: string, name: string): boolean {
+  for (let dir = root; ; dir = path.dirname(dir)) {
+    if (existsSync(path.join(dir, 'node_modules', ...packageOf(name).split('/'), 'package.json'))) return true
+    if (path.dirname(dir) === dir) return false
   }
 }
 

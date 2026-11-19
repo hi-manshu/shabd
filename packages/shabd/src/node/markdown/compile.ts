@@ -84,6 +84,8 @@ export interface CompiledPage {
   unlabelled: PageData['unlabelled']
   /** Tags in a `.md` page that are written like components. */
   strays: PageData['strays']
+  /** The page's live snippets, which `shabd check` tries. */
+  snippets: PageData['snippets']
   /** Heading ids on this page. */
   anchors: string[]
   /** The colours of the page's code tokens in the site's own syntax themes, as a stylesheet. The page module exports it. */
@@ -190,6 +192,7 @@ export class MarkdownCompiler {
       external: data.external,
       unlabelled: data.unlabelled,
       strays: data.strays,
+      snippets: data.snippets,
       anchors: data.anchors,
       codeCss: data.codeCss,
       codeColours: data.codeColours,

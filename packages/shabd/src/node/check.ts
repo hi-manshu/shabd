@@ -11,6 +11,7 @@
 import path from 'node:path'
 import pc from 'picocolors'
 import type { CheckLevel } from '../shared/schema.js'
+import { SNIPPET_MODULES, SnippetError, transformSnippet } from '../shared/snippet.js'
 import { checkExternalLinks, type ExternalOptions } from './check-external.js'
 import { isShabdError, type ShabdError } from './config/errors.js'
 import { redirectRoute } from './config/load.js'
@@ -20,7 +21,7 @@ export type ProblemLevel = Exclude<CheckLevel, 'off'>
 
 export interface Problem {
   level: ProblemLevel
-  /** Which check found it: `link`, `redirect`, `sidebar`, `variable`, `alt-text`, `description`, `external-link`, `openapi`. */
+  /** Which check found it: `link`, `redirect`, `sidebar`, `variable`, `alt-text`, `description`, `external-link`, `openapi`, `snippet`. */
   rule: string
   /** File the problem is in, relative to the site root. */
   file: string
@@ -69,6 +70,9 @@ export async function collectProblems(context: ShabdContext, options: CheckOptio
     }
   }
 
+  /** What a live snippet may import: what every snippet has, and what the config names. */
+  const importable = new Set([...SNIPPET_MODULES, ...config.sandboxModules.map((module) => module.name)])
+
   // Compile everything first: links can only be checked against the full set of pages and anchors.
   const anchors = new Map<string, Set<string>>()
   const links: { file: string; target: string; line?: number }[] = []
@@ -100,6 +104,24 @@ export async function collectProblems(context: ShabdContext, options: CheckOptio
           ...at(stray.line),
           message: `<${stray.name}> is written like a component, and components only work in .mdx pages. Here it is an HTML element the browser does not know. Name the file .mdx.`,
         })
+      }
+      // A live snippet that cannot run shows its reader an error where the example was meant to be.
+      for (const snippet of compiled.snippets) {
+        const problem = (message: string, line = 0) =>
+          problems.push({ level: 'error', rule: 'snippet', file, ...at(snippet.line ? snippet.line + line : undefined), message })
+        try {
+          const { needs } = await transformSnippet(snippet.code)
+          for (const name of needs) {
+            if (importable.has(name)) continue
+            problem(
+              `This live snippet imports "${name}", and a snippet can import only what the site says it may. Name it under features.sandbox.modules in ${path.basename(config.configFile)}.`,
+            )
+          }
+        } catch (error) {
+          if (!(error instanceof SnippetError)) throw error
+          // The place is given as a line of the page, so the one counted within the snippet is taken off the message.
+          problem(`This live snippet cannot run: ${error.message.replace(/ \(\d+:\d+\)$/, '')}`, error.line)
+        }
       }
       if (rules.altText !== 'off') {
         for (const image of compiled.unlabelled) {

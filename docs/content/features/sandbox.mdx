@@ -94,8 +94,49 @@ In scope without importing anything:
 - `useShared`
 - Every component from `components:` in the config. `Counter` above is one
 
-`import` works for `react` and for Shabd's own client entry, written `shabd/client` or `@himanshoe/shabd/client`. Any other
-import is refused with a message that says so.
+`import` works for `react` and for Shabd's own client entry, written `shabd/client` or `@himanshoe/shabd/client`.
+What else a snippet may import is for the site to say.
+
+## Modules a snippet may import
+
+Name them under `features.sandbox.modules`: packages the site has installed, and files of its own.
+
+```yaml title="shabd.config.yaml"
+features:
+  sandbox:
+    modules:
+      - date-fns # a package
+      - date-fns/locale # a path inside one
+      - { name: docs/units, file: ./components/units.ts } # a file of the site's, under a name
+```
+
+A snippet imports each by the name written there. This one imports a file of this site, which the config of these
+docs names `docs/units`:
+
+```tsx live
+import { bytes } from 'docs/units'
+
+export default function Size() {
+  const [size, setSize] = useShared('size', 1536)
+  const set = (event) => setSize(Number(event.target.value))
+  return (
+    <p>
+      <label>
+        Size <input type="range" max="5000000" step="512" value={size} onChange={set} />
+      </label>{' '}
+      <output>{bytes(size)}</output>
+    </p>
+  )
+}
+```
+
+- A module is fetched when a snippet on the page imports it, and not before. A page with no such snippet does not
+  pay for it, and a reader who types an `import` of one into a snippet gets it then.
+- A package has to be installed where the site is, for example with `npm install date-fns`. A package that is not
+  installed, or a file that is not there, is an error when the config loads, and the error says which line names it.
+- A file is bundled like the rest of the site, so it can import other files and packages of its own.
+- `react`, `shabd/client` and `@himanshoe/shabd/client` are taken, and cannot be given another meaning.
+- Any other import is refused, with a message that lists the names there are.
 
 ## Things to know
 
@@ -104,5 +145,8 @@ import is refused with a message that says so.
 - A snippet runs in the page, with the page's permissions, like any other script on it. A site with a
   Content-Security-Policy that forbids `unsafe-eval` cannot run sandboxes.
 - An error in a snippet is shown under its result. The rest of the page carries on.
+- [`shabd check`](../reference/cli.md#what-check-looks-for) and a build read every live snippet as it is written,
+  and report one that cannot be made into a script, or that imports a name the site has not given, with its page and
+  line. They do not run the snippet, so a mistake that only shows when it runs is not found.
 
 Set `features.sandbox: false` to render `live` fences as ordinary code blocks.

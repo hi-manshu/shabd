@@ -43,6 +43,8 @@ Always errors:
 - A mistake in `shabd.config.yaml`, `sidebar.yaml` or a page's frontmatter, and a page that does not compile.
 - A link to a page that does not exist, or to a heading the page does not have.
 - A [redirect](../configuration/site.md#redirects) that leads to no page, or whose old address still has a page.
+- A [live snippet](../features/sandbox.mdx) that cannot be made into a script, or that imports what the site has
+  not [said it may](../features/sandbox.mdx#modules-a-snippet-may-import).
 
 Always warnings:
 
