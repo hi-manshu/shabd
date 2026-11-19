@@ -585,6 +585,13 @@ const SearchFeatureSchema = z.strictObject({
   semantic: z.boolean().default(true),
   /** Embedding model, loaded by Transformers.js at build time and in the visitor's browser. */
   model: z.string().min(1).default('Xenova/all-MiniLM-L6-v2'),
+  /**
+   * Where the visitor's browser gets the model from. `huggingface` downloads
+   * it from the Hugging Face Hub, and the runtime that executes it from
+   * jsDelivr. `site` serves both from the site itself: the build copies them
+   * into the output, and the browser asks no other host for anything.
+   */
+  modelSource: z.enum(['huggingface', 'site']).default('huggingface'),
   maxResults: z.int().min(1).max(50).default(8),
   /** How similar a section must be to a query to count as a semantic match. Depends on the model. */
   minSimilarity: z.number().min(0).max(1).default(0.35),

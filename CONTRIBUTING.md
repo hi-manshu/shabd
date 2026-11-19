@@ -33,11 +33,12 @@ The tests start two servers on copies of the small site in `e2e/site`: `shabd de
 watch the page follow, and `shabd preview` of a production build for the rest. Nothing in `e2e/site` or `docs/` is
 modified.
 
-Three variations are switched on from the environment:
+Four variations are switched on from the environment:
 
 ```sh
 SHABD_E2E_STORE=sqlite npx playwright test                 # the whole suite on the SQLite search store
 SHABD_E2E_SEMANTIC=1 npx playwright test e2e/semantic.spec.ts   # the real embedding model (downloads 22 MB)
+SHABD_E2E_SEMANTIC=1 SHABD_E2E_MODEL=site npx playwright test e2e/semantic.spec.ts   # the model served from the site
 npx playwright test --project=firefox e2e/dev.spec.ts      # one browser, one file
 ```
 

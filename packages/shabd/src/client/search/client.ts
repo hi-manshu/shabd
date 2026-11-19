@@ -70,6 +70,9 @@ function start(): Worker {
     manifestUrl: file('manifest'),
     model: features.search.model,
     minSimilarity: features.search.minSimilarity,
+    modelSource: features.search.modelSource,
+    modelsUrl: file('models'),
+    runtimeUrl: file('runtime'),
   })
   return worker
 }

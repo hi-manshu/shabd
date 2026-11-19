@@ -31,6 +31,10 @@ export const SEARCH_FILES = {
   database: '_shabd/search.sqlite',
   /** Fingerprint and size of the database, so a browser can tell whether its copy is current. */
   manifest: '_shabd/search-manifest.json',
+  /** A folder: the embedding model's files, when `features.search.modelSource` is `site`. */
+  models: '_shabd/models/',
+  /** A folder: the WebAssembly runtime that executes the model, when `modelSource` is `site`. */
+  runtime: '_shabd/runtime/',
 } as const
 
 export interface SearchManifest {

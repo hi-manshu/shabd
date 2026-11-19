@@ -14,6 +14,7 @@ import type { ModelStatus, WorkerRequest, WorkerResponse } from './protocol.js'
 
 type Embed = (text: string) => Promise<Float32Array>
 type Init = Extract<WorkerRequest, { type: 'init' }>
+type TransformersEnv = NonNullable<(typeof import('virtual:shabd/embedder'))['env']>
 
 const scope = self as unknown as {
   postMessage(message: WorkerResponse): void
@@ -24,6 +25,8 @@ const post = (message: WorkerResponse) => scope.postMessage(message)
 let store: SearchStore | null = null
 let modelName = ''
 let minSimilarity: number | undefined
+/** Set when the site serves the model itself: the two folders it serves from. */
+let served: { models: string; runtime: string } | null = null
 let embed: Embed | null = null
 let modelLoading: Promise<void> | null = null
 /** Id of the most recent query received; older ones are abandoned once superseded. */
@@ -58,12 +61,49 @@ async function init(request: Init): Promise<void> {
 
   modelName = store.semantic?.model ?? request.model
   minSimilarity = request.minSimilarity
+  served = request.modelSource === 'site' ? { models: request.modelsUrl, runtime: request.runtimeUrl } : null
   post({ type: 'ready', sections: store.sections, semantic: store.semantic !== null, store: store.kind, persistent })
   if (!store.semantic) setModel({ state: 'unavailable' })
 }
 
 function setModel(status: ModelStatus): void {
   post({ type: 'model', status })
+}
+
+/**
+ * Tell Transformers.js to take the model, and the runtime that executes it,
+ * from this site and from nowhere else (`features.search.modelSource: site`).
+ *
+ * Left alone it asks two other hosts.
+ *
+ * The model comes from the Hugging Face Hub, which is `remoteHost`. That is
+ * set to this site's own folder of model files, laid out as `{model}/` and
+ * the file's name. Transformers.js also has settings for model files that
+ * are "local" (`allowLocalModels`, `localModelPath`), and they are not
+ * used: in a browser, version 4.3 asks for each local file twice, once in
+ * full to read its size, and never reads or cancels that first answer. In
+ * Chromium the second request for the 22 MB of weights then failed with a
+ * network error. Through `remoteHost` the size is asked for with a request
+ * for one byte.
+ *
+ * The runtime, ONNX Runtime's WebAssembly, comes from jsDelivr.
+ * Transformers.js has chosen which two files it wants by the time it is
+ * imported, and written their addresses in `wasmPaths`. The same two files
+ * are asked for here, by name, in the site's own folder.
+ */
+function serveFromSite(env: TransformersEnv, from: { models: string; runtime: string }): void {
+  // A folder's address may come without the slash at its end.
+  const folder = (address: string) => new URL(address.replace(/\/?$/, '/'), self.location.href)
+
+  env.remoteHost = folder(from.models).href
+  env.remotePathTemplate = '{model}/'
+
+  const wasm = env.backends.onnx.wasm
+  const paths = wasm?.wasmPaths
+  if (wasm && paths && typeof paths === 'object') {
+    const here = (address: unknown) => new URL(String(address).split('/').pop() ?? '', folder(from.runtime)).href
+    wasm.wasmPaths = { mjs: here(paths.mjs), wasm: here(paths.wasm) }
+  }
 }
 
 function loadModel(): Promise<void> {
@@ -77,6 +117,7 @@ function loadModel(): Promise<void> {
         setModel({ state: 'unavailable', reason: 'Transformers.js is not installed for this site.' })
         return
       }
+      if (served && transformers.env) serveFromSite(transformers.env, served)
       const files = new Map<string, number>()
       const extract = await transformers.pipeline('feature-extraction', modelName, {
         // The same 8-bit weights the build used, so queries and documents share a vector space.

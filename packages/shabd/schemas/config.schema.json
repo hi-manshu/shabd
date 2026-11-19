@@ -1460,6 +1460,14 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "modelSource": {
+                  "default": "huggingface",
+                  "type": "string",
+                  "enum": [
+                    "huggingface",
+                    "site"
+                  ]
+                },
                 "maxResults": {
                   "default": 8,
                   "type": "integer",

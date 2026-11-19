@@ -11,7 +11,7 @@
  */
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import pc from 'picocolors'
@@ -27,6 +27,7 @@ import { createContext, type ShabdContext } from '../context.js'
 import { markdownPath, pageAddress, publicUrl, renderLlmsFull, renderLlmsTxt } from '../llms/llms-txt.js'
 import { pageMarkdown } from '../llms/markdown.js'
 import { DOCS_FILE, SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, type DocsFile } from '../mcp/source.js'
+import { modelFiles, runtimeFiles } from '../search/model-files.js'
 import { SearchService } from '../search/service.js'
 import { generateSocialImages } from '../social/index.js'
 import { serverOutDir, shabd } from '../vite/plugin.js'
@@ -202,6 +203,35 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
       ? `semantic, ${index.file.semantic.dims} dimensions, ${index.stats.embedded} newly embedded`
       : 'keywords only'
     step(`search index: ${index.stats.docs} sections (${kind}) ${pc.dim(seconds(performance.now() - phase))}`)
+
+    if (features.search.enabled && features.search.modelSource === 'site' && index.file.semantic) {
+      // The files the reader's browser would otherwise fetch from Hugging Face and from jsDelivr.
+      const model = await modelFiles(index.file.semantic.model, config.root)
+      const runtime = await runtimeFiles(config.root)
+      if (model.length === 0 || runtime.length === 0) {
+        const missing = model.length === 0 ? `the files of "${index.file.semantic.model}"` : 'the ONNX runtime'
+        console.log(
+          pc.yellow(
+            `    features.search.modelSource is "site", but ${missing} could not be found beside Transformers.js. ` +
+              'Readers get keyword search only.',
+          ),
+        )
+      } else {
+        const copies = [
+          ...model.map((file) => ({ ...file, to: SEARCH_FILES.models + file.name })),
+          ...runtime.map((file) => ({ ...file, to: SEARCH_FILES.runtime + file.name })),
+        ]
+        for (const { file, to } of copies) {
+          await mkdir(path.dirname(path.join(outDir, to)), { recursive: true })
+          await copyFile(file, path.join(outDir, to))
+        }
+        const megabytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MiB`
+        const total = copies.reduce((sum, file) => sum + file.bytes, 0)
+        const largest = copies.reduce((a, b) => (b.bytes > a.bytes ? b : a))
+        step(`model and its runtime, served from the site: ${copies.length} files, ${megabytes(total)}`)
+        console.log(pc.dim(`    The largest is ${largest.to}, ${megabytes(largest.bytes)}. Some hosts limit the size of one file.`))
+      }
+    }
 
     if (features.search.enabled && features.search.store === 'sqlite') {
       const database = await search.database()

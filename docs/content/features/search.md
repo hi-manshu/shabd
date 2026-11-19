@@ -113,6 +113,7 @@ features:
   search:
     semantic: true
     model: Xenova/all-MiniLM-L6-v2
+    modelSource: huggingface
     maxResults: 8
     minSimilarity: 0.35
     store: memory
@@ -136,17 +137,66 @@ a hundred sections.
 | Search index | About 50 KB | The text of every section |
 | Vectors | 384 bytes per section | About 36 KB here |
 | Embedding model | 22 MB | Fetched from Hugging Face, then cached by the browser |
-| ONNX runtime | 27 MB on disk, about 5 MB compressed | Part of your build, served from your own site |
+| ONNX runtime | 27 MB, 6.6 MB compressed with gzip | Fetched from jsDelivr, then cached by the browser |
 
 Keyword search needs only the first row. The model and the runtime are fetched once, the first time a reader opens
 search, and only for semantic search. A reader whose browser is set to save data is not sent them and keeps keyword
 search.
 
-The runtime is one 27 MB file in `dist/assets/`. Some hosts limit the size of a single file, so check yours before
-turning semantic search on. Cloudflare Pages, for example, allows 25 MiB.
+Those two are requests to other hosts. [Serving the model yourself](#serving-the-model-yourself) keeps them on
+your own site.
+
+The build writes the runtime into `dist/assets/` as well, as one file of 27 MB, because the bundler finds it named
+in Transformers.js. A reader's browser does not ask for that copy: Transformers.js sends it to jsDelivr. The file
+is in the output all the same. Some hosts limit the size of a single file, so check yours before turning semantic
+search on. Cloudflare Pages, for example, allows 25 MiB.
 
 The first build downloads the model too, into `node_modules/@huggingface/transformers/.cache`. Later builds reuse it,
 and only embed passages whose text changed.
+
+### Serving the model yourself
+
+```yaml
+features:
+  search:
+    modelSource: site
+```
+
+With `modelSource: site` the reader's browser gets the model, and the runtime that executes it, from your site,
+and asks no other host for anything.
+
+- The build copies the model into `dist/_shabd/models/`. These are the files Transformers.js downloaded to embed
+  your pages, out of its cache in `node_modules`, so nothing is downloaded a second time.
+- It copies the runtime into `dist/_shabd/runtime/`, out of `onnxruntime-web` in `node_modules`: two builds of it,
+  because Transformers.js asks Safari before version 26 for a plainer one than it asks other browsers for.
+- The dev server serves the same files at the same addresses.
+- Transformers.js keeps what it fetched in the browser's cache storage, as it does with the default. A second
+  visit was not tested.
+
+With the default model that is eight more files in `dist/`, 62 MiB in all:
+
+| | Size | Compressed with gzip |
+| --- | --- | --- |
+| The model's weights, `onnx/model_quantized.onnx` | 21.9 MiB | 15.5 MiB |
+| Its tokeniser and two small files | 0.7 MiB | |
+| The runtime for most browsers, `ort-wasm-simd-threaded.asyncify.wasm` | 25.6 MiB | 6.3 MiB |
+| The runtime for Safari before 26, `ort-wasm-simd-threaded.wasm` | 13.6 MiB | 3.5 MiB |
+
+A reader downloads the model and one of the two runtimes. The build prints the size of the largest file it
+copied, because that is the one a host is most likely to refuse. With the default model it is the runtime, at
+25.6 MiB: over the 25 MiB that Cloudflare Pages allows for one file. Another model is another size, and
+multilingual ones are often several times larger, so look at the model's files before choosing one to serve.
+
+The copy of the runtime that the bundler writes into `dist/assets/` is still there, and still unused.
+
+If Transformers.js is not installed, or the build runs with `--no-semantic`, there is no model to copy and
+nothing is. If the files cannot be found where Transformers.js keeps them, the build says so, and readers get
+keyword search.
+
+This was run with the real model in Chromium, Firefox and WebKit, on both stores, from a build and from the dev
+server. Behind a proxy that cuts off every host but the site's own, search by meaning loaded; with the default
+source it did not. In Chromium, where a test can see what a worker asks for, every request went to the site. The
+runtime for Safari before 26 was not run in such a browser.
 
 ## Choosing a store
 
@@ -215,17 +265,17 @@ weights for a title, a heading and the text, but they are not the same formula, 
 still being typed differently: the in-memory store looks up as many as 40 words that start with what was typed,
 each on its own and at a discount, and FTS5 takes all of them as one word.
 
-On this site's own index of 128 sections, with 300 queries of each kind made from its words
+On this site's own index of 132 sections, with 300 queries of each kind made from its words
 (`node scripts/bench/store-agreement.mjs docs`):
 
 | Query | Same first result | Same eight sections | In the same order |
 | --- | --- | --- | --- |
-| One word, finished | 295 of 300 | 296 | 266 |
-| Two words, finished | 290 | 288 | 223 |
-| One misspelt word | 293 | 297 | 264 |
-| A misspelt word and a right one | 287 | 293 | 256 |
-| One word with its first four letters typed | 232 | 244 | 160 |
-| Two words, the second with four letters typed | 195 | 191 | 55 |
+| One word, finished | 293 of 300 | 299 | 275 |
+| Two words, finished | 286 | 292 | 223 |
+| One misspelt word | 294 | 297 | 268 |
+| A misspelt word and a right one | 287 | 289 | 245 |
+| One word with its first four letters typed | 236 | 239 | 163 |
+| Two words, the second with four letters typed | 201 | 202 | 55 |
 
 So for words typed in full the two stores nearly always find the same sections, mostly in the same order. While
 a word is still being typed they often show different results.
@@ -239,8 +289,9 @@ If the package is missing, or the database cannot be opened, search uses the mem
 
 ## Things to know
 
-- Queries never leave the device. The model itself is downloaded from Hugging Face by Transformers.js, which is a
-  request to a third party. Serving the model from your own site is on the roadmap.
+- Queries never leave the device. By default the model is downloaded from Hugging Face and the runtime that
+  executes it from jsDelivr, which are requests to two third parties. With
+  [`modelSource: site`](#serving-the-model-yourself) both come from your own site.
 - An agent is ranked what a reader is ranked. Where `shabd dev`, `shabd preview` or `shabd mcp` serves the
   [MCP endpoint](./mcp.md#search-by-meaning), `search_docs` matches by keyword and by meaning, with the same model
   and the same ranking. There the query is embedded by that process, not in a browser.

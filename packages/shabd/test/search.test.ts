@@ -1,6 +1,9 @@
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { chunkPage, embeddingInput } from '../src/node/search/chunk.js'
+import { modelFilesIn, runtimeFiles } from '../src/node/search/model-files.js'
 import { editDistance } from '../src/shared/edit-distance.js'
+import { temporarySites } from './helpers/site.js'
 import { locatePassage, passageTarget } from '../src/shared/passage.js'
 import {
   closeTerms,
@@ -487,5 +490,51 @@ describe('finding a passage in its section', () => {
     const text = section.slice(0, 200).join(' ')
     expect(passageTarget(text, ['w1'])).toEqual({ text, words: ['w1'] })
     expect(passageTarget('x'.repeat(100_000), []).text.length).toBeLessThan(10_000)
+  })
+})
+
+describe('the model, for a site that serves it itself', () => {
+  const folder = temporarySites()
+
+  it('takes the files a browser asks for out of the cache, under the names it asks for them by', async () => {
+    const cache = await folder({
+      'Xenova/tiny-model/config.json': '{}',
+      'Xenova/tiny-model/tokenizer.json': '{"a":1}',
+      'Xenova/tiny-model/onnx/model_quantized.onnx': 'eight-bit weights',
+      // Weights that something else downloaded into the same cache. Shabd embeds with the 8-bit ones.
+      'Xenova/tiny-model/onnx/model.onnx': 'full-precision weights, four times the size',
+      'Xenova/another-model/config.json': '{}',
+    })
+    const files = await modelFilesIn(cache, 'Xenova/tiny-model')
+    expect(files.map((file) => [file.name, file.bytes])).toEqual([
+      ['Xenova/tiny-model/config.json', 2],
+      ['Xenova/tiny-model/tokenizer.json', 7],
+      ['Xenova/tiny-model/onnx/model_quantized.onnx', 17],
+    ])
+    expect(files.every((file) => file.file.startsWith(cache))).toBe(true)
+  })
+
+  it('takes the weights there are when none are named as 8-bit, and nothing for a model that is not there', async () => {
+    const cache = await folder({
+      'acme/embedder/config.json': '{}',
+      'acme/embedder/onnx/weights.onnx': 'weights',
+    })
+    expect((await modelFilesIn(cache, 'acme/embedder')).map((file) => file.name)).toEqual([
+      'acme/embedder/config.json',
+      'acme/embedder/onnx/weights.onnx',
+    ])
+    expect(await modelFilesIn(cache, 'acme/never-downloaded')).toEqual([])
+  })
+
+  it('finds the runtime beside Transformers.js: the two builds a browser can ask for', async () => {
+    // The docs site has Transformers.js installed, and with it the ONNX runtime.
+    const files = await runtimeFiles(fileURLToPath(new URL('../../../docs', import.meta.url)))
+    expect(files.map((file) => file.name)).toEqual([
+      'ort-wasm-simd-threaded.asyncify.mjs',
+      'ort-wasm-simd-threaded.asyncify.wasm',
+      'ort-wasm-simd-threaded.mjs',
+      'ort-wasm-simd-threaded.wasm',
+    ])
+    for (const file of files) expect(file.bytes, file.name).toBeGreaterThan(10_000)
   })
 })

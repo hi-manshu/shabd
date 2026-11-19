@@ -11,8 +11,10 @@
  * policy before it gets here.
  */
 import { createHash, randomUUID } from 'node:crypto'
+import { createReadStream } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { extname } from 'node:path'
 import { normalizePath, type Connect, type ViteDevServer } from 'vite'
 import { stripBase } from '../../shared/paths.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
@@ -24,9 +26,17 @@ import { pageMarkdown } from '../llms/markdown.js'
 import { createMcpHandler } from '../mcp/http.js'
 import { liveDocs } from '../mcp/live.js'
 import { SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, toRoutePath } from '../mcp/source.js'
+import { modelFiles, runtimeFiles } from '../search/model-files.js'
 import { SearchService } from '../search/service.js'
 
 const STUDIO_PREFIX = '/_shabd/studio/'
+
+/** What the model's and the runtime's files are sent as. A browser compiles WebAssembly as it arrives only under its own type. */
+const CONTENT_TYPES: Record<string, string> = {
+  '.json': 'application/json; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8',
+  '.wasm': 'application/wasm',
+}
 export const STUDIO_TOKEN_HEADER = 'x-shabd-studio'
 
 const sha1 = (text: string) => createHash('sha1').update(text).digest('hex')
@@ -82,6 +92,44 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
       if (!vectors) return false
       sendText(res, Buffer.from(vectors.buffer, vectors.byteOffset, vectors.byteLength), 'application/octet-stream')
       return true
+    }
+
+    if (features.search.enabled && features.search.modelSource === 'site') {
+      // What a build copies into the output is served here from where it lies: the model from the cache
+      // Transformers.js downloaded it into, and the runtime from node_modules.
+      const sets = [
+        {
+          folder: `/${SEARCH_FILES.models}`,
+          // The model is in the cache once the index has been built with it. An index without vectors has no model.
+          files: async () => {
+            const { semantic } = (await search.index()).file
+            return semantic ? modelFiles(semantic.model, config.root) : []
+          },
+        },
+        { folder: `/${SEARCH_FILES.runtime}`, files: () => runtimeFiles(config.root) },
+      ]
+      for (const { folder, files } of sets) {
+        if (!path.startsWith(folder)) continue
+        // The file is looked up by name among the few that are served. The request's path is never joined to a folder.
+        const name = path.slice(folder.length)
+        const served = (await files()).find((file) => file.name === name || encodeURI(file.name) === name)
+        if (!served) return false
+        // Transformers.js asks for a file's first byte to learn its size before it asks for the file.
+        const range = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range ?? '')
+        const last = served.bytes - 1
+        const start = range ? Number(range[1]) : 0
+        const end = range?.[2] ? Math.min(Number(range[2]), last) : last
+        const partial = range !== null && start <= end
+        res.statusCode = partial ? 206 : 200
+        if (partial) res.setHeader('Content-Range', `bytes ${start}-${end}/${served.bytes}`)
+        res.setHeader('Accept-Ranges', 'bytes')
+        res.setHeader('Content-Type', CONTENT_TYPES[extname(served.name)] ?? 'application/octet-stream')
+        res.setHeader('Content-Length', partial ? end - start + 1 : served.bytes)
+        res.setHeader('Cache-Control', 'no-cache')
+        if (method === 'HEAD') res.end()
+        else createReadStream(served.file, partial ? { start, end } : {}).pipe(res)
+        return true
+      }
     }
 
     if (features.search.enabled && features.search.store === 'sqlite') {

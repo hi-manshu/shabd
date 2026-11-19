@@ -11,6 +11,11 @@ export type WorkerRequest =
       manifestUrl: string
       model: string
       minSimilarity: number
+      /** Where the model comes from: the Hugging Face Hub, or this site, at the two addresses below. */
+      modelSource: 'huggingface' | 'site'
+      /** The folder the site serves model files from, and the one it serves the runtime that executes them from. */
+      modelsUrl: string
+      runtimeUrl: string
     }
   /** Start loading the embedding model. Sent when the reader opens search, not before. */
   | { type: 'warm' }

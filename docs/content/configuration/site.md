@@ -224,7 +224,7 @@ Each feature takes `true`, `false`, or an object of options.
 
 | Key | Options | Default |
 | --- | --- | --- |
-| `search` | `enabled`, `semantic`, `model`, `maxResults`, `minSimilarity`, `store` | on, with semantic search, in memory |
+| `search` | `enabled`, `semantic`, `model`, `modelSource` (`huggingface` or `site`), `maxResults`, `minSimilarity`, `store` | on, with semantic search, the model from Hugging Face, in memory |
 | `mcp` | `enabled`, `route`, `semantic` | on, at `/mcp`, searching by meaning [where it can](../features/mcp.md#search-by-meaning) |
 | `llms` | `enabled`, `full` | on, with `llms-full.txt` |
 | `studio` | `enabled`, `sync` (`off`, `tabs` or `peers`) | on, syncing between tabs |

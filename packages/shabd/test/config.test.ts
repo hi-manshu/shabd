@@ -81,6 +81,15 @@ features:
     expect(config.features.mcp).toEqual({ enabled: true, route: '/agents', semantic: true })
   })
 
+  it('takes the embedding model from Hugging Face unless the site is to serve it', () => {
+    expect(load('site:\n  title: Docs\n').config.features.search.modelSource).toBe('huggingface')
+    const served = load('site:\n  title: Docs\nfeatures:\n  search: { modelSource: site }\n')
+    expect(served.config.features.search.modelSource).toBe('site')
+    const error = failure(() => load('site:\n  title: Docs\nfeatures:\n  search: { modelSource: cdn }\n'))
+    expect(error.issues[0]?.path).toEqual(['features', 'search', 'modelSource'])
+    expect(error.issues[0]?.line).toBe(4)
+  })
+
   it('points at the line and column of a typo and suggests the fix', () => {
     const error = failure(() => load('site:\n  title: Docs\n  descripton: Hello\n'))
     expect(error.issues).toHaveLength(1)
