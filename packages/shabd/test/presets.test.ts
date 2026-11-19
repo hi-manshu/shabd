@@ -2,6 +2,7 @@ import { bundledThemes } from 'shiki'
 import { describe, expect, it } from 'vitest'
 import { resolveConfig } from '../src/node/config/load.js'
 import { MarkdownCompiler } from '../src/node/markdown/compile.js'
+import { themedCodeCss } from '../src/node/markdown/plugins/rehype-code.js'
 import { readFileSync } from 'node:fs'
 import { contrastOn, over, parseColor, toHex, type Rgba } from '../src/shared/color.js'
 import {
@@ -186,7 +187,7 @@ describe('code in every preset', () => {
   it('holds every token to 4.5:1 against what is behind it, in both modes', async () => {
     expect(theme.code.minContrast).toBe(4.5)
     const compiled = await compilerWith(theme.code.minContrast, 'floor').compile(SOURCE)
-    const colours = coloursByKey(compiled.codeCss, plan.keys)
+    const colours = coloursByKey(themedCodeCss(plan.keys, compiled.codeColours), plan.keys)
     const classes = classesByLine(await renderCompiled(compiled.code))
     expect(classes.plain.size).toBeGreaterThan(8)
     expect(classes.highlighted.size).toBeGreaterThan(4)
@@ -213,7 +214,7 @@ describe('code in every preset', () => {
 
   it('leaves the syntax themes as they are when the floor is 0', async () => {
     const untouched = await compilerWith(0, 'no-floor').compile(SOURCE)
-    const colours = coloursByKey(untouched.codeCss, plan.keys)
+    const colours = coloursByKey(themedCodeCss(plan.keys, untouched.codeColours), plan.keys)
     // Everforest Light, on the Forest preset, as it ships: its yellow is 2.05:1 on that surface.
     const key = plan.palettes.forest![0]!
     const { surface } = THEME_PRESETS.forest.colors
@@ -229,6 +230,8 @@ describe('code in every preset', () => {
       sandbox: false,
       fingerprint: 'no-backgrounds',
     })
-    expect(untouched.codeCss).toBe((await plainCompiler.compile(SOURCE)).codeCss)
+    const plain = await plainCompiler.compile(SOURCE)
+    expect(untouched.codeCss).toBe(plain.codeCss)
+    expect(untouched.codeColours).toEqual(plain.codeColours)
   }, 60_000)
 })

@@ -139,11 +139,15 @@ export class CodeHighlighter {
   }
 
   /**
-   * The stylesheet for a page that uses these token classes. Each class sets
-   * `--sb-tok`, which the theme's stylesheet reads as the token's colour:
-   * first for the site's light theme, then for its dark one, then for each
-   * theme a preset from the menu brings (`data-code` on the root element
-   * says which). The rules are nested to state each condition once.
+   * The stylesheet for a page that uses these token classes, in the site's
+   * own two syntax themes. Each class sets `--sb-tok`, which the theme's
+   * stylesheet reads as the token's colour: first for the light theme, then
+   * for the dark one. The rules are nested to state each condition once.
+   *
+   * This is what every page carries. The colours under the themes a preset
+   * from the menu brings are in `coloursFor`: only a reader who picks a
+   * preset needs them, and a page that carried them for every reader was
+   * many times the size.
    *
    * Only the light theme's colours apply off the screen. A printed page is
    * white, whatever colour mode and preset the reader has on.
@@ -153,10 +157,20 @@ export class CodeHighlighter {
     if (names.length === 0) return ''
     const rules = (index: number) => names.map((name) => `.${name}{--sb-tok:${this.#colours.get(name)![index]}}`).join('')
     const dark = rules(1)
-    let screen = `[data-theme=dark]{${dark}}`
-    if (this.keys.length > 2) this.keys.forEach((key, index) => (screen += `:root[data-code=${key}]{${rules(index)}}`))
     // Without JavaScript nothing sets data-theme, and the page follows the device.
-    return `${rules(0)}@media screen{${screen}}@media screen and (prefers-color-scheme:dark){:root:not([data-theme]){${dark}}}`
+    return `${rules(0)}@media screen{[data-theme=dark]{${dark}}}@media screen and (prefers-color-scheme:dark){:root:not([data-theme]){${dark}}}`
+  }
+
+  /**
+   * The colour of each of these token classes under every syntax theme of
+   * the plan, in the order of `keys`: what `themedCodeCss` writes a
+   * stylesheet from. Empty on a site with no theme menu, whose two themes
+   * are already in `cssFor`.
+   */
+  coloursFor(classes: Iterable<string>): Record<string, string[]> {
+    if (this.keys.length <= 2) return {}
+    const names = [...new Set(classes)].filter((name) => this.#colours.has(name)).sort()
+    return Object.fromEntries(names.map((name) => [name, this.#colours.get(name)!]))
   }
 
   /** Load the highlighter ahead of the first page, off the critical path. */
@@ -303,7 +317,24 @@ export function rehypeCode(highlighter: CodeHighlighter) {
     )
     // The page carries the colours of exactly the tokens it shows.
     pageData(file).codeCss = highlighter.cssFor(classes)
+    pageData(file).codeColours = highlighter.coloursFor(classes)
   }
+}
+
+/**
+ * The colours of code under each syntax theme a reader can reach from the
+ * theme menu, as a stylesheet. `data-code` on the root element says which
+ * theme applies, and a rule here outranks the page's own for the same token.
+ *
+ * `keys` are the plan's themes in order, and `colours` holds, for each token
+ * class, its colour under each of them. A build writes this once for the
+ * whole site; the dev server puts it in each page.
+ */
+export function themedCodeCss(keys: readonly string[], colours: Record<string, string[]>): string {
+  const names = Object.keys(colours).sort()
+  if (keys.length <= 2 || names.length === 0) return ''
+  const rules = (index: number) => names.map((name) => `.${name}{--sb-tok:${colours[name]![index]}}`).join('')
+  return `@media screen{${keys.map((key, index) => `:root[data-code=${key}]{${rules(index)}}`).join('')}}`
 }
 
 /** A `live` fence becomes a <Sandbox>, resolved from the MDX component map. */

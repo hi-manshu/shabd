@@ -38,8 +38,10 @@ export interface PageData {
   unlabelled: ({ src: string } & Located)[]
   /** Tags in a `.md` page that are written like components, which only work in `.mdx`. */
   strays: ({ name: string } & Located)[]
-  /** The colours of the page's code tokens, as a stylesheet. Empty when the page has no highlighted code. */
+  /** The colours of the page's code tokens in the site's own two syntax themes, as a stylesheet. Empty when the page has no highlighted code. */
   codeCss: string
+  /** Each token class of the page with its colour under every syntax theme the theme menu can reach. Empty without a menu. */
+  codeColours: Record<string, string[]>
   /** Every heading id on the page, for checking `#fragment` links that point here. */
   anchors: string[]
 }
@@ -59,6 +61,7 @@ export function initPageData(file: VFile, input: Pick<PageData, 'liftTitle' | 'r
     strays: [],
     anchors: [],
     codeCss: '',
+    codeColours: {},
   }
   file.data[KEY] = data
   return data

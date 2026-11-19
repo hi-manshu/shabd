@@ -1,6 +1,6 @@
 /** Blocks that normally live in the `header` region. Each is independent, so YAML can reorder or drop them. */
 import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react'
-import { COLOR_MODE_KEY, PALETTE_KEY } from '../../../shared/presets.js'
+import { CODE_THEMES_ID, CODE_THEMES_META, COLOR_MODE_KEY, PALETTE_KEY } from '../../../shared/presets.js'
 import { isExternal } from '../../../shared/paths.js'
 import type { PaletteChoice } from '../../../shared/types.js'
 import { hasIcon, Icon } from '../../app/icons.js'
@@ -143,6 +143,26 @@ function syncCodeTheme(palettes: PaletteChoice[]): void {
   else delete root.dataset.code
 }
 
+/**
+ * Fetch the colours of code under the presets' syntax themes. A built site
+ * keeps them in one stylesheet, which a page names and does not load: only a
+ * reader who picks a preset needs it. It is fetched as the menu opens, so
+ * that it is there by the time one is picked. A reader who comes back with
+ * a preset already picked gets it from the script in the page head.
+ *
+ * In `shabd dev` there is no such stylesheet: each page carries all of it.
+ */
+function loadCodeThemes(): void {
+  if (document.getElementById(CODE_THEMES_ID)) return
+  const href = document.querySelector<HTMLMetaElement>(`meta[name="${CODE_THEMES_META}"]`)?.content
+  if (!href) return
+  const link = document.createElement('link')
+  link.rel = 'stylesheet'
+  link.id = CODE_THEMES_ID
+  link.href = href
+  document.head.append(link)
+}
+
 export function ThemeToggle() {
   const { colorMode, palettes } = useSite()
   if (!colorMode.toggle) return null
@@ -225,6 +245,8 @@ export function ThemeMenu() {
         delete root.dataset.palette
         localStorage.removeItem(PALETTE_KEY)
       } else {
+        // Usually here already, from when the menu opened.
+        loadCodeThemes()
         root.dataset.palette = name
         localStorage.setItem(PALETTE_KEY, name)
       }
@@ -244,7 +266,10 @@ export function ThemeMenu() {
         aria-label="Choose a theme"
         aria-expanded={open}
         aria-controls="sb-theme-menu-list"
-        onClick={() => setOpen(!open)}
+        onClick={() => {
+          if (!open) loadCodeThemes()
+          setOpen(!open)
+        }}
       >
         <Icon name="palette" />
       </button>

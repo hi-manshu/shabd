@@ -124,3 +124,52 @@ describe('site.urls', () => {
     }
   })
 })
+
+describe('code colours for the theme menu', () => {
+  const PAGES = {
+    'content/index.md': '# Home\n\n```ts\nconst a = 1\n```\n',
+    'content/other.md': '# Other\n\n```py\ndef words(title: str) -> int:\n    return len(title.split())\n```\n',
+    'content/plain.md': '# Plain\n\nNo code here.\n',
+  }
+  const classesIn = (text: string) => new Set([...text.matchAll(/sbk-[a-z0-9]+/g)].map((match) => match[0]))
+  const ownSheet = (html: string) => /<style data-sb-code="">([\s\S]*?)<\/style>/.exec(html)?.[1] ?? ''
+
+  it('are in one stylesheet for the site, which each page names and none carries', async () => {
+    const built = await build({ 'shabd.config.yaml': `site:\n  title: Docs\ntheme:\n  picker: [forest, ink]\n${KEYWORD_SEARCH}`, ...PAGES })
+    const home = await built.read('index.html')
+    const other = await built.read('other/index.html')
+
+    const named = /<meta name="shabd-code-themes" content="\/(_shabd\/code-themes\.[0-9a-f]{8}\.css)">/.exec(home)?.[1]
+    expect(named).toBeDefined()
+    // The same file on every page, with or without code of its own: the menu is on all of them.
+    expect(other).toContain(named)
+    expect(await built.read('plain/index.html')).toContain(named)
+    // Named before the script that reads the name.
+    expect(home.indexOf('shabd-code-themes')).toBeLessThan(home.indexOf('<script>'))
+
+    // A page's own stylesheet has its tokens in the site's two themes, and no rule that waits on a preset.
+    expect(ownSheet(home)).toMatch(/^\.sbk-[a-z0-9]+\{--sb-tok:/)
+    expect(ownSheet(home)).toContain('@media screen{[data-theme=dark]{')
+    expect(home).not.toContain('data-code=')
+    expect(other).not.toContain('data-code=')
+
+    // The one stylesheet has every token of every page, under every theme the menu can reach.
+    const sheet = await built.read(named!)
+    expect(sheet.startsWith('@media screen{:root[data-code=light]{')).toBe(true)
+    const keys = [...sheet.matchAll(/:root\[data-code=([a-z0-9]+)\]/g)].map((match) => match[1])
+    expect(keys.slice(0, 2)).toEqual(['light', 'dark'])
+    expect(keys.length).toBeGreaterThan(2)
+    const tokens = [...classesIn(ownSheet(home)), ...classesIn(ownSheet(other))]
+    expect(tokens.length).toBeGreaterThan(4)
+    for (const name of new Set(tokens)) expect(sheet.split(`.${name}{`).length - 1, name).toBe(keys.length)
+  })
+
+  it('are not written for a site with no menu, whose pages hold all there is', async () => {
+    const built = await build({ 'shabd.config.yaml': `site:\n  title: Docs\n${KEYWORD_SEARCH}`, ...PAGES })
+    const home = await built.read('index.html')
+    expect(home).not.toContain('shabd-code-themes')
+    expect(ownSheet(home)).toMatch(/^\.sbk-[a-z0-9]+\{--sb-tok:/)
+    expect(built.has('_shabd/search-index.json')).toBe(true)
+    expect(home).not.toContain('code-themes')
+  })
+})

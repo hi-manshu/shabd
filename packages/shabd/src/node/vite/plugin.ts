@@ -45,6 +45,7 @@ import { substituteVars } from '../content/vars.js'
 import { compilePage, createContext, isSplit, type ShabdContext } from '../context.js'
 import { MDX_COMPONENTS_ID } from '../markdown/compile.js'
 import { HMR_RUNTIME_ID, PAGE_ERROR_ID, toErrorModule, toPageModule } from '../markdown/page-module.js'
+import { themedCodeCss } from '../markdown/plugins/rehype-code.js'
 import { hasMermaid, mathStylesheet } from '../markdown/user-plugins.js'
 import { CLIENT_DIR, CLIENT_ENTRY, PACKAGE_ROOT, packageName, resolveFromPackage, SERVER_ENTRY } from '../paths.js'
 import { devMiddlewares } from './dev-middleware.js'
@@ -290,7 +291,14 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
 
       return {
         code: page
-          ? toPageModule(compiled, page.frontmatter, context.dev ? page.id : undefined, page.updated)
+          ? toPageModule(
+              compiled,
+              page.frontmatter,
+              context.dev ? page.id : undefined,
+              page.updated,
+              // In a build these are in one stylesheet for the whole site (src/node/build/build.ts).
+              context.dev ? themedCodeCss(context.compiler.highlighter.keys, compiled.codeColours) : '',
+            )
           : compiled.code,
         map: { mappings: '' },
       }

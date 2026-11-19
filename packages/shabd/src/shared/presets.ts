@@ -550,6 +550,15 @@ export const THEME_PRESETS = {
 export const COLOR_MODE_KEY = 'shabd-theme'
 export const PALETTE_KEY = 'shabd-palette'
 
+/**
+ * A built page names, in a meta tag of this name, the stylesheet that holds
+ * the colours of code under the syntax themes of the theme menu. It is
+ * fetched for a reader who has picked a preset, as a link with this id: by
+ * the inline script in the page head, or by the menu as it is opened.
+ */
+export const CODE_THEMES_META = 'shabd-code-themes'
+export const CODE_THEMES_ID = 'sb-code-themes'
+
 export type PresetName = keyof typeof THEME_PRESETS
 export const PRESET_NAMES = Object.keys(THEME_PRESETS) as [PresetName, ...PresetName[]]
 export const DEFAULT_PRESET: PresetName = 'shabd'

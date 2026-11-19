@@ -120,16 +120,20 @@ site's as they are. When the menu offers both kinds, it lists them under "Themes
 Code follows the choice. A preset from the menu shows code in its own pair of syntax themes, and the site's own
 entry shows the pair you set under [`code`](#code).
 
-The menu makes pages with code heavier. Each page carries the colours of its own code in every syntax theme the
-menu can reach, once in its HTML and once in its script. This site offers all twenty-three presets, which use 27
-syntax themes between them: its page with the most code carries about 39 KB of those colours in each, a little
-over 5 KB compressed. A page with no code carries none.
+The menu does not make a page heavier for a reader who never opens it. A page carries the colours of its own code
+in the site's two syntax themes, with a menu or without: on this site, about 4 KB on the page with the most code,
+in its HTML and again in its script. The colours under every other theme the menu can reach are in one stylesheet
+for the whole site. A page names it and does not load it. It is fetched when a reader opens the menu, and from then
+on before the first paint of each page for a reader who has picked a preset.
 
-Without a menu a page carries two syntax themes, and each preset on the menu adds at most two. If page weight
-matters to you, list the presets you want under `picker` and leave `picker: true` alone.
+This site offers all twenty-three presets, which use 27 syntax themes between them. That stylesheet is 103 KB
+here, about 15 KB compressed, and holds every colour of every page's code. Each preset on the menu adds at most
+two themes to it, so a site that lists a few presets under `picker` has a smaller one.
 
-The presets' own colours are not repeated in every page. A build puts them in one stylesheet that every page
-shares: about 40 KB here, about 5 KB compressed.
+The presets' own colours are not repeated in every page either. A build puts them in one stylesheet that every
+page shares: about 48 KB here, about 5 KB compressed.
+
+`shabd dev` has neither stylesheet. There every page carries all of it, so that an edit to the theme shows at once.
 
 The menu is the `theme-menu` block, so a [layout](./layouts.md) can move it or leave it out.
 

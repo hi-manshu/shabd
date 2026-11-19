@@ -4,6 +4,7 @@
  */
 import type { HeadTag, ShabdConfig } from '../../shared/schema.js'
 import { siteHref, withBase } from '../../shared/paths.js'
+import { CODE_THEMES_META } from '../../shared/presets.js'
 import { colorModeScript, themeBaseCss, themeToCss } from '../config/theme-css.js'
 
 export interface DocumentOptions {
@@ -30,6 +31,13 @@ export interface DocumentOptions {
    * Without one, everything is written into the document.
    */
   paletteStylesheet?: string
+  /**
+   * Address of a stylesheet holding the colours of code under the syntax
+   * themes those presets bring. The document only names it: it is fetched
+   * for a reader who has picked a preset, by the script in the head or, at
+   * the moment of picking, by the theme menu.
+   */
+  codeStylesheet?: string
 }
 
 const ESCAPES: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
@@ -103,6 +111,8 @@ export function renderDocument(options: DocumentOptions): string {
     config.features.feed.enabled &&
       `<link rel="alternate" type="application/rss+xml" title="${escapeHtml(config.features.feed.title ?? site.title)}" href="${escapeHtml(withBase(site.base, '/rss.xml'))}">`,
     '<meta name="generator" content="Shabd">',
+    // Before the script, which reads it.
+    options.codeStylesheet && `<meta name="${CODE_THEMES_META}" content="${escapeHtml(options.codeStylesheet)}">`,
     `<script${options.scriptAttributes ?? ''}>${colorModeScript(theme)}</script>`,
     options.paletteStylesheet
       ? `<style id="sb-theme">${themeBaseCss(theme)}</style>\n    <link rel="stylesheet" href="${escapeHtml(options.paletteStylesheet)}">`

@@ -6,6 +6,8 @@
  */
 import { luminanceOf, parseColor } from '../../shared/color.js'
 import {
+  CODE_THEMES_ID,
+  CODE_THEMES_META,
   COLOR_MODE_KEY,
   COLOR_TOKENS,
   HEADER_MUTED,
@@ -337,9 +339,15 @@ export function colorModeScript(theme: Pick<ThemeConfig, 'colorMode' | 'picker' 
   const offered = Object.fromEntries(
     theme.picker.filter((name) => name !== theme.preset).map((name) => [name, plan.palettes[name] ?? ['light', 'dark']]),
   )
+  // A reader who picked a preset also needs the colours of code under its syntax themes. A build keeps
+  // those in a stylesheet of their own, which the document names in a meta tag; it is written into the
+  // head here, as the parser reads it, so that the page is not painted before it has arrived.
+  const codeThemes =
+    `var c=document.querySelector('meta[name="${CODE_THEMES_META}"]');` +
+    `if(c)document.write('<link rel="stylesheet" id="${CODE_THEMES_ID}" href="'+c.content.replace(/"/g,'&quot;')+'">')`
   const palette = Object.keys(offered).length
     ? `var P=${JSON.stringify(offered)},p=localStorage.getItem('${PALETTE_KEY}');` +
-      `if(p&&P.hasOwnProperty(p)){d.dataset.palette=p;d.dataset.code=P[p][m==='dark'?1:0]}`
+      `if(p&&P.hasOwnProperty(p)){d.dataset.palette=p;d.dataset.code=P[p][m==='dark'?1:0];${codeThemes}}`
     : ''
   return (
     `(function(){try{var d=document.documentElement,s=localStorage.getItem('${COLOR_MODE_KEY}');` +

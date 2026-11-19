@@ -86,8 +86,13 @@ export interface CompiledPage {
   strays: PageData['strays']
   /** Heading ids on this page. */
   anchors: string[]
-  /** The colours of the page's code tokens, as a stylesheet. The page module exports it. */
+  /** The colours of the page's code tokens in the site's own syntax themes, as a stylesheet. The page module exports it. */
   codeCss: string
+  /**
+   * The same tokens under every syntax theme the theme menu can reach. A
+   * build gathers these from every page into one stylesheet for the site.
+   */
+  codeColours: Record<string, string[]>
 }
 
 export interface CompileResult extends CompiledPage {
@@ -187,6 +192,7 @@ export class MarkdownCompiler {
       strays: data.strays,
       anchors: data.anchors,
       codeCss: data.codeCss,
+      codeColours: data.codeColours,
     }
   }
 

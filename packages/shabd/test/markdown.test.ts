@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { isShabdError } from '../src/node/config/errors.js'
 import { parseCodeMeta } from '../src/node/markdown/code-meta.js'
 import { MarkdownCompiler, type CompileInput } from '../src/node/markdown/compile.js'
+import { themedCodeCss } from '../src/node/markdown/plugins/rehype-code.js'
 import { resolvePageLink } from '../src/node/markdown/plugins/rehype-links.js'
 import { renderCompiled } from './helpers/render.js'
 
@@ -98,13 +99,23 @@ describe('markdown pipeline', () => {
     const result = await menu.compile(page('```ts\nconst a = 1\n```\n\nNo code here.\n'))
     const html = await renderCompiled(result.code)
     const keyword = /<span class="(sbk-[a-z0-9]+)">const<\/span>/.exec(html)?.[1]
-    const block = (key: string) => new RegExp(`:root\\[data-code=${key}\\]\\{([^}]*\\})*?\\.${keyword}\\{--sb-tok:(#[0-9a-f]{6})\\}`).exec(result.codeCss)?.[2]
+    // The page's own stylesheet has the site's two themes and nothing of the menu's: every reader gets it.
+    expect(result.codeCss).toContain(`.${keyword}{--sb-tok:#d73a49}`)
+    expect(result.codeCss).not.toContain('data-code')
+    // The menu's themes are beside it, as colours, for whoever writes the stylesheet a reader fetches on picking one.
+    expect(menu.highlighter.keys).toEqual(['light', 'dark', 't2', 't3'])
+    expect(result.codeColours[keyword!]).toHaveLength(4)
+    const themed = themedCodeCss(menu.highlighter.keys, result.codeColours)
+    expect(themed.startsWith('@media screen{:root[data-code=light]{')).toBe(true)
+    const block = (key: string) => new RegExp(`:root\\[data-code=${key}\\]\\{([^}]*\\})*?\\.${keyword}\\{--sb-tok:(#[0-9a-f]{6})\\}`).exec(themed)?.[2]
     // The site's own two keep their names; the others are numbered.
     expect(block('light')).toBe('#d73a49')
     expect(block('dark')).toBe('#9d7cd8')
     expect(block('t2')).toMatch(/^#[0-9a-f]{6}$/)
     expect(block('t3')).toMatch(/^#[0-9a-f]{6}$/)
     expect(block('t2')).not.toBe(block('light'))
+    // A site with no menu has only its two themes, and nothing to put in such a stylesheet.
+    expect(themedCodeCss(['light', 'dark'], result.codeColours)).toBe('')
 
     // The same colours give the same class in another compiler, so cached pages agree with fresh ones.
     const again = new MarkdownCompiler({
@@ -116,7 +127,9 @@ describe('markdown pipeline', () => {
     expect(await renderCompiled((await again.compile(page('```ts\nconst b = 2\n```\n'))).code)).toContain(`class="${keyword}">const<`)
 
     // A page without code has no stylesheet at all.
-    expect((await menu.compile(page('Just text.\n'))).codeCss).toBe('')
+    const plain = await menu.compile(page('Just text.\n'))
+    expect(plain.codeCss).toBe('')
+    expect(plain.codeColours).toEqual({})
   })
 
   it('moves a syntax colour that is too faint for the code background, and only that one', async () => {

@@ -23,13 +23,14 @@ import type { RenderedPage } from '../../shared/types.js'
 import { chooseAdapter, type MovedAddress } from '../adapters/index.js'
 import { collectProblems, formatProblem } from '../check.js'
 import { themePaletteCss } from '../config/theme-css.js'
-import { createContext, type ShabdContext } from '../context.js'
+import { compilePage, createContext, type ShabdContext } from '../context.js'
 import { markdownPath, pageAddress, publicUrl, renderLlmsFull, renderLlmsTxt } from '../llms/llms-txt.js'
 import { pageMarkdown } from '../llms/markdown.js'
 import { DOCS_FILE, SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, type DocsFile } from '../mcp/source.js'
 import { modelFiles, runtimeFiles } from '../search/model-files.js'
 import { SearchService } from '../search/service.js'
 import { generateSocialImages } from '../social/index.js'
+import { themedCodeCss } from '../markdown/plugins/rehype-code.js'
 import { serverOutDir, shabd } from '../vite/plugin.js'
 import { FEED_FILE, feedEntries, renderFeed } from './feed.js'
 import { escapeHtml, renderDocument, renderRedirect } from './html.js'
@@ -106,11 +107,21 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
 
   // The presets in the theme menu are the same on every page. They go in one
   // file, named after its contents so that it can be cached for good.
+  const named = (name: string, css: string) => `_shabd/${name}.${createHash('sha1').update(css).digest('hex').slice(0, 8)}.css`
   const paletteCss = themePaletteCss(config.config.theme)
-  const paletteFile = paletteCss
-    ? `_shabd/palettes.${createHash('sha1').update(paletteCss).digest('hex').slice(0, 8)}.css`
-    : undefined
+  const paletteFile = paletteCss ? named('palettes', paletteCss) : undefined
   if (paletteFile) await write(paletteFile, paletteCss)
+
+  // So do the colours of code under the syntax themes those presets bring. A page carries the colours of
+  // its own code in the site's two themes, which every reader needs. The rest is for a reader who picks
+  // a preset, and is fetched then: every token class of every page, once, in one file.
+  const themed: Record<string, string[]> = {}
+  if (compiler.highlighter.keys.length > 2) {
+    for (const page of pages) Object.assign(themed, (await compilePage(context, page)).codeColours)
+  }
+  const codeCss = themedCodeCss(compiler.highlighter.keys, themed)
+  const codeFile = codeCss ? named('code-themes', codeCss) : undefined
+  if (codeFile) await write(codeFile, codeCss)
 
   const renderRoute = async (routePath: string, sourceFile?: string) => {
     const rendered = await render(routePath)
@@ -127,6 +138,7 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
       head: assets.headTags(sourceFile),
       scripts: assets.entryScript(),
       ...(paletteFile ? { paletteStylesheet: withBase(config.config.site.base, `/${paletteFile}`) } : {}),
+      ...(codeFile ? { codeStylesheet: withBase(config.config.site.base, `/${codeFile}`) } : {}),
     })
   }
 

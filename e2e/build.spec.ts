@@ -428,8 +428,10 @@ test.describe('components', () => {
     await expect(html).toHaveAttribute('data-palette', 'forest')
     await expect(menu).toHaveAttribute('aria-expanded', 'false')
     expect(await token('--sb-accent')).toBe('#1f6f43')
+    // The colours of code under a preset are in a stylesheet that is fetched as the menu opens (code-themes.spec.ts),
+    // so they arrive a moment after the palette does.
+    await expect.poll(ink).not.toBe(own)
     const forest = await ink()
-    expect(forest).not.toBe(own)
 
     // The palette has a dark form of its own, and so does its syntax theme.
     await page.locator('.sb-theme-toggle').click()
