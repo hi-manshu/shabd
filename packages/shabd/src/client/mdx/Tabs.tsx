@@ -75,11 +75,18 @@ export function Tabs({ children, syncKey }: { children?: ReactNode; syncKey?: st
     }
   }
 
+  // The arrows move to the tab beside this one and round the ends; Home and End go to the first and the last.
   const onKeyDown = (event: React.KeyboardEvent) => {
-    const step = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
-    if (!step) return
+    const last = tabs.length - 1
+    const to: Record<string, number> = {
+      ArrowRight: selected === last ? 0 : selected + 1,
+      ArrowLeft: selected === 0 ? last : selected - 1,
+      Home: 0,
+      End: last,
+    }
+    const next = to[event.key]
+    if (next === undefined) return
     event.preventDefault()
-    const next = (selected + step + tabs.length) % tabs.length
     const button = document.getElementById(`${id}-tab-${next}`)
     select(next, button ?? undefined)
     button?.focus()
@@ -110,6 +117,8 @@ export function Tabs({ children, syncKey }: { children?: ReactNode; syncKey?: st
           id={`${id}-panel-${index}`}
           aria-labelledby={`${id}-tab-${index}`}
           hidden={index !== selected}
+          // Tab goes from the tabs into the panel, also when there is nothing in it to stop at.
+          tabIndex={0}
           className="sb-tab-panel"
           // On paper every panel is printed, and this is the heading it is printed under.
           data-label={tab.props.label}

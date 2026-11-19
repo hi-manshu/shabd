@@ -15,6 +15,10 @@ There are two kinds of matching, and results combine both.
 - **Semantic** search finds sections that mean something similar, even with no word in common. Searching this site
   for "warn the reader about something dangerous" finds the section on callouts.
 
+Search opens from the button in the header, with `/`, or with Ctrl and K (Command and K on a Mac). The arrow keys
+move through the results while the field keeps the focus, Enter goes to the one that is marked, and Escape closes
+search and puts the focus back where it was. A screen reader is told how many results there are as they change.
+
 ## How it works
 
 When the site is built:

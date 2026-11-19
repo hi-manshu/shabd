@@ -604,6 +604,15 @@ type AnyColors = Partial<Record<ColorToken | OptionalColorToken, ModeColor>>
 export const LINE_HIGHLIGHT_STRENGTH = 0.3
 
 /**
+ * A badge: how much of its colour the word keeps (the rest is the page's
+ * text colour), and how strong the tint behind it is. The stylesheet draws
+ * both (`.sb-badge` in base.css); a test keeps the numbers equal, and holds
+ * the word to 4.5:1 on the tint in every palette.
+ */
+export const BADGE_LABEL = 0.8
+export const BADGE_TINT = 0.13
+
+/**
  * How much of the header's own ink (`colors.headerText`) its quieter text
  * keeps; the rest is the header showing through. It is written into the
  * theme's CSS from here, and the contrast tests lay the same share over the

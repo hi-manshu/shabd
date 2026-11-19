@@ -6,6 +6,8 @@ import { themedCodeCss } from '../src/node/markdown/plugins/rehype-code.js'
 import { readFileSync } from 'node:fs'
 import { contrastOn, over, parseColor, toHex, type Rgba } from '../src/shared/color.js'
 import {
+  BADGE_LABEL,
+  BADGE_TINT,
   COLOR_TOKENS,
   LINE_HIGHLIGHT_STRENGTH,
   PRESET_NAMES,
@@ -82,6 +84,44 @@ const tinted = (highlight: string, background: string) => {
   const [red, green, blue] = parseColor(highlight) as Rgba
   return toHex(over([red, green, blue, LINE_HIGHLIGHT_STRENGTH], parseColor(background) as Rgba))
 }
+
+describe('a badge', () => {
+  /** The word of a badge and the tint under it, for a badge of this colour drawn on this background. */
+  const badge = (colour: Rgba, text: Rgba, behind: Rgba) => ({
+    label: over([colour[0], colour[1], colour[2], BADGE_LABEL], text),
+    tint: over([colour[0], colour[1], colour[2], BADGE_TINT], behind),
+  })
+
+  it('is drawn by the stylesheet with the numbers that are checked here', () => {
+    const css = readFileSync(new URL('../src/client/styles/base.css', import.meta.url), 'utf8')
+    expect(css).toContain(`--sb-badge-label: color-mix(in srgb, var(--sb-badge-color, var(--sb-muted)) ${BADGE_LABEL * 100}%, var(--sb-text));`)
+    expect(css).toContain(`background: color-mix(in srgb, var(--sb-badge-color, var(--sb-muted)) ${BADGE_TINT * 100}%, transparent);`)
+  })
+
+  it('can be read in every preset and every colour a badge has, on the page and on a surface', () => {
+    const misses: string[] = []
+    let plain = 0
+    for (const name of PRESET_NAMES) {
+      const { colors } = THEME_PRESETS[name]
+      for (const mode of MODES) {
+        const text = parseColor(colors.text[mode]) as Rgba
+        for (const ink of ['muted', 'note', 'tip', 'success', 'caution', 'danger'] as const) {
+          const colour = parseColor(colors[ink][mode]) as Rgba
+          for (const where of ['background', 'surface'] as const) {
+            const { label, tint } = badge(colour, text, parseColor(colors[where][mode]) as Rgba)
+            const ratio = contrastOn(label, tint)
+            if (ratio < 4.5) misses.push(`${name} ${mode}: ${ink} on ${where} is ${ratio.toFixed(2)}`)
+            // The same badge with the word in its own colour, as it was drawn before.
+            if (contrastOn(colour, tint) < 4.5) plain++
+          }
+        }
+      }
+    }
+    expect(misses).toEqual([])
+    // Why the word is not simply in the badge's colour: that is too faint in this many places.
+    expect(plain).toBe(74)
+  })
+})
 
 describe('what code is drawn on', () => {
   it('is the surface of the site\'s own palette when there is no menu', () => {

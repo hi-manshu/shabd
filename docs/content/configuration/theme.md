@@ -58,7 +58,9 @@ The other thirteen are palettes. They change colour and leave the rest of the lo
 | `contrast` | Pure black and white with the strongest borders and colours |
 
 A test holds every preset to the same floor: body text has a contrast of at least 7:1, and muted text, links and
-callout titles at least 4.5:1, against both the page and the surface colour.
+callout titles at least 4.5:1, against both the page and the surface colour. A badge is a word on a tint of its own
+colour, which is harder to read than the same word on the page, so a fifth of the text colour is mixed into the
+word: it is held to 4.5:1 on its tint, in every colour a badge has.
 
 Comparing one colour with another is not enough for a theme that puts a picture behind the page, because what is
 behind the text there is not one colour. A second test renders a page in each of the ten themes, light and dark,

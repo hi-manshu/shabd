@@ -20,6 +20,8 @@ export function MenuToggle() {
       className="sb-icon-button sb-menu-toggle"
       aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
       aria-expanded={sidebarOpen}
+      // The sidebar region. PageLayout gives it this id.
+      aria-controls="sb-sidebar"
       onClick={() => setUi({ sidebarOpen: !sidebarOpen })}
     >
       <Icon name={sidebarOpen ? 'close' : 'menu'} />

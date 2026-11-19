@@ -21,10 +21,16 @@ import { heading } from './Heading.js'
 import { Steps } from './Steps.js'
 import { Tab, Tabs } from './Tabs.js'
 
-/** Wide tables scroll inside their own box instead of stretching the page. */
+/**
+ * Wide tables scroll inside their own box instead of stretching the page.
+ * The box can take the keyboard's focus, so that it can be scrolled without
+ * a pointer, and so it has a name. It is a group and not a region: a region
+ * is a landmark of the page, and a page with several tables would have
+ * several landmarks called the same.
+ */
 function Table(props: ComponentProps<'table'>) {
   return (
-    <div className="sb-table-scroll" tabIndex={0} role="region" aria-label="Table">
+    <div className="sb-table-scroll" tabIndex={0} role="group" aria-label="Table">
       <table {...props} />
     </div>
   )

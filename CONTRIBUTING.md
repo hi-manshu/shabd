@@ -50,6 +50,13 @@ A new feature that has something to click belongs in these tests. They have caug
 a hydration error, a hot update that reloaded into a blank page, and a watcher that reported deleted files as
 changed.
 
+`e2e/a11y.spec.ts` is where accessibility is tested. It runs [axe](https://github.com/dequelabs/axe-core) over each
+kind of page in both colour modes, and over the parts that open over a page: search, the theme menu, the
+navigation on a small screen, the form that tries a request. A new kind of page, or a new thing that opens,
+belongs in its list. axe finds what can be found by rule, such as a control with no name or text that is too
+faint. It cannot tell where the focus goes, so the tests after it press the keys: add one for anything that opens,
+closes or moves the focus.
+
 ## Large sites
 
 `npm run bench` measures Shabd on sites far larger than its own docs. It writes a site of 1,000 pages and one of

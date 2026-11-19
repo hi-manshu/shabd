@@ -184,9 +184,18 @@
       background: none;
     }
 
-    .sb-search-button-label,
     .sb-search-button kbd {
       display: none;
+    }
+
+    /* The icon is all that is seen. The word stays for a screen reader: without it the button has no name. */
+    .sb-search-button-label {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 
@@ -252,10 +261,10 @@
     outline-color: var(--sb-header-focus);
   }
 
+  /* A header with an ink of its own has its badges in that ink. Any other header has them as the page does. */
   .sb-region-header .sb-badge {
-    --sb-badge-ink: var(--sb-header-badge, var(--sb-badge-color, var(--sb-muted)));
-    color: var(--sb-badge-ink);
-    background: color-mix(in oklab, var(--sb-badge-ink) 13%, transparent);
+    color: var(--sb-header-badge, var(--sb-badge-label));
+    background: color-mix(in srgb, var(--sb-header-badge, var(--sb-badge-color, var(--sb-muted))) 13%, transparent);
   }
 
   /* On a small screen the search field is its icon alone, drawn straight on the header. */

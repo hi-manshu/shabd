@@ -68,11 +68,17 @@ export default function SearchDialog() {
   const close = () => setUi({ searchOpen: false })
 
   useEffect(() => {
+    // What had the focus before search opened gets it back when search closes. A browser does that for
+    // a dialog that is closed; this one is taken off the page, and the focus was left on nothing.
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
     openSearch()
     // The page a result leads to needs this the moment it is shown, so it is fetched while the reader types.
     void import('./passage.js').catch(() => {})
     const element = dialog.current
     if (element && !element.open) element.showModal()
+    return () => {
+      if (opener?.isConnected) opener.focus()
+    }
   }, [])
 
   const modelReady = status.model.state === 'ready'
@@ -164,6 +170,9 @@ export default function SearchDialog() {
             aria-controls={listId}
             aria-activedescendant={hits[active] ? `${listId}-${active}` : undefined}
             aria-autocomplete="list"
+            // Named here. The label around the field also holds the button that closes search, and
+            // without a name of its own the field was read out as that button.
+            aria-label="Search the docs"
             placeholder="Search the docs"
             autoComplete="off"
             spellCheck={false}
@@ -172,7 +181,8 @@ export default function SearchDialog() {
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
           />
-          <button type="button" className="sb-kbd" onClick={close} aria-label="Close search">
+          {/* The name starts with what the button shows, for a reader who says what they see to press it. */}
+          <button type="button" className="sb-kbd" onClick={close} aria-label="Esc: close search">
             esc
           </button>
         </label>
@@ -219,6 +229,11 @@ export default function SearchDialog() {
             Nothing matches “{results.query}”. Try other words, or fewer of them.
           </p>
         )}
+
+        {/* How many results there are, said aloud as they change: the list itself is silent until it is entered. */}
+        <p className="sb-visually-hidden" aria-live="polite">
+          {query.trim() && results ? (hits.length === 1 ? '1 result' : `${hits.length} results`) : ''}
+        </p>
 
         <p className="sb-search-status" role="status">
           {statusLine(status, features.search.semantic)}
