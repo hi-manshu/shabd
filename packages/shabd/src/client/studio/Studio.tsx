@@ -14,6 +14,7 @@ import { Icon } from '../app/icons.js'
 import { usePage } from '../app/router.js'
 import { useSite } from '../app/store.js'
 import { setUi } from '../app/ui.js'
+import { CodeEditor } from '../editor/CodeEditor.js'
 import {
   ConflictError,
   connectFolder,
@@ -72,6 +73,8 @@ export default function Studio() {
   const { id, title } = usePage()
   const [backend, setBackend] = useState<StudioBackend | null>(null)
   const [text, setText] = useState('')
+  /** The page whose text is in the editor. It trails `id` for as long as the next page's file takes to read. */
+  const [shown, setShown] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>({ kind: 'loading' })
 
   /** State the save loop needs without re-subscribing effects on every keystroke. */
@@ -95,25 +98,32 @@ export default function Studio() {
     }
   }, [])
 
-  const load = useCallback(async (from: StudioBackend, page: string) => {
-    const file = await from.read(page)
+  /** Put a file that has been read into the editor. */
+  const show = useCallback((page: string, file: SourceFile) => {
     live.current = { ...live.current, text: file.source, saved: file.source, version: file.version }
     setText(file.source)
+    setShown(page)
     setStatus({ kind: 'idle' })
   }, [])
 
   useEffect(() => {
     if (!backend || !id) return
     setStatus({ kind: 'loading' })
+    // A file that arrives after the Studio has moved on to another page is dropped: it is not that page's text.
     let current = true
-    load(backend, id).catch((error: unknown) => {
-      if (current) setStatus({ kind: 'error', message: error instanceof Error ? error.message : String(error) })
-    })
+    backend.read(id).then(
+      (file) => {
+        if (current) show(id, file)
+      },
+      (error: unknown) => {
+        if (current) setStatus({ kind: 'error', message: error instanceof Error ? error.message : String(error) })
+      },
+    )
     return () => {
       current = false
       window.clearTimeout(live.current.timer)
     }
-  }, [backend, id, load])
+  }, [backend, id, show])
 
   /* ── saving ── */
 
@@ -158,7 +168,8 @@ export default function Studio() {
 
   useEffect(() => {
     if (!id || !backend) return
-    return onPageUpdate((updated) => {
+    let watching = true
+    const stop = onPageUpdate((updated) => {
       if (updated !== id) return
       const state = live.current
       const sinceSave = performance.now() - state.saveStarted
@@ -168,10 +179,19 @@ export default function Studio() {
         state.saveStarted = 0
       } else if (state.text === state.saved) {
         // Someone else changed the file (an editor, git). Nothing unsaved here, so follow it.
-        void load(backend, id).catch(() => {})
+        backend.read(id).then(
+          (file) => {
+            if (watching) show(id, file)
+          },
+          () => {},
+        )
       }
     })
-  }, [id, backend, load])
+    return () => {
+      watching = false
+      stop()
+    }
+  }, [id, backend, show])
 
   /* ── while typing, a half-written line of frontmatter is an "error" for a moment ── */
 
@@ -240,19 +260,6 @@ export default function Studio() {
     }
   }
 
-  const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
-      event.preventDefault()
-      void save()
-    } else if (event.key === 'Tab' && !event.shiftKey) {
-      event.preventDefault()
-      const area = event.currentTarget
-      const { selectionStart, selectionEnd, value } = area
-      edit(`${value.slice(0, selectionStart)}  ${value.slice(selectionEnd)}`)
-      requestAnimationFrame(() => area.setSelectionRange(selectionStart + 2, selectionStart + 2))
-    }
-  }
-
   const resolveConflict = (choice: 'disk' | 'mine') => {
     if (status.kind !== 'conflict') return
     const state = live.current
@@ -287,16 +294,16 @@ export default function Studio() {
       </header>
 
       {id ? (
-        <textarea
+        // The key makes each page a document of its own: a new page starts with nothing to undo.
+        <CodeEditor
+          key={shown ?? ''}
           className="sb-studio-editor"
-          aria-label={`Markdown source of ${title}`}
+          language="markdown"
+          label={`Markdown source of ${title}`}
           value={text}
-          disabled={status.kind === 'loading'}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoCorrect="off"
-          onChange={(event) => edit(event.target.value)}
-          onKeyDown={onKeyDown}
+          readOnly={status.kind === 'loading'}
+          onChange={edit}
+          onSave={() => void save()}
         />
       ) : (
         <p className="sb-studio-empty">There is no page at this address to edit.</p>

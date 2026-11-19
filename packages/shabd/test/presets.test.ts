@@ -65,6 +65,16 @@ describe('theme presets', () => {
     expect(misses).toEqual([])
   })
 
+  it('draws the editor in those colours and no others, so that it is readable wherever the page is', () => {
+    const theme = readFileSync(new URL('../src/client/editor/theme.ts', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+    // No colour of its own.
+    expect(theme).not.toMatch(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|color|color-mix)\(/i)
+    const used = new Set([...theme.matchAll(/var\(--sb-([a-z-]+)\)/g)].map((match) => match[1]!))
+    // The one that is a length.
+    expect(used.delete('editor-padding')).toBe(true)
+    expect([...used].sort()).toEqual(Object.keys(FLOORS).sort())
+  })
+
   it.each(PRESET_NAMES)('%s names code themes that Shiki ships', (name) => {
     const { code } = THEME_PRESETS[name]
     expect(Object.keys(bundledThemes)).toEqual(expect.arrayContaining([code.light, code.dark]))

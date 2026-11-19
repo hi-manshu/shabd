@@ -227,25 +227,11 @@
     background: var(--sb-surface);
   }
 
+  /* The editor takes the room that is left in the panel and scrolls inside it. Its own rules are under "editor". */
   .sb-studio-editor {
     flex: 1;
     min-block-size: 0;
-    padding: 1rem;
-    border: 0;
-    outline: 0;
-    resize: none;
     background: var(--sb-surface);
-    color: var(--sb-text);
-    font-family: var(--sb-font-mono);
-    font-size: 0.84rem;
-    line-height: 1.7;
-    tab-size: 2;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-  }
-
-  .sb-studio-editor:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--sb-accent-soft);
   }
 
   .sb-studio-empty {
@@ -329,6 +315,77 @@
     font-size: 0.72rem;
     resize: vertical;
     word-break: break-all;
+  }
+}
+
+@layer shabd.overlays {
+  /* ───────────── editor ───────────── */
+
+  /*
+   * The frame of a code editor (src/client/editor). What is inside it is
+   * CodeMirror, whose rules are in editor/theme.ts: its stylesheet is not in
+   * a cascade layer, so nothing written here can answer it.
+   *
+   * The frame has no background. The editor's colours are held to their
+   * contrast against the page and the surface colour only, so whatever puts
+   * an editor on screen gives it one of those two.
+   */
+  .sb-editor {
+    --sb-editor-padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    color: var(--sb-text);
+    font-family: var(--sb-font-mono);
+    font-size: 0.84rem;
+    line-height: 1.7;
+    font-variant-ligatures: none;
+  }
+
+  .sb-editor:focus-within {
+    box-shadow: inset 0 0 0 2px var(--sb-accent-soft);
+  }
+
+  /* In a frame with a height of its own the editor fills it and scrolls; in one without, it is as tall as its text. */
+  .sb-editor-view,
+  .sb-editor-plain,
+  .sb-editor .cm-editor {
+    flex: 1;
+    min-block-size: 0;
+  }
+
+  .sb-editor-view {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sb-editor .cm-scroller,
+  .sb-editor-plain {
+    overflow: auto;
+  }
+
+  /* The text as it is, until CodeMirror has loaded. Laid out as CodeMirror lays it out, so that nothing moves when it takes over. */
+  .sb-editor-plain {
+    margin: 0;
+    padding: var(--sb-editor-padding);
+    font: inherit;
+    tab-size: 2;
+    white-space: break-spaces;
+    overflow-wrap: anywhere;
+  }
+
+  /* How to leave the editor by keyboard. It is said when the editor has focus, and its room is kept so that nothing moves then. */
+  .sb-editor-hint {
+    padding: 0 var(--sb-editor-padding) 0.45rem;
+    font-family: var(--sb-font-sans);
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: var(--sb-muted);
+    visibility: hidden;
+  }
+
+  .sb-editor:not([data-readonly]):focus-within .sb-editor-hint {
+    visibility: visible;
   }
 }
 

@@ -1,6 +1,8 @@
 /** The dev server: files change on disk and the page on screen follows, without loading again. */
-import type { Page } from '@playwright/test'
-import { DEV, expect, markPage, open, regions, test } from './support/fixtures.js'
+import type { Locator, Page } from '@playwright/test'
+import { contrastOn, parseColor, type Rgba } from '../packages/shabd/src/shared/color.js'
+import { PRESET_NAMES } from '../packages/shabd/src/shared/presets.js'
+import { DEV, expect, markPage, open, regions, test, type SiteFiles } from './support/fixtures.js'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -155,37 +157,121 @@ test.describe('hot updates', () => {
 })
 
 test.describe('studio', () => {
+  /** The Studio's editor, found the way a screen reader finds it: a text field, by its name. */
+  const editorOf = (page: Page): Locator => page.getByRole('textbox', { name: /^Markdown source of / })
+
   const openStudio = async (page: Page, path: string) => {
     await open(page, `${DEV}${path}`)
     await page.getByRole('button', { name: 'Edit page' }).click()
-    const editor = page.locator('.sb-studio-editor')
-    await expect(editor).toBeEnabled()
+    const editor = editorOf(page)
+    // It cannot be typed into until the file has been read.
+    await expect(editor).toBeEditable()
     return editor
   }
+
+  /**
+   * What the editor shows, line for line. CodeMirror draws only the lines near the ones in view; the
+   * pages these tests edit are short enough to be drawn whole.
+   */
+  const textOf = (editor: Locator): Promise<string> =>
+    editor.locator('.cm-line').allTextContents().then((lines) => lines.join('\n'))
+
+  /** Put the cursor at the end of the line that holds `text`. */
+  const cursorAfter = async (editor: Locator, text: string) => {
+    await editor.locator('.cm-line', { hasText: text }).click()
+    await editor.press('End')
+  }
+
+  /**
+   * Wait until the file holds exactly what the editor shows. A test that types and stops sooner leaves a
+   * save on its way. It lands after the test's files have been put back, and the tests that follow find
+   * the page as this one left it.
+   */
+  const written = (editor: Locator, site: SiteFiles, file: string) =>
+    expect.poll(async () => (await site.read(file)) === (await textOf(editor))).toBe(true)
 
   test('typing saves to the file and updates the page beside it', async ({ page, site }) => {
     await site.track('content/guide/setup.md')
     const editor = await openStudio(page, '/guide/setup')
     const stillThere = await markPage(page)
     await expect(page.locator('.sb-studio-file strong')).toHaveText('content/guide/setup.md')
-    await expect(editor).toHaveValue(/^# Setting up/)
+    expect(await textOf(editor)).toBe(await site.read('content/guide/setup.md'))
 
-    await editor.fill((await editor.inputValue()).replace('Install the thing.', 'Install the other thing.'))
-    await expect(page.locator('.sb-content')).toContainText('Install the other thing.')
+    // Key by key, as a person types.
+    await cursorAfter(editor, 'Install the thing.')
+    await page.keyboard.type(' Then the other thing.')
+    await expect(page.locator('.sb-content')).toContainText('Install the thing. Then the other thing.')
     await expect(page.locator('.sb-studio-footer')).toContainText(/Saved\. The page updated \d+ ms later\./)
-    expect(await site.read('content/guide/setup.md')).toContain('Install the other thing.')
+    expect(await site.read('content/guide/setup.md')).toContain('Install the thing. Then the other thing.')
+
+    // And all at once, as a paste over everything does.
+    await editor.fill((await textOf(editor)).replace('Then the other thing.', 'Then another.'))
+    await expect(page.locator('.sb-content')).toContainText('Install the thing. Then another.')
+    await expect.poll(() => site.read('content/guide/setup.md')).toContain('Install the thing. Then another.')
     expect(await stillThere()).toBe(true)
   })
 
   test('follows the file when it changes on disk and nothing is unsaved', async ({ page, site }) => {
     const editor = await openStudio(page, '/guide/setup')
+    await cursorAfter(editor, '## Second step')
+
     await site.edit('content/guide/setup.md', (text) => text.replace('Install the thing.', 'Changed in another editor.'))
-    await expect(editor).toHaveValue(/Changed in another editor\./)
+    await expect(editor).toContainText('Changed in another editor.')
+    expect(await textOf(editor)).toBe(await site.read('content/guide/setup.md'))
+
+    // The cursor is still where it was: only the line that changed was touched.
+    await page.keyboard.type(' of two')
+    await expect.poll(() => site.read('content/guide/setup.md')).toContain('Changed in another editor.\n\n## Second step of two\n')
+  })
+
+  test('undo takes back what was typed and not what came from the file, and a new page has nothing to undo', async ({ page, site }) => {
+    await site.track('content/guide/setup.md')
+    await site.track('content/guide/intro.md')
+    const editor = await openStudio(page, '/guide/setup')
+    await cursorAfter(editor, 'Install the thing.')
+    await page.keyboard.type(' Typed here.')
+    await expect.poll(() => site.read('content/guide/setup.md')).toContain('Install the thing. Typed here.')
+    // The Studio has seen its own save come back as a page. The next change to the file is someone else's.
+    await expect(page.locator('.sb-studio-footer')).toContainText('The page updated')
+
+    // Something else changes another line of the file, and the editor follows.
+    await site.edit('content/guide/setup.md', (text) => text.replace('Run the thing.', 'Run the thing twice.'))
+    await expect(editor).toContainText('Run the thing twice.')
+
+    await editor.press('ControlOrMeta+z')
+    await expect(editor).not.toContainText('Typed here.')
+    await expect(editor).toContainText('Run the thing twice.')
+    await expect.poll(() => site.read('content/guide/setup.md')).toContain('Install the thing.\n\n## Second step\n\nRun the thing twice.')
+
+    // Another page is another document: what was typed in the first cannot be undone into it.
+    await page.locator('.sb-region-sidebar').getByRole('link', { name: 'Introduction' }).click()
+    await expect(page.locator('.sb-studio-file strong')).toHaveText('content/guide/intro.md')
+    const intro = await site.read('content/guide/intro.md')
+    await expect.poll(() => textOf(editor)).toBe(intro)
+    await expect(editor).toBeEditable()
+    await cursorAfter(editor, 'zebras')
+    await editor.press('ControlOrMeta+z')
+    await editor.press('ControlOrMeta+Shift+z')
+    await page.keyboard.type('!')
+    await expect.poll(() => site.read('content/guide/intro.md')).toBe(intro.replace('exactly once.', 'exactly once.!'))
+  })
+
+  test('a file with Windows line endings keeps them when it is edited', async ({ page, site }) => {
+    await site.edit('content/guide/setup.md', (text) => text.replace(/\n/g, '\r\n'))
+    const windows = await site.read('content/guide/setup.md')
+    const editor = await openStudio(page, '/guide/setup')
+
+    await cursorAfter(editor, 'Install the thing.')
+    await page.keyboard.type(' And the rest.')
+    // One sentence was added. Every line still ends as it did.
+    await expect
+      .poll(() => site.read('content/guide/setup.md'))
+      .toBe(windows.replace('Install the thing.', 'Install the thing. And the rest.'))
   })
 
   test('asks which version to keep when the file and the draft both changed', async ({ page, site }) => {
     const editor = await openStudio(page, '/guide/setup')
-    const original = await editor.inputValue()
+    const original = await textOf(editor)
 
     // Type, and before the pause that triggers a save is over, change the file underneath.
     await editor.fill(original.replace('Install the thing.', 'My draft.'))
@@ -196,7 +282,7 @@ test.describe('studio', () => {
     expect(await site.read('content/guide/setup.md')).toContain('Their change.')
 
     await footer.getByRole('button', { name: 'Load the file from disk' }).click()
-    await expect(editor).toHaveValue(/Their change\./)
+    await expect.poll(() => textOf(editor)).toBe(original.replace('Install the thing.', 'Their change.'))
 
     // The other way round: keep the draft, and it is written over the file.
     await editor.fill(original.replace('Install the thing.', 'My second draft.'))
@@ -204,6 +290,168 @@ test.describe('studio', () => {
     await expect(footer).toContainText('This file was changed outside the Studio.')
     await footer.getByRole('button', { name: 'Keep my version' }).click()
     await expect.poll(() => site.read('content/guide/setup.md')).toContain('My second draft.')
+  })
+
+  test('the editor can be reached and left with the keyboard alone', async ({ page, site }) => {
+    await site.track('content/guide/setup.md')
+    const editor = await openStudio(page, '/guide/setup')
+    // The way out is part of what a screen reader says about the field, and is on screen while the field has focus.
+    const hint = 'Tab indents. To move on by keyboard, press Esc, then Tab.'
+    await expect(editor).toHaveAccessibleDescription(hint)
+    await expect(page.getByText(hint)).toBeHidden()
+
+    await page.getByRole('button', { name: 'Close the editor' }).focus()
+    await page.keyboard.press('Tab')
+    await expect(editor).toBeFocused()
+    await expect(page.getByText(hint)).toBeVisible()
+
+    // Tab indents the line the cursor is on and Shift+Tab takes the indent back. Neither moves on.
+    await page.keyboard.press('Tab')
+    await expect.poll(() => textOf(editor)).toMatch(/^ {2}# Setting up\n/)
+    await page.keyboard.press('Shift+Tab')
+    await expect.poll(() => textOf(editor)).toMatch(/^# Setting up\n/)
+    await expect(editor).toBeFocused()
+
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Tab')
+    await expect(editor).not.toBeFocused()
+    await expect(page.getByText(hint)).toBeHidden()
+    await written(editor, site, 'content/guide/setup.md')
+  })
+
+  test('Ctrl or ⌘ + S saves without waiting for a pause in typing', async ({ page, site }) => {
+    await site.track('content/guide/setup.md')
+    const editor = await openStudio(page, '/guide/setup')
+    await cursorAfter(editor, 'Install the thing.')
+
+    // Note when the key goes down, when the file is sent, and whether the browser was kept from saving the page itself.
+    await page.evaluate(() => {
+      const seen = { key: 0, sent: 0, prevented: false }
+      Object.assign(window, { __save: seen })
+      const isSave = (event: KeyboardEvent) => event.key.toLowerCase() === 's' && (event.ctrlKey || event.metaKey)
+      window.addEventListener('keydown', (event) => void (isSave(event) && Object.assign(seen, { key: performance.now(), sent: 0 })), true)
+      window.addEventListener('keydown', (event) => void (isSave(event) && (seen.prevented = event.defaultPrevented)))
+      const send = window.fetch
+      window.fetch = (input, init) => {
+        if (init?.method === 'PUT' && seen.key && !seen.sent) seen.sent = performance.now()
+        return send(input, init)
+      }
+    })
+
+    // A save follows a quarter of a second without typing. One sent within a tenth of a second of the key did
+    // not wait for that. On a machine too busy to press the key that soon after the letter, the pause gets
+    // there first and the key finds nothing left to save: then it is tried again.
+    await expect(async () => {
+      await page.keyboard.type('!')
+      await page.keyboard.press('ControlOrMeta+s')
+      const seen = await page.evaluate(() => (window as unknown as { __save: { key: number; sent: number; prevented: boolean } }).__save)
+      expect(seen.prevented).toBe(true)
+      expect(seen.sent).toBeGreaterThan(0)
+      expect(seen.sent - seen.key).toBeLessThan(100)
+    }).toPass()
+    await written(editor, site, 'content/guide/setup.md')
+    expect(await site.read('content/guide/setup.md')).toMatch(/Install the thing\.!+\n/)
+  })
+
+  test('the editor is drawn in the palette\'s own colours, readable in every preset and both modes', async ({ page, site }) => {
+    await site.track('content/guide/intro.md')
+    const editor = await openStudio(page, '/guide/intro')
+    // A little of everything the editor colours: frontmatter, Markdown, and code in a fence.
+    await editor.fill(
+      [
+        '---',
+        'title: Colours',
+        'badges: [New, "Quoted"]',
+        '---',
+        '',
+        '# A heading with `code` and a [link](https://example.com "A title")',
+        '',
+        '> [!NOTE] A callout, **strong** and *slanted*',
+        '',
+        '- [ ] a task <!-- a comment -->',
+        '',
+        '```tsx',
+        '// A comment',
+        'export default function Example({ count = 2 }: { count: number }) {',
+        '  const label: string = `Clicked ${count} times`',
+        '  return <button className="primary" onClick={() => alert(\'hi\')}>{label}</button>',
+        '}',
+        '```',
+        '',
+      ].join('\n'),
+    )
+    await written(editor, site, 'content/guide/intro.md')
+    // Wait for the fence to be read as TSX: a keyword in the palette's accent.
+    await expect(editor.locator('.cm-line', { hasText: 'export default' }).locator('span', { hasText: /^export$/ })).toBeVisible()
+
+    // Put every preset on the page in turn, in both modes, and read what the editor is drawn in.
+    const drawn = await page.evaluate((presets) => {
+      const root = document.documentElement
+      const before = { palette: root.dataset.palette, theme: root.dataset.theme }
+      const probe = document.body.appendChild(document.createElement('span'))
+      const token = (name: string) => {
+        probe.style.color = `var(--sb-${name})`
+        return getComputedStyle(probe).color
+      }
+      /** The colour of the nearest thing with a colour of its own behind an element. */
+      const behind = (element: Element | null): string => {
+        for (let at = element; at; at = at.parentElement) {
+          const colour = getComputedStyle(at).backgroundColor
+          if (colour !== 'rgba(0, 0, 0, 0)' && colour !== 'transparent') return colour
+        }
+        return 'none'
+      }
+      const content = document.querySelector('.sb-studio .cm-content')!
+      const result = []
+      for (const preset of presets) {
+        for (const mode of ['light', 'dark']) {
+          root.dataset.palette = preset
+          root.dataset.theme = mode
+          const pairs = new Set<string>()
+          const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT)
+          while (walker.nextNode()) {
+            const text = walker.currentNode
+            if (text.textContent?.trim()) pairs.add(`${getComputedStyle(text.parentElement!).color} on ${behind(text.parentElement)}`)
+          }
+          const names = ['text', 'muted', 'accent', 'note', 'tip', 'success', 'caution', 'danger', 'background', 'surface']
+          result.push({ preset, mode, pairs: [...pairs], tokens: Object.fromEntries(names.map((name) => [name, token(name)])) })
+        }
+      }
+      probe.remove()
+      if (before.palette === undefined) delete root.dataset.palette
+      else root.dataset.palette = before.palette
+      root.dataset.theme = before.theme
+      return result
+    }, PRESET_NAMES)
+
+    expect(drawn).toHaveLength(PRESET_NAMES.length * 2)
+    const floors: Record<string, number> = { text: 7, muted: 4.5, accent: 4.5, note: 4.5, tip: 4.5, success: 4.5, caution: 4.5, danger: 4.5 }
+    const misses: string[] = []
+    for (const { preset, mode, pairs, tokens } of drawn) {
+      const used = new Set<string>()
+      for (const pair of pairs) {
+        const [ink = '', under = ''] = pair.split(' on ')
+        // Two of a palette's colours may be the same one: then the stricter floor applies.
+        const names = Object.keys(floors).filter((name) => tokens[name] === ink)
+        for (const name of names) used.add(name)
+        if (names.length === 0) misses.push(`${preset} ${mode}: ${ink} is not one of the palette's colours for text`)
+        if (under !== tokens.surface) misses.push(`${preset} ${mode}: text on ${under}, which is not the surface colour ${tokens.surface}`)
+        const floor = Math.max(...names.map((name) => floors[name]!))
+        const ratio = contrastOn(parseColor(ink) as Rgba, parseColor(under) as Rgba)
+        if (ratio < floor) misses.push(`${preset} ${mode}: ${names.join('/')} ${ink} on ${under} is ${ratio.toFixed(2)}, needs ${floor}`)
+      }
+      // Seven of the eight: nothing in the sample is invalid, which is all that `danger` is for.
+      const unused = Object.keys(floors).filter((name) => name !== 'danger' && !used.has(name))
+      if (unused.length > 0) misses.push(`${preset} ${mode}: nothing in the sample is drawn in ${unused.join(', ')}`)
+    }
+    expect(misses).toEqual([])
+
+    // The switch in the header reaches the editor like the rest of the page.
+    const ink = () => editor.evaluate((element) => getComputedStyle(element).color)
+    const before = await ink()
+    await page.getByRole('button', { name: 'Switch colour theme' }).click()
+    await expect.poll(ink).not.toBe(before)
+    expect(await ink()).toBe(await page.evaluate(() => getComputedStyle(document.body).color))
   })
 
   test('saves through a connected folder with the File System Access API', async ({ page, browserName }) => {
@@ -243,7 +491,7 @@ test.describe('studio', () => {
 
     await page.getByRole('button', { name: 'Connect a folder' }).click()
     await expect(label).toHaveText('Writing to the “content” folder on this device')
-    await expect(editor).toHaveValue('# Setting up\n\nThe copy in the folder.\n')
+    await expect.poll(() => textOf(editor)).toBe('# Setting up\n\nThe copy in the folder.\n')
 
     await editor.fill('# Setting up\n\nWritten by the browser.\n')
     await expect(page.locator('.sb-studio-footer')).toContainText('Saved.')
@@ -260,7 +508,27 @@ test.describe('studio', () => {
     await page.reload()
     await page.getByRole('button', { name: 'Edit page' }).click()
     await expect(label).toHaveText('Writing to the “content” folder on this device')
-    await expect(page.locator('.sb-studio-editor')).toHaveValue('# Setting up\n\nChanged by something else.\n')
+    await expect.poll(() => textOf(editorOf(page))).toBe('# Setting up\n\nChanged by something else.\n')
+  })
+
+  test('a draft typed in one tab shows in another, which keeps its cursor', async ({ page, context, site }) => {
+    await site.track('content/guide/setup.md')
+    const first = await openStudio(page, '/guide/setup')
+    const otherTab = await context.newPage()
+    const second = await openStudio(otherTab, '/guide/setup')
+    await cursorAfter(second, '## Second step')
+
+    await cursorAfter(first, 'Install the thing.')
+    await page.keyboard.type(' Typed in the first tab.')
+    await expect(second).toContainText('Install the thing. Typed in the first tab.')
+
+    // The draft replaced the whole text of the second tab. Its cursor is still at the end of the heading.
+    await otherTab.keyboard.type(' of two')
+    await expect(first).toContainText('## Second step of two')
+    await expect
+      .poll(() => site.read('content/guide/setup.md'))
+      .toContain('Install the thing. Typed in the first tab.\n\n## Second step of two\n')
+    await otherTab.close()
   })
 
   test('two editors connect peer to peer and share a draft', async ({ page, browser, browserName, site }) => {
@@ -322,12 +590,12 @@ test.describe('studio', () => {
     await expect(guestPanel).toContainText('You are connected', { timeout: 15_000 })
 
     // A draft typed on one side appears on the other, in both directions.
-    const original = await hostEditor.inputValue()
+    const original = await textOf(hostEditor)
     await hostEditor.fill(original.replace('Install the thing.', 'Typed by the host.'))
-    await expect(guestEditor).toHaveValue(/Typed by the host\./)
+    await expect(guestEditor).toContainText('Typed by the host.')
 
-    await guestEditor.fill((await guestEditor.inputValue()).replace('Typed by the host.', 'Answered by the guest.'))
-    await expect(hostEditor).toHaveValue(/Answered by the guest\./)
+    await guestEditor.fill((await textOf(guestEditor)).replace('Typed by the host.', 'Answered by the guest.'))
+    await expect(hostEditor).toContainText('Answered by the guest.')
     await expect.poll(() => site.read('content/guide/setup.md')).toContain('Answered by the guest.')
 
     await guestContext.close()

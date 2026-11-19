@@ -174,7 +174,8 @@ shabd/
 │   │       ├── layout/             PageLayout (the layout engine) and its blocks
 │   │       ├── mdx/                components Markdown renders as
 │   │       ├── search/             search worker and dialog
-│   │       ├── studio/             editor, file backends, draft sync
+│   │       ├── studio/             the Studio's panel, file backends, draft sync
+│   │       ├── editor/             the code editor (CodeMirror), fetched when one is shown
 │   │       ├── sandbox/            live code sandboxes
 │   │       └── styles/             the default theme
 │   └── test/                       unit and integration tests
