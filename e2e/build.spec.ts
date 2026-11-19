@@ -92,7 +92,8 @@ test.describe('sidebar', () => {
   test('lists sidebar.yaml as written, then the folders it does not mention', async ({ page }) => {
     await open(page, `${BUILT}/guide/intro`)
     const sidebar = page.locator('.sb-region-sidebar')
-    await expect(sidebar.locator('.sb-nav-heading')).toHaveText(['Guide', 'Play', 'API', 'Extras'])
+    // The last one is not a folder of the site: its pages are made from an OpenAPI description (openapi.spec.ts).
+    await expect(sidebar.locator('.sb-nav-heading')).toHaveText(['Guide', 'Play', 'API', 'Extras', 'Fixture store'])
 
     const extras = sidebar.locator('.sb-nav-category', { hasText: 'Extras' })
     await expect(extras.locator('.sb-nav-link')).toHaveText(['Alpha notes', 'Beta notes'])

@@ -341,6 +341,29 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
         return []
       }
 
+      // An OpenAPI description. Its pages are made again; the ones the browser has are swapped in place.
+      if (config.openapi.some((api) => same(file, api.spec))) {
+        await lookAgain()
+        try {
+          const { added, changed, removed } = await store.regenerate()
+          if (added.length > 0 || removed.length > 0) reload(VIRTUAL.routes)
+          // The sidebar has the API's groups and titles in it, whether or not the set of pages changed.
+          reload(VIRTUAL.data)
+          for (const page of changed) {
+            for (const module of client.moduleGraph.getModulesByFile(normalizePath(page.file)) ?? []) void client.reloadModule(module)
+          }
+          const count = added.length + changed.length + removed.length
+          server.config.logger.info(
+            `${pc.magenta('shabd')} ${path.relative(config.root, file)} changed: ${count} ${count === 1 ? 'page' : 'pages'} made again`,
+            { timestamp: true },
+          )
+        } catch (error) {
+          // A description that cannot be read leaves the pages as they were, and says what is wrong with it.
+          reportError(server, error)
+        }
+        return []
+      }
+
       if (!store.owns(file)) return undefined
 
       if (type === 'delete') {
@@ -396,7 +419,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
 
     configureServer(server) {
       const context = ctx()
-      server.watcher.add([context.config.configFile, context.config.sidebarFile])
+      server.watcher.add([context.config.configFile, context.config.sidebarFile, ...context.config.openapi.map((api) => api.spec)])
       logSidebarWarnings(server, context)
       for (const error of context.store.errors()) server.config.logger.error(error.pretty(context.config.root))
       if (context.store.lastUpdatedNote) {
@@ -623,13 +646,15 @@ async function reloadConfig(
     next.sidebarFile !== previous.sidebarFile ||
     // The days pages were last changed are read from Git once, when the server starts.
     next.config.defaults.lastUpdated !== previous.config.defaults.lastUpdated ||
-    JSON.stringify([next.components, next.blocks, next.stylesheets, bundledFonts(next), next.config.features.search]) !==
+    // Which descriptions pages are made from, and where they go: the pages are made when the server starts.
+    JSON.stringify([next.components, next.blocks, next.stylesheets, bundledFonts(next), next.config.features.search, next.openapi]) !==
       JSON.stringify([
         previous.components,
         previous.blocks,
         previous.stylesheets,
         bundledFonts(previous),
         previous.config.features.search,
+        previous.openapi,
       ])
 
   if (structural) {

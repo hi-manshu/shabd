@@ -18,6 +18,7 @@ import { loadSidebar, type LoadedSidebar, type ResolvedConfig } from '../config/
 import { paletteChoices, themeToCss } from '../config/theme-css.js'
 import { leadingHeading, parseFrontmatter } from './frontmatter.js'
 import { formatDay, lastCommitDates } from './git.js'
+import { generatedId, writeApiPages, type ApiSection } from '../openapi/site.js'
 import { substituteVars, type VariableNote } from './vars.js'
 import { resolveSidebars, type ResolvedSidebars } from './sidebar.js'
 
@@ -48,6 +49,12 @@ export interface PageRecord {
   updated?: PageUpdated
   /** Set when the frontmatter is invalid. The page keeps its route so the error can be shown there. */
   error?: ShabdError
+  /**
+   * The OpenAPI description the page was made from, as a path from the site
+   * folder. Such a page has no file of its own to edit: `file` is what Shabd
+   * wrote, and is written again when the description changes.
+   */
+  generated?: string
 }
 
 /**
@@ -88,6 +95,8 @@ export class ContentStore {
   #sidebarSource: LoadedSidebar
   #sidebar: ResolvedSidebars | undefined
   #published: { list: readonly PageRecord[]; byPath: ReadonlyMap<string, PageRecord> } | undefined
+  /** The OpenAPI descriptions pages were made from (`openapi:` in the config). */
+  #apis: ApiSection[] = []
   #revision = 0
   /** File → the day of its last commit. Empty unless `defaults.lastUpdated` is on. */
   #commitDays = new Map<string, string>()
@@ -120,7 +129,10 @@ export class ContentStore {
         },
       ])
     }
-    await Promise.all(files.map((file) => store.upsert(file)))
+    // The pages made from OpenAPI descriptions are written first, and then read like the rest.
+    const apis = await writeApiPages(config)
+    store.#apis = apis.sections
+    await Promise.all([...files, ...apis.files].map((file) => store.upsert(file)))
     store.assertUniqueRoutes()
     return store
   }
@@ -173,14 +185,27 @@ export class ContentStore {
     return this.pages().flatMap((page) => (page.error ? [page.error] : []))
   }
 
-  /** True when `file` is inside the content directory and would be a page. */
+  /** True when `file` would be a page: it is inside the content directory, or among the pages made from a description. */
   owns(file: string): boolean {
+    const generated = generatedId(this.config, file)
+    if (generated !== undefined) return isRoutable(generated)
     const relative = path.relative(this.config.contentDir, file)
     return !relative.startsWith('..') && !path.isAbsolute(relative) && isRoutable(toPosix(relative))
   }
 
+  /** A generated page has the id it would have if its folder were the content folder: `api/pets/list-pets.md`. */
   idOf(file: string): string {
-    return toPosix(path.relative(this.config.contentDir, file))
+    return generatedId(this.config, file) ?? toPosix(path.relative(this.config.contentDir, file))
+  }
+
+  /** The OpenAPI descriptions pages were made from, with what of each could not be shown. */
+  get apis(): readonly ApiSection[] {
+    return this.#apis
+  }
+
+  /** The description a generated page came from. */
+  #apiOf(id: string): ApiSection | undefined {
+    return this.#apis.find((api) => api.dir === '' || id.startsWith(`${api.dir}/`))
   }
 
   /** The site's sidebar, or its sidebars: the one for pages in no section, and one for each section. */
@@ -194,7 +219,7 @@ export class ContentStore {
         isIndex: page.isIndex,
         sidebar: page.frontmatter.sidebar,
       })),
-      { lang: this.config.config.site.lang },
+      { lang: this.config.config.site.lang, apis: this.#apis },
     )
     return this.#sidebar
   }
@@ -211,7 +236,13 @@ export class ContentStore {
     const { config, layouts } = this.config
     const pages: Record<string, PageMeta> = {}
     for (const page of this.pages()) {
-      pages[page.path] = { id: page.id, path: page.path, title: page.title, description: page.description }
+      pages[page.path] = {
+        id: page.id,
+        path: page.path,
+        title: page.title,
+        description: page.description,
+        ...(page.generated ? { generated: true } : {}),
+      }
     }
     // The tags for <head> are written into each document. Leaving them out here keeps them out of the script.
     const { head: _head, ...site } = config.site
@@ -238,6 +269,22 @@ export class ContentStore {
     const text = source ?? (await readFile(file, 'utf8'))
     const hash = sha1(text)
     const previous = this.#pages.get(id)
+    // A page made from a description has the id of the file it would be in the content folder, and a
+    // site can have that file too. Neither may quietly take the place of the other.
+    // Compared as the file system sees them: the dev server names a file with forward slashes on every system.
+    if (previous && path.resolve(previous.file) !== path.resolve(file)) {
+      const relative = (other: string) => toPosix(path.relative(this.config.root, other))
+      const made = previous.generated ?? this.#apiOf(id)?.spec
+      throw new ShabdError(previous.generated ? file : previous.file, [
+        {
+          path: [],
+          message:
+            `Two pages map to the same URL ${previous.path}:\n    ${relative(previous.file)}\n    ${relative(file)}\n` +
+            `  One of them is made from an OpenAPI description${made ? ` (${relative(path.resolve(this.config.root, made))})` : ''}. ` +
+            'Move the other, or give the API another `path`.',
+        },
+      ])
+    }
     if (previous && previous.hash === hash) return { page: previous, change: 'none' }
 
     const page = this.#read(id, file, text, hash, previous)
@@ -260,6 +307,25 @@ export class ContentStore {
       this.#revision++
     }
     return page
+  }
+
+  /**
+   * Make the pages of the OpenAPI descriptions again, after one of them
+   * changed, and take them into the store. Gives back the pages that are new,
+   * the ones whose text changed and the ones that are gone, so that the dev
+   * server can tell the browser.
+   *
+   * A description that can no longer be read throws, and the pages stay as
+   * they were.
+   */
+  async regenerate(): Promise<{ added: PageRecord[]; changed: PageRecord[]; removed: PageRecord[] }> {
+    const written = await writeApiPages(this.config)
+    this.#apis = written.sections
+    // The names and the order of an API's groups are part of the sidebar, whether or not a page changed.
+    this.#sidebar = undefined
+    const removed = written.removed.flatMap((file) => this.remove(file) ?? [])
+    const read = async (files: string[]) => Promise.all(files.map(async (file) => (await this.upsert(file)).page))
+    return { added: await read(written.added), changed: await read(written.changed), removed }
   }
 
   /** Swap in a reloaded config. Only for changes that do not alter compiled pages or the page set. */
@@ -291,7 +357,10 @@ export class ContentStore {
   }
 
   #read(id: string, file: string, text: string, hash: string, previous?: PageRecord): PageRecord {
-    const { text: source, notes } = substituteVars(text, this.config.vars)
+    const api = generatedId(this.config, file) === undefined ? undefined : this.#apiOf(id)
+    const generated = api ? toPosix(path.relative(this.config.root, api.spec)) : undefined
+    // A description is somebody else's text, and braces in it are braces: the site's variables are for its own pages.
+    const { text: source, notes } = generated ? { text, notes: [] } : substituteVars(text, this.config.vars)
     const format = id.toLowerCase().endsWith('.mdx') ? 'mdx' : 'md'
     const slug = fileToSlug(id)
     const fileName = id.slice(id.lastIndexOf('/') + 1).replace(/\.mdx?$/i, '')
@@ -335,6 +404,7 @@ export class ContentStore {
       description: frontmatter.description ?? '',
       ...(day ? { updated: { day, text: formatDay(day, this.config.config.site.lang) } } : {}),
       ...(error ? { error } : {}),
+      ...(generated ? { generated } : {}),
     }
   }
 }

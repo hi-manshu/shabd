@@ -1818,6 +1818,57 @@
         }
       },
       "additionalProperties": false
+    },
+    "openapi": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "spec": {
+              "type": "string",
+              "minLength": 1
+            },
+            "path": {
+              "default": "/api",
+              "type": "string",
+              "pattern": "^\\/[^?#]*$"
+            },
+            "try": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "spec"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "spec": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "default": "/api",
+                "type": "string",
+                "pattern": "^\\/[^?#]*$"
+              },
+              "try": {
+                "default": false,
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "spec"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
     }
   },
   "required": [

@@ -8,10 +8,85 @@ The pages are Markdown with frontmatter, the same as pages written by hand, and 
 they came from. So search finds them, `llms.txt` lists them, each has a Markdown copy, and the
 [MCP tools](./mcp.md) read them. An agent that reads the page of an operation has what it needs to call it.
 
-How to have Shabd make these pages for a site is not written here yet.
-
 It reads OpenAPI 3.0 and 3.1, in YAML or JSON. A description in OpenAPI 2.0, which is also called Swagger, is
 refused with a message that says to convert it first.
+
+## Turning it on
+
+Name the description in the config, and say where on the site its pages go:
+
+```yaml title="shabd.config.yaml"
+openapi:
+  spec: ./openapi.yaml
+  path: /api
+```
+
+| Key | Default | |
+| --- | --- | --- |
+| `spec` | | The description: a `.yaml`, `.yml` or `.json` file, by its path from the site folder. Required |
+| `path` | `/api` | Where the pages are on the site. The overview is at this address and each operation under it |
+| `try` | `false` | Put a [Try it](../configuration/frontmatter.md#trying-a-request) form on the page of every operation. Where the request has a JSON body, the form starts from its example |
+
+A site with several APIs writes a list, and gives each a `path` of its own. One may not be inside another:
+
+```yaml title="shabd.config.yaml"
+openapi:
+  - { spec: ./pets.yaml, path: /reference/pets }
+  - { spec: ./orders.json, path: /reference/orders, try: true }
+```
+
+The pages are made when `shabd dev` or `shabd build` starts. While `shabd dev` runs they are made again each time
+the description is saved, and the page on screen changes in place. A description that cannot be read is reported
+with the line that is wrong. A build stops there. The dev server keeps the pages it had until the description
+can be read again.
+
+### Where the pages are
+
+They are written as Markdown files to `.shabd/openapi/` in the site folder, laid out as the content folder is:
+the pages of an API at `/api` are in `.shabd/openapi/api/`. They are there to be read, by Shabd and by you. An
+edit to one is lost the next time the pages are made, so "Edit this page" is not offered on them and the
+[Studio](./studio.md) does not open them. Keep `.shabd/` out of version control, as the starter's `.gitignore`
+does.
+
+A page of your own cannot have the address of a generated one. `content/api/index.md` and an API at `/api` are an
+error that names both. Other pages in the same folder are fine.
+
+The site's [variables](../guide/writing/markdown.md#variables) are not filled into these pages. A description is
+somebody else's text, and braces in it are braces.
+
+### In the sidebar
+
+An API is laid out as its description has it: the overview, then a group for each tag with its operations in the
+order they are written. A folder would give neither the tags' names nor that order.
+
+- With nothing about it in `sidebar.yaml`, the API is added at the end like any
+  [folder you did not mention](../configuration/sidebar.md#folders-you-did-not-mention), under the title the
+  description gives it.
+- `autogenerate` puts it under a heading of yours:
+
+  ```yaml title="sidebar.yaml"
+  - category: Reference
+    autogenerate: api
+  ```
+
+- A large API is better with [a sidebar of its own](../configuration/sidebar.md#more-than-one-sidebar), so that
+  the rest of the site does not carry it:
+
+  ```yaml title="sidebar.yaml"
+  /api/:
+    - category: API
+      autogenerate: api
+  ```
+
+- A page can also be listed by its path, as any page is: `api/pets/list-pets`.
+
+A description with no tags has no groups, and its operations are listed under the overview.
+
+### What check says
+
+What a description holds that its pages cannot show is listed by [`shabd check`](../reference/cli.md), and after a
+build, as notes against the description's file: the first twelve in full, and a count of the rest. They are under
+[What is left out](#what-is-left-out) below.
 
 ## The pages
 

@@ -53,6 +53,8 @@ export interface PageMeta {
   path: string
   title: string
   description: string
+  /** The page was made by Shabd, from an OpenAPI description: there is no file of it to edit. */
+  generated?: true
 }
 
 /** A section of a page, as indexed for search and served to AI agents. */

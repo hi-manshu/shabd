@@ -163,6 +163,11 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
         sendJson(res, { error: 'Expected { id, source } for an existing page.' }, 400)
         return
       }
+      // A page made from an OpenAPI description is written again whenever the description changes.
+      if (page.generated) {
+        sendJson(res, { error: `This page is made from ${page.generated}. Change the description, and the page follows.` }, 403)
+        return
+      }
       const onDisk = await readFile(page.file, 'utf8')
       if (body.source === onDisk) {
         // Already what is on disk (another tab saved the same draft): nothing to write.

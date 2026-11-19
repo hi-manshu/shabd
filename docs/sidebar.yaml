@@ -46,6 +46,8 @@
       badge: { text: Beta, variant: caution }
     - features/feed
     - features/social-images
+    - file: features/openapi
+      badge: New
 
 - link: https://github.com/hi-manshu/shabd
   label: GitHub

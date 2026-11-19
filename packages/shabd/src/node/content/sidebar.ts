@@ -64,8 +64,23 @@ interface SortableEntry {
   isIndex: boolean
 }
 
+/**
+ * An API whose pages were made from an OpenAPI description. Where a sidebar
+ * is generated from its folder, it is laid out as the description is: the
+ * overview, then the operations under their tags, in the order they were
+ * written. A folder has neither the tags' names nor that order.
+ */
+export interface ApiGroups {
+  /** The folder of its pages, as a slug: `api`. Empty for an API at the root of the site. */
+  dir: string
+  /** What the API is called. */
+  title: string
+  groups: { label: string; slugs: string[] }[]
+}
+
 export interface ResolveOptions {
   lang?: string
+  apis?: readonly ApiGroups[]
   /**
    * The pages this sidebar answers for, on a site with more than one. Its
    * entries may name any page, but only folders that hold pages of its own
@@ -146,15 +161,56 @@ function resolveIn({ pages, bySlug, directories }: ContentTree, input: SidebarIn
       })
       .map((entry) => entry.node)
 
-  /** Every page and sub-folder of a content directory, alphabetically. */
+  /* ── APIs made from a description ── */
+
+  /** Each API by its folder, with the pages that are its own and the folders that hold them. */
+  const apis = new Map(
+    (options.apis ?? []).map((api) => {
+      const slugs = new Set([api.dir, ...api.groups.flatMap((group) => group.slugs)])
+      const folders = new Set<string>()
+      for (const slug of slugs) {
+        for (let dir = parentDir(slug); dir !== api.dir && dir !== ''; dir = parentDir(dir)) folders.add(dir)
+      }
+      return [api.dir, { ...api, slugs, folders }] as const
+    }),
+  )
+
+  /** An API as its description has it: the overview, then each tag's operations in the order they were written. */
+  const fromDescription = (api: ApiGroups, collapsed: boolean): SidebarNode[] => {
+    const entry = (slug: string): SidebarNode[] => {
+      const page = bySlug.get(slug)
+      // The home page is reached from the site title, here as in every generated group.
+      if (!page || page.sidebar.exclude || page.slug === '') return []
+      listed.add(page.slug)
+      return [pageNode(page)]
+    }
+    const nodes = entry(api.dir)
+    for (const group of api.groups) {
+      const items = group.slugs.flatMap(entry)
+      if (items.length === 0) continue
+      // A description with no tags has one group, and its pages need no folder around them.
+      if (api.groups.length === 1) nodes.push(...items)
+      else nodes.push({ type: 'group', kind: 'folder', label: group.label, collapsed, items, auto: true })
+    }
+    return nodes
+  }
+
+  /**
+   * Every page and sub-folder of a content directory, alphabetically. The
+   * folder of an API starts with the API as its description lays it out, and
+   * anything else the folder holds comes after.
+   */
   const generate = (dir: string, collapsed: boolean): SidebarNode[] => {
     const directory = directories.get(dir)
     if (!directory) return []
+    const api = apis.get(dir)
+    const described = api ? fromDescription(api, collapsed) : []
     const entries: SortableEntry[] = []
 
     for (const page of directory.pages) {
       if (page.sidebar.exclude) continue
       if (page.slug === '') continue // the home page is reached from the site title
+      if (api?.slugs.has(page.slug)) continue
       listed.add(page.slug)
       const node = pageNode(page)
       entries.push({
@@ -166,9 +222,12 @@ function resolveIn({ pages, bySlug, directories }: ContentTree, input: SidebarIn
     }
 
     for (const subdir of directory.subdirs) {
+      // The folder of one of the API's tags: its pages are in the API's own list, above.
+      if (api?.folders.has(subdir)) continue
       const items = generate(subdir, collapsed)
       if (items.length === 0) continue
-      const label = titleize(subdir.slice(subdir.lastIndexOf('/') + 1))
+      // An API is called what its description calls it, and any other folder by its name.
+      const label = apis.get(subdir)?.title ?? titleize(subdir.slice(subdir.lastIndexOf('/') + 1))
       const index = bySlug.get(subdir)
       const [only] = items
       // A folder that holds nothing but its own index page is that page: `terms/cache/index.md` is the
@@ -185,7 +244,7 @@ function resolveIn({ pages, bySlug, directories }: ContentTree, input: SidebarIn
       })
     }
 
-    return sortEntries(entries)
+    return [...described, ...sortEntries(entries)]
   }
 
   const fromAutogenerate = (
@@ -303,7 +362,7 @@ function resolveIn({ pages, bySlug, directories }: ContentTree, input: SidebarIn
       const group: SidebarGroup = {
         type: 'group',
         kind: 'category',
-        label: dir.split('/').map(titleize).join(' / '),
+        label: apis.get(dir)?.title ?? dir.split('/').map(titleize).join(' / '),
         collapsed: false,
         items,
         auto: true,
@@ -355,7 +414,7 @@ export function inSection(path: string, prefix: string): boolean {
 export function resolveSidebars(
   input: SidebarInput | Record<string, SidebarInput>,
   pages: readonly SidebarPageInfo[],
-  options: { lang?: string } = {},
+  options: { lang?: string; apis?: readonly ApiGroups[] } = {},
 ): ResolvedSidebars {
   if (Array.isArray(input)) {
     const one = resolveSidebar(input, pages, options)

@@ -62,6 +62,13 @@ export interface ResolvedConfig {
   redirects: Redirect[]
   /** `vars:` as one flat table of text: a nested value is `group.name`. */
   vars: Record<string, string>
+  /** `openapi:`: each description's file as an absolute path, and the address its pages start at. */
+  openapi: { spec: string; prefix: string; try: boolean }[]
+  /**
+   * The folder the pages made from those descriptions are written to. It is
+   * in the site folder and never under `node_modules`: see src/node/openapi/site.ts.
+   */
+  generatedDir: string
   /** Where a key of the config is written, for problems found after it has loaded. */
   locate(path: (string | number)[]): { line: number; column: number } | undefined
   /** Changes whenever a setting that affects compiled pages changes. Part of every cache key. */
@@ -158,6 +165,26 @@ export function resolveConfig(root: string, configFile: string, source: string):
     return absolute
   })
 
+  // One description is written as a mapping and several as a list, and a problem is reported where it is written.
+  const listed = Array.isArray((yaml.data as { openapi?: unknown } | null)?.openapi)
+  const openapi = config.openapi.map((api, index) => {
+    const at = (key: string) => (listed ? ['openapi', index, key] : ['openapi', key])
+    const spec = path.resolve(root, api.spec)
+    if (!existsSync(spec)) issues.push({ path: at('spec'), message: `File not found: ${api.spec} (looked in ${spec})` })
+    const other = config.openapi.findIndex((earlier, position) => position < index && inPath(api.path, earlier.path))
+    if (other >= 0) {
+      const theirs = config.openapi[other]!.path
+      issues.push({
+        path: at('path'),
+        message:
+          api.path === theirs
+            ? `Two descriptions have their pages at ${api.path}. Give each a \`path\` of its own.`
+            : `${api.path} and ${theirs} are one inside the other, so the pages of one API would be among the pages of the other. Give each a \`path\` of its own.`,
+      })
+    }
+    return { spec, prefix: api.path, try: api.try }
+  })
+
   if (issues.length > 0) {
     throw new ShabdError(configFile, locateIssues(issues, yaml), source)
   }
@@ -200,10 +227,18 @@ export function resolveConfig(root: string, configFile: string, source: string):
     socialFonts,
     redirects,
     vars,
+    openapi,
+    generatedDir: path.join(root, '.shabd', 'openapi'),
     locate: (path) => yaml.locate(path, 'key'),
     compileFingerprint,
     structureFingerprint,
   }
+}
+
+/** Is one address the other, or inside it or around it? `/api` and `/api/v2` are; `/api` and `/api-v2` are not. */
+function inPath(a: string, b: string): boolean {
+  const within = (inner: string, outer: string) => outer === '/' || inner === outer || inner.startsWith(`${outer}/`)
+  return within(a, b) || within(b, a)
 }
 
 /** The page a redirect target names, without its `#heading`. */

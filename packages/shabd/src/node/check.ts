@@ -20,7 +20,7 @@ export type ProblemLevel = Exclude<CheckLevel, 'off'>
 
 export interface Problem {
   level: ProblemLevel
-  /** Which check found it: `link`, `redirect`, `sidebar`, `variable`, `alt-text`, `description`, `external-link`. */
+  /** Which check found it: `link`, `redirect`, `sidebar`, `variable`, `alt-text`, `description`, `external-link`, `openapi`. */
   rule: string
   /** File the problem is in, relative to the site root. */
   file: string
@@ -41,6 +41,9 @@ export interface CheckOptions {
   network?: ExternalOptions
 }
 
+/** How many notes about one OpenAPI description are given in full. */
+const MOST_NOTES = 12
+
 /** Compile every page and collect problems with content, navigation and links. */
 export async function collectProblems(context: ShabdContext, options: CheckOptions = {}): Promise<CheckResult> {
   const { config, store } = context
@@ -53,6 +56,17 @@ export async function collectProblems(context: ShabdContext, options: CheckOptio
   const sidebarFile = relative(config.sidebarFile)
   for (const warning of store.sidebarWarnings()) {
     problems.push({ level: 'warning', rule: 'sidebar', file: sidebarFile, line: warning.line, message: warning.message })
+  }
+
+  // What of an OpenAPI description its pages could not show. A large description can leave hundreds of
+  // these, mostly of one kind, so the first few are given and the rest counted.
+  for (const api of store.apis) {
+    const file = relative(api.spec)
+    for (const note of api.notes.slice(0, MOST_NOTES)) problems.push({ level: 'note', rule: 'openapi', file, message: note })
+    const more = api.notes.length - MOST_NOTES
+    if (more > 0) {
+      problems.push({ level: 'note', rule: 'openapi', file, message: `${more} more ${more === 1 ? 'part' : 'parts'} of this description could not be shown either.` })
+    }
   }
 
   // Compile everything first: links can only be checked against the full set of pages and anchors.

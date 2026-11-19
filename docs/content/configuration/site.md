@@ -240,7 +240,8 @@ features:
 
 Each feature has its own page: [Search](../features/search.md), [MCP and llms.txt](../features/mcp.md),
 [Studio](../features/studio.md), [Live sandboxes](../features/sandbox.mdx), [Feed](../features/feed.md) and
-[Social pictures](../features/social-images.md).
+[Social pictures](../features/social-images.md). An API reference made from a description is not a switch here: it
+has a key of its own, [`openapi`](#openapi).
 
 ## build
 
@@ -256,6 +257,25 @@ build:
 With an adapter, a build also writes what that host needs to answer the MCP endpoint, and the site's
 [redirects](#redirects) in the host's own format. `shabd build --adapter <name>` does the same for one build, and
 wins over this key. [Deploying](../guide/deploying.md) says what each adapter writes.
+
+## openapi
+
+An API reference made from an OpenAPI description: an overview, and a page for each operation.
+
+| Key | Default | Meaning |
+| --- | --- | --- |
+| `spec` | | The description: a YAML or JSON file, by its path from the site folder. Required |
+| `path` | `/api` | Where its pages are on the site |
+| `try` | `false` | Put a [Try it](./frontmatter.md#trying-a-request) form on the page of every operation |
+
+```yaml title="shabd.config.yaml"
+openapi:
+  spec: ./openapi.yaml
+  path: /api
+```
+
+Several descriptions are written as a list. [OpenAPI](../features/openapi.md) says what the pages hold, where they
+are written and how they are listed in the sidebar.
 
 ## redirects
 

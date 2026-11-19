@@ -94,7 +94,7 @@ export function operationPage(reader: Reader, operation: Operation, options: { t
       ...(server?.url ? { baseUrl: server.url } : {}),
       auth: auth.phrase,
       deprecated: operation.deprecated,
-      ...(options.tryIt ? { try: true } : {}),
+      ...(options.tryIt ? { try: true, ...tryBody(body) } : {}),
     },
     // The page has no file of its own in the repository to edit.
     editLink: false,
@@ -260,6 +260,26 @@ function exampleBlock(example: Example, type: string): string {
   }
   const json = toJson(value)
   return json === undefined ? '' : fence(json, 'json title="Example"')
+}
+
+/**
+ * The body a reader's request starts from, in the form that sends it
+ * (`api.body`): the example of a JSON body, as the value it is. The form
+ * sends JSON and nothing else, so a body of another kind gives it nothing.
+ */
+function tryBody({ type, example }: Content): { body?: unknown } {
+  if (type === undefined || example === undefined || !isJson(type)) return {}
+  let { value } = example
+  if (typeof value === 'string' && /^\s*[[{]/.test(value)) {
+    try {
+      value = JSON.parse(value)
+    } catch {
+      // Text that only looks like JSON is sent as the text it is.
+    }
+  }
+  // Through JSON and back: what is written into the frontmatter is then a plain value, with nothing holding itself.
+  const json = toJson(value)
+  return json === undefined ? {} : { body: JSON.parse(json) as unknown }
 }
 
 function toJson(value: unknown): string | undefined {

@@ -716,6 +716,23 @@ const CheckSchema = z.strictObject({
   externalLinks: z.enum(CHECK_LEVELS).default('off'),
 })
 
+/* ──────────────────────────────── openapi ─────────────────────────────── */
+
+const OpenApiSchema = z.strictObject({
+  /** The description of the API: a YAML or JSON file, by its path from the site folder. OpenAPI 3.0 or 3.1. */
+  spec: z.string().min(1),
+  /** Where its pages are on the site: the overview at this address, and a page for each operation under it. */
+  path: z
+    .string()
+    .regex(/^\/[^?#]*$/, 'Write the address as it is on the site, starting with a slash: /api')
+    .default('/api')
+    .transform((address) => address.replace(/\/+$/, '') || '/'),
+  /** Offer each request to be sent from its page: the "Try it" form of an API page. */
+  try: z.boolean().default(false),
+})
+
+export type OpenApiConfig = z.output<typeof OpenApiSchema>
+
 /* ──────────────────────────────── markdown ────────────────────────────── */
 
 export interface PluginRef {
@@ -787,6 +804,11 @@ export const ConfigSchema = z.strictObject({
   markdown: MarkdownSchema.prefault({}),
   /** How strict `shabd check` is about what is a matter of taste. */
   check: CheckSchema.prefault({}),
+  /** Pages made from an OpenAPI description: one description, or a list of them. */
+  openapi: z
+    .union([OpenApiSchema, z.array(OpenApiSchema)])
+    .default([])
+    .transform((written) => (Array.isArray(written) ? written : [written])),
 })
 
 export type ShabdConfigInput = z.input<typeof ConfigSchema>
