@@ -150,8 +150,9 @@ and only embed passages whose text changed.
 
 ## Choosing a store
 
-`store` decides how the index is held in the reader's browser. There are two, and they give the same results for the
-same query.
+`store` decides how the index is held in the reader's browser. There are two. They hold the same words, take a
+misspelt word for the same words, and rank by meaning with the same code. They score a keyword match with
+different formulas, so they do not always put results in the same order: see [how far they agree](#how-far-they-agree).
 
 | | `memory` (the default) | `sqlite` |
 | --- | --- | --- |
@@ -177,21 +178,57 @@ with 384-dimension vectors, run in Node with the same code and the same SQLite b
 
 | | 2,000 sections | 20,000 sections |
 | --- | --- | --- |
-| `memory`: download, compressed | 1.3 MB | 13 MB |
-| `memory`: time to open | 88 ms | 846 ms |
-| `memory`: held in memory | about 17 MB | about 122 MB |
-| `memory`: keyword query, with semantic | 0.5 ms, 1.9 ms | 2.7 ms, 19 ms |
-| `sqlite`: download, compressed | 2.2 MB | 21 MB |
-| `sqlite`: time to open | 2 ms | 6 ms |
-| `sqlite`: keyword query, with semantic | 1.0 ms, 7.4 ms | 6.5 ms, 72 ms |
+| `memory`: download, compressed | 1.2 MB | 11.6 MB |
+| `memory`: time to open | 75 ms | 716 ms |
+| `memory`: held in memory | about 17 MB | about 108 MB |
+| `memory`: keyword query, with semantic | 0.33 ms, 1.4 ms | 0.46 ms, 14 ms |
+| `memory`: query with a misspelt word | 2.0 ms | 3.7 ms |
+| `sqlite`: download, compressed | 2.0 MB | 19.0 MB |
+| `sqlite`: time to open | 0.5 ms | 1.3 ms |
+| `sqlite`: keyword query, with semantic | 0.64 ms, 2.0 ms | 1.0 ms, 15 ms |
+| `sqlite`: the first query with semantic | 6.5 ms | 63 ms |
+| `sqlite`: query with a misspelt word | 2.6 ms | 4.8 ms |
+| `sqlite`: the first query with a misspelt word | 37 ms | 117 ms |
 
-The memory store is smaller to download and faster to query at both sizes. What it pays is the time to build its
-index on every visit and the memory that index takes, and both grow with the site. The SQLite store opens at once
-and builds nothing, in exchange for a larger file and slower queries.
+They were measured with `node --expose-gc scripts/bench/search-stores.mjs`, on an Apple M2 Pro with Node 22.16.
+Each time is the median of 200 queries, or of five runs for what is done once, and the figure given is the middle
+one of three runs of the script. A keyword query is two words, the second with its first four letters typed. The
+script builds the same index on every run, so the numbers can be made again. It does not measure a browser: not
+the download, and not the SQLite store reading its file from the browser's private file system.
+
+The memory store is smaller to download. What it pays is the time to build its index on every visit and the
+memory that index takes, and both grow with the site. The SQLite store opens at once and builds nothing, in
+exchange for a larger file. A query takes about as long in either. By keyword it is a millisecond or less. By
+meaning it is as long as it takes to compare the query with every vector, which both stores do the same way: the
+SQLite store reads the vectors out of its database on the first such query, and holds them from then on, 384
+bytes a section.
 
 So keep `memory` for a site of hundreds or a few thousand sections, which is most documentation. Consider `sqlite`
 when search takes noticeably long to open. This site has about a hundred sections: its JSON index is about 16 KB
 compressed, and the same index as SQLite would be about 76 KB plus SQLite itself.
+
+### How far they agree
+
+A query by meaning is ranked by the same code over the same vectors in both stores, and comes out the same. A
+keyword match is scored by SQLite's FTS5 in one and by Shabd's own code in the other. Both use BM25, with the same
+weights for a title, a heading and the text, but they are not the same formula, and they treat a word that is
+still being typed differently: the in-memory store looks up as many as 40 words that start with what was typed,
+each on its own and at a discount, and FTS5 takes all of them as one word.
+
+On this site's own index of 128 sections, with 300 queries of each kind made from its words
+(`node scripts/bench/store-agreement.mjs docs`):
+
+| Query | Same first result | Same eight sections | In the same order |
+| --- | --- | --- | --- |
+| One word, finished | 295 of 300 | 296 | 266 |
+| Two words, finished | 290 | 288 | 223 |
+| One misspelt word | 293 | 297 | 264 |
+| A misspelt word and a right one | 287 | 293 | 256 |
+| One word with its first four letters typed | 232 | 244 | 160 |
+| Two words, the second with four letters typed | 195 | 191 | 55 |
+
+So for words typed in full the two stores nearly always find the same sections, mostly in the same order. While
+a word is still being typed they often show different results.
 
 In tests, Chromium and Firefox kept the database between visits and did not download it a second time. WebKit, as
 driven by the test runner, did not offer its private file system to the worker; the store then reads the database
@@ -214,9 +251,9 @@ If the package is missing, or the database cannot be opened, search uses the mem
 - Misspellings are counted in letters, which suits an alphabet. They were tried in English, and on one word of
   Hindi.
 - The SQLite store reads the list of its words the first time a word is not found. That happens once per visit,
-  and takes longer the larger the index is.
-- Vectors are compared with a plain scan in both stores, not an approximate index. At 20,000 sections that is 19 ms
-  in the memory store and 72 ms in the SQLite store.
+  and takes longer the larger the index is: 37 ms at 2,000 sections and 117 ms at 20,000.
+- Vectors are compared with a plain scan in both stores, not an approximate index. At 20,000 sections that is 14 ms
+  in the memory store and 15 ms in the SQLite store.
 - A passage is found on the page by its words, so it is found only where the page shows them as text. Words in a
   tab that is not open, or under a folded `<details>`, cannot be scrolled to or marked: the page then opens at the
   section's heading. That case has no test.

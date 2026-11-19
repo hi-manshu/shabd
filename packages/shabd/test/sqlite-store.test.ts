@@ -166,7 +166,7 @@ describe('typos, which FTS5 knows nothing of', () => {
   })
 })
 
-describe('semantic search through a SQL function', () => {
+describe('semantic search over vectors read out of the database', () => {
   it('finds a section that shares no word with the query, and says so', () => {
     const hits = store.search('publish my documentation online', pointingAt('Hosting'), 3)
     expect(hits[0]?.doc.heading).toBe('Hosting')
@@ -183,6 +183,48 @@ describe('semantic search through a SQL function', () => {
     const weak = docs.map((d) => (d.heading === 'Hosting' ? 0.2 : 0))
     expect(store.search('zzqqxx', weak, 3)).toEqual([])
     expect(headings(store.search('zzqqxx', weak, 3, 0.1))).toEqual(['Hosting'])
+  })
+
+  it('reads the vectors once, and not before a query comes with one', () => {
+    const database = openSearchDatabase(sqlite3, bytes)
+    // Every statement the store runs that reads the vector column.
+    const reads: string[] = []
+    const watched = new Proxy(database, {
+      get(target, name) {
+        const value = Reflect.get(target, name) as unknown
+        if (typeof value !== 'function') return value
+        return (...args: unknown[]) => {
+          if (typeof args[0] === 'string' && /\bvector\b/.test(args[0])) reads.push(args[0])
+          return (value as (...args: unknown[]) => unknown).apply(target, args)
+        }
+      },
+    })
+    const fresh = new SqliteStore(watched)
+
+    fresh.search('font ', null, 3)
+    fresh.search('colurs ', null, 3)
+    expect(reads).toEqual([])
+
+    for (const heading of ['Hosting', 'Typography', 'Install']) {
+      expect(fresh.search('zzqqxx ', pointingAt(heading), 3)[0]?.doc.heading).toBe(heading)
+    }
+    expect(reads).toHaveLength(1)
+    fresh.close()
+  })
+
+  it('ranks without vectors when the database holds some that do not line up with its sections', () => {
+    // A copy of the database that can be written to, with one section's vector taken out.
+    const copy = new sqlite3.oo1.DB()
+    const { capi, wasm } = sqlite3
+    const resizeable = (capi as unknown as { SQLITE_DESERIALIZE_RESIZEABLE: number }).SQLITE_DESERIALIZE_RESIZEABLE
+    const flags = capi.SQLITE_DESERIALIZE_FREEONCLOSE | resizeable
+    copy.checkRc(capi.sqlite3_deserialize(copy.pointer!, 'main', wasm.allocFromTypedArray(bytes), bytes.length, bytes.length, flags))
+    copy.exec('UPDATE sections SET vector = NULL WHERE id = 2')
+
+    const broken = new SqliteStore(copy)
+    expect(broken.search('zzqqxx ', pointingAt('Hosting'), 3)).toEqual([])
+    expect(headings(broken.search('font ', pointingAt('Hosting'), 3))).toEqual(['Typography'])
+    broken.close()
   })
 })
 
@@ -232,6 +274,36 @@ describe('the two stores', () => {
     }
     // The cases above are not all empty on both sides.
     expect(headings(memory.search('server instaler ', null, 5))).toEqual(['Install', 'Hosting'])
+  })
+
+  it('rank sections by meaning in the same order', () => {
+    // Vectors that point every which way, so that a query is near many sections and far from none.
+    let seed = 20261119
+    const next = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296) - 0.5
+    const many = Array.from({ length: 60 }, (_, i) => doc(`/p${i}`, `Section ${i}`, `Text of section ${i}.`))
+    const dims = 16
+    const unit = () => {
+      const values = Array.from({ length: dims }, next)
+      const length = Math.hypot(...values)
+      return values.map((value) => value / length)
+    }
+    const stored = new Int8Array(many.length * dims)
+    many.forEach((_, i) => stored.set(unit().map((value) => Math.round(value * 127)), i * dims))
+    const file: SearchIndexFile = { version: 1, docs: many, semantic: { model: 'test-model', dims } }
+    const inMemory = new MemoryStore(file, stored)
+    const inSqlite = new SqliteStore(openSearchDatabase(sqlite3, writeSearchDatabase(sqlite3, file, stored, 'vectors')))
+
+    for (let query = 0; query < 20; query++) {
+      const vector = unit()
+      for (const minimum of [0, 0.2, 0.35]) {
+        const fromSqlite = inSqlite.search('zzqqxx ', vector, 10, minimum).map((hit) => [hit.doc.heading, hit.score])
+        const fromMemory = inMemory.search('zzqqxx ', vector, 10, minimum).map((hit) => [hit.doc.heading, hit.score])
+        expect(fromSqlite).toEqual(fromMemory)
+      }
+    }
+    // With no threshold every query has its ten nearest sections to show.
+    expect(inSqlite.search('zzqqxx ', unit(), 10, 0)).toHaveLength(10)
+    inSqlite.close()
   })
 
   it('hold the same terms, cut by the same tokeniser', () => {

@@ -9,9 +9,13 @@
  *   sections_fts  an FTS5 index over the words of title, heading and text
  *   meta          schema version, content fingerprint, embedding model
  *
- * Keyword ranking is FTS5's BM25. Semantic ranking is a scan of the vector
- * column through a SQL function implemented here. Both feed the same rank
- * fusion as the in-memory store (src/shared/search-core.ts).
+ * Keyword ranking is FTS5's BM25. Semantic ranking is not done in SQL: the
+ * vectors are read out of their column once, the first time a query comes
+ * with one, and compared in JavaScript by the code the in-memory store uses.
+ * Comparing them through a SQL function took about three times as long,
+ * because the function was called from SQLite for every row, and the call
+ * cost more than the comparison. Both rankings feed the same rank fusion as
+ * the in-memory store (src/shared/search-core.ts).
  *
  * The words are Shabd's, not FTS5's. FTS5's tokenisers split on spaces and
  * punctuation, which finds no words in Chinese, Japanese or Thai, and one of
@@ -35,6 +39,8 @@ import {
   MIN_SIMILARITY,
   planQuery,
   queryTerms,
+  rankBySimilarity,
+  similarities,
   soughtWords,
   tokenize,
   wordsToMark,
@@ -43,6 +49,7 @@ import {
   type SearchHit,
   type SearchIndexFile,
   type SearchStore,
+  type SemanticData,
 } from './search-core.js'
 
 /** Bump when the tables change. A database with another version is rebuilt, not read. */
@@ -67,11 +74,6 @@ export interface SqliteDatabase {
   selectObjects(sql: string, bind?: unknown[]): Record<string, unknown>[]
   selectValue(sql: string, bind?: unknown[]): unknown
   selectValues(sql: string, bind?: unknown[]): unknown[]
-  createFunction(
-    name: string,
-    fn: (context: unknown, ...args: unknown[]) => unknown,
-    options?: { arity?: number; deterministic?: boolean },
-  ): unknown
   checkRc(resultCode: number): unknown
   close(): void
 }
@@ -238,9 +240,10 @@ export class SqliteStore implements SearchStore {
   /** The content fingerprint the database was built with. */
   readonly version: string
   #db: SqliteDatabase
-  #queryVector: ArrayLike<number> | null = null
   /** Every term of the index, once a misspelt word has made it worth reading them out. */
   #terms: string[] | null = null
+  /** Every section's vector, once a query has come with one. Null if the database turns out to hold none it can use. */
+  #vectors: SemanticData | null | undefined
 
   constructor(db: SqliteDatabase) {
     const meta = readSearchMeta(db)
@@ -249,20 +252,33 @@ export class SqliteStore implements SearchStore {
     this.sections = meta.sections
     this.version = meta.version
     this.semantic = meta.dims > 0 ? { model: meta.model, dims: meta.dims } : null
+  }
 
-    // similarity(vector): cosine similarity between a stored vector and the
-    // current query. The vectors are unit length and stored as signed bytes.
-    db.createFunction(
-      'similarity',
-      (_context, blob) => {
-        const query = this.#queryVector
-        if (!query || !(blob instanceof Uint8Array)) return null
-        let sum = 0
-        for (let i = 0; i < blob.length; i++) sum += query[i]! * ((blob[i]! << 24) >> 24)
-        return sum / 127
-      },
-      { arity: 1, deterministic: false },
-    )
+  /**
+   * The vectors, side by side in one array, as the in-memory store holds
+   * them. They are read out of the database once and stay in memory after:
+   * 384 bytes a section with the default model.
+   *
+   * Reading them is paid once: the first query by meaning took 63 ms at
+   * 20,000 sections, and each one after it 15 ms. Leaving the vectors in the
+   * database and comparing each through a SQL function, as this store used
+   * to, was paid on every query: 51 ms, most of it spent calling from SQLite
+   * into JavaScript 20,000 times. (scripts/bench/search-stores.mjs, in Node.)
+   */
+  #readVectors(): SemanticData | null {
+    if (this.#vectors !== undefined) return this.#vectors
+    const dims = this.semantic?.dims ?? 0
+    const rows = dims > 0 ? this.#db.selectValues('SELECT vector FROM sections ORDER BY id') : []
+    // A database whose vectors do not line up with its sections has none that can be used.
+    const usable = rows.length === this.sections && rows.every((row) => row instanceof Uint8Array && row.length === dims)
+    if (!usable || rows.length === 0) return (this.#vectors = null)
+
+    const vectors = new Int8Array(rows.length * dims)
+    rows.forEach((row, position) => {
+      const bytes = row as Uint8Array
+      vectors.set(new Int8Array(bytes.buffer, bytes.byteOffset, dims), position * dims)
+    })
+    return (this.#vectors = { vectors, dims })
   }
 
   /**
@@ -342,26 +358,15 @@ export class SqliteStore implements SearchStore {
 
   search(query: string, queryVector: ArrayLike<number> | null, limit: number, minSimilarity = MIN_SIMILARITY): SearchHit[] {
     const pool = candidatePool(limit)
-    const ids = (rows: Record<string, unknown>[]) => rows.map((row) => Number(row.id) - 1)
-
     const plan = this.#plan(query)
     const keywordIds = this.#rank(plan, pool)
 
-    let meaningIds: number[] = []
-    if (this.semantic && queryVector) {
-      this.#queryVector = queryVector
-      try {
-        meaningIds = ids(
-          this.#db.selectObjects(
-            `SELECT id FROM (SELECT id, similarity(vector) AS score FROM sections WHERE vector IS NOT NULL)
-             WHERE score >= ? ORDER BY score DESC LIMIT ?`,
-            [minSimilarity, pool],
-          ),
-        )
-      } finally {
-        this.#queryVector = null
-      }
-    }
+    // The same two functions rank by meaning in the in-memory store, over the same bytes.
+    const semantic = queryVector ? this.#readVectors() : null
+    const meaningIds =
+      semantic && queryVector
+        ? rankBySimilarity(similarities(queryVector, semantic.vectors, semantic.dims), pool, minSimilarity)
+        : []
 
     const fused = fuseHits(keywordIds, meaningIds, limit)
     if (fused.length === 0) return []

@@ -681,7 +681,8 @@ export function search(
  *                 full-text search by FTS5, and in the browser the file is
  *                 kept in the origin-private file system and read page by
  *                 page, so a large index is neither re-downloaded nor held
- *                 in memory.
+ *                 in memory. Its vectors are: they are read out once a query
+ *                 is made by meaning, 384 bytes a section.
  */
 export interface SearchStore {
   readonly kind: 'memory' | 'sqlite'
