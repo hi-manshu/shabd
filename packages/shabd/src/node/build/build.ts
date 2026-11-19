@@ -34,6 +34,7 @@ import { themedCodeCss } from '../markdown/plugins/rehype-code.js'
 import { serverOutDir, shabd } from '../vite/plugin.js'
 import { FEED_FILE, feedEntries, renderFeed } from './feed.js'
 import { escapeHtml, renderDocument, renderRedirect } from './html.js'
+import { OFFLINE_PAGE, SERVICE_WORKER_FILE, offlineBody, offlineFiles, serviceWorker } from './offline.js'
 import { renderRobots, renderSitemap, wantsRobots } from './robots.js'
 
 export interface BuildOptions {
@@ -49,7 +50,11 @@ interface ManifestChunk {
   src?: string
   isEntry?: boolean
   imports?: string[]
+  /** What the chunk loads on demand, by key. */
+  dynamicImports?: string[]
   css?: string[]
+  /** Fonts, pictures and workers the chunk names. */
+  assets?: string[]
 }
 type Manifest = Record<string, ManifestChunk>
 
@@ -295,6 +300,29 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
     }
   }
 
+  /* ── for reading without a connection ── */
+
+  // After everything a reader may need is written, and before a host is given the folder.
+  if (features.offline.enabled) {
+    await write(
+      OFFLINE_PAGE,
+      renderDocument({
+        config: config.config,
+        title: 'No connection',
+        description: '',
+        path: '/',
+        noindex: true,
+        body: offlineBody(escapeHtml(site.base)),
+        // The site's stylesheets and no script: there is nothing here to run.
+        head: assets.styleTags(),
+        ...(paletteFile ? { paletteStylesheet: withBase(site.base, `/${paletteFile}`) } : {}),
+      }),
+    )
+    const offline = await offlineFiles(outDir, assets.ahead())
+    await write(SERVICE_WORKER_FILE, serviceWorker(site.base, offline))
+    step(`offline: ${offline.files.length} files, ${(offline.bytes / 1024 / 1024).toFixed(1)} MB, fetched by a reader's browser after a first visit`)
+  }
+
   /* ── for the host ── */
 
   // Last: by now dist/ holds everything an adapter may copy or point at.
@@ -365,6 +393,31 @@ class AssetResolver {
       ...styles.map((file) => `<link rel="stylesheet" href="${this.#url(file)}">`),
       ...scripts.map((file) => `<link rel="modulepreload" href="${this.#url(file)}">`),
     ].join('\n    ')
+  }
+
+  /**
+   * The bundled files a page needs when it is shown, or one step later: what
+   * the app loads, every page's own chunk, and what either of them asks for
+   * on demand (the search dialog, the form that tries a request). What those
+   * in turn load on demand is not among them: the library that draws
+   * diagrams, the compiler of a live sandbox. Those are megabytes, for the
+   * pages that use them.
+   */
+  ahead(): Set<string> {
+    const entryKey = Object.keys(this.#manifest).find((key) => this.#manifest[key] === this.#entry)!
+    const chunks = this.#closure(entryKey, new Set())
+    const seen = new Set<string>()
+    const all = [...chunks]
+    // The pages are among these: the route table, which the app loads, imports each of them on demand.
+    for (const chunk of chunks) for (const key of chunk.dynamicImports ?? []) all.push(...this.#closure(key, seen))
+    return new Set(all.flatMap((chunk) => [chunk.file, ...(chunk.css ?? []), ...(chunk.assets ?? [])]))
+  }
+
+  /** The app's stylesheets alone, for a document that runs no script. */
+  styleTags(): string {
+    return [...new Set(this.#shared.chunks.flatMap((chunk) => chunk.css ?? []))]
+      .map((file) => `<link rel="stylesheet" href="${this.#url(file)}">`)
+      .join('\n    ')
   }
 
   entryScript(): string {

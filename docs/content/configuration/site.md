@@ -231,6 +231,7 @@ Each feature takes `true`, `false`, or an object of options.
 | `sandbox` | `enabled` | on |
 | `feed` | `enabled`, `title`, `directory`, `limit` | off |
 | `socialImages` | `enabled`, `font` | off |
+| `offline` | `enabled` | off |
 
 ```yaml
 features:
@@ -239,8 +240,8 @@ features:
 ```
 
 Each feature has its own page: [Search](../features/search.md), [MCP and llms.txt](../features/mcp.md),
-[Studio](../features/studio.md), [Live sandboxes](../features/sandbox.mdx), [Feed](../features/feed.md) and
-[Social pictures](../features/social-images.md). An API reference made from a description is not a switch here: it
+[Studio](../features/studio.md), [Live sandboxes](../features/sandbox.mdx), [Feed](../features/feed.md),
+[Social pictures](../features/social-images.md) and [Reading offline](../features/offline.md). An API reference made from a description is not a switch here: it
 has a key of its own, [`openapi`](#openapi).
 
 ## build

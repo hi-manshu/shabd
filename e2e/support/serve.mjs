@@ -30,6 +30,9 @@ let config = await readFile(configFile, 'utf8')
 if (process.env.SHABD_E2E_SEMANTIC) config = config.replace('semantic: false', 'semantic: true')
 if (process.env.SHABD_E2E_STORE) config = config.replace('search: {', `search: { store: ${process.env.SHABD_E2E_STORE},`)
 if (process.env.SHABD_E2E_MODEL) config = config.replace('search: {', `search: { modelSource: ${process.env.SHABD_E2E_MODEL},`)
+// A worker that keeps the site in the browser. It answers every request of the site, so it is not on by default.
+if (process.env.SHABD_E2E_OFFLINE) config = config.replace('  feed: true\n', '  feed: true\n  offline: true\n')
+if (process.env.SHABD_E2E_OFFLINE && !config.includes('offline: true')) throw new Error('serve.mjs: could not switch features.offline on in the fixture')
 await writeFile(configFile, config)
 
 if (mode === 'dev') {

@@ -656,6 +656,10 @@ const SocialImagesFeatureSchema = z.strictObject({
     .transform((font) => (typeof font === 'string' ? [font] : font)),
 })
 
+const OfflineFeatureSchema = z.strictObject({
+  enabled: z.boolean().default(false),
+})
+
 const FeaturesSchema = z.strictObject({
   search: feature(SearchFeatureSchema, true),
   mcp: feature(McpFeatureSchema, true),
@@ -666,6 +670,8 @@ const FeaturesSchema = z.strictObject({
   feed: feature(FeedFeatureSchema, false),
   /** A picture for each page, shown where the page is shared. Needs `site.url` and `@resvg/resvg-js`. */
   socialImages: feature(SocialImagesFeatureSchema, false),
+  /** Keep the built site in the reader's browser after a first visit, so that it can be read without a connection. */
+  offline: feature(OfflineFeatureSchema, false),
 })
 
 /* ──────────────────────────────── content ─────────────────────────────── */

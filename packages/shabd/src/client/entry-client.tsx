@@ -4,7 +4,9 @@ import 'virtual:shabd/math-styles'
 import 'virtual:shabd/user-styles'
 import { createRoot, hydrateRoot } from 'react-dom/client'
 import { App } from './app/App.js'
+import { setUpOffline } from './app/offline.js'
 import { currentRoute, loadPage } from './app/router.js'
+import { siteStore } from './app/store.js'
 
 const container = document.getElementById('app')
 if (!container) throw new Error('Shabd: #app element is missing from the document')
@@ -18,3 +20,6 @@ if (container.hasChildNodes()) {
 } else {
   createRoot(container).render(<App initial={initial} />)
 }
+
+// Keeping the site for reading without a connection, or no longer keeping it.
+setUpOffline(siteStore.get())

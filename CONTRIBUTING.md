@@ -33,14 +33,18 @@ The tests start two servers on copies of the small site in `e2e/site`: `shabd de
 watch the page follow, and `shabd preview` of a production build for the rest. Nothing in `e2e/site` or `docs/` is
 modified.
 
-Four variations are switched on from the environment:
+Five variations are switched on from the environment:
 
 ```sh
 SHABD_E2E_STORE=sqlite npx playwright test                 # the whole suite on the SQLite search store
 SHABD_E2E_SEMANTIC=1 npx playwright test e2e/semantic.spec.ts   # the real embedding model (downloads 22 MB)
 SHABD_E2E_SEMANTIC=1 SHABD_E2E_MODEL=site npx playwright test e2e/semantic.spec.ts   # the model served from the site
+SHABD_E2E_OFFLINE=1 npx playwright test e2e/offline.spec.ts     # the worker that keeps the site for reading offline
 npx playwright test --project=firefox e2e/dev.spec.ts      # one browser, one file
 ```
+
+The tests on GitHub run the suite as it is and once more on the SQLite store. The model and the worker are not
+run there: run those here when you change search, or what a build writes for a reader's browser.
 
 On macOS the tests keep the display awake while they run. Without that, WebKit stopped answering clicks in runs
 where the display had gone to sleep. The cause was not proven; the note in `e2e/support/global-setup.ts` has the

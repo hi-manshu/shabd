@@ -48,6 +48,8 @@
     - features/social-images
     - file: features/openapi
       badge: New
+    - file: features/offline
+      badge: New
 
 - link: https://github.com/hi-manshu/shabd
   label: GitHub
