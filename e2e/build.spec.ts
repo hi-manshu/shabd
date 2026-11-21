@@ -1,5 +1,6 @@
 /** A production build, served the way a static host serves it. */
 import type { Page } from '@playwright/test'
+import { editorText, snippetEditor } from './support/editor.js'
 import { BUILT, expect, markPage, open, regions, test } from './support/fixtures.js'
 
 test.describe('prerendered pages', () => {
@@ -494,8 +495,8 @@ test.describe('sandboxes', () => {
     await button.click()
     await button.click()
 
-    const editor = sandbox.locator('.sb-sandbox-editor')
-    const code = await editor.inputValue()
+    const editor = snippetEditor(sandbox)
+    const code = await editorText(editor)
     await editor.fill(code.replace('Clicked {count} times', 'Pressed {count} times'))
     await expect(button).toHaveText('Pressed 2 times')
 

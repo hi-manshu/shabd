@@ -4,6 +4,7 @@
  * messages: its script, the snippet, the shared state, and how the page looks.
  */
 import type { Page } from '@playwright/test'
+import { editorText, said, snippetEditor } from './support/editor.js'
 import { BUILT, DEV, expect, open, test } from './support/fixtures.js'
 
 const sandbox = (page: Page, title: string) => page.locator('.sb-sandbox', { has: page.locator('.sb-code-label', { hasText: title }) })
@@ -35,8 +36,8 @@ for (const [where, origin] of [
       await expect(gauge).toHaveText('7 bar')
 
       // Editing the code keeps the state, and a mistake keeps what ran last.
-      const editor = box.locator('.sb-sandbox-editor')
-      const code = await editor.inputValue()
+      const editor = snippetEditor(box)
+      const code = await editorText(editor)
       await editor.fill(code.replace('>Raise<', '>Lift<'))
       await expect(frame.getByRole('button', { name: 'Lift' })).toBeVisible()
       await expect(gauge).toHaveText('7 bar')
@@ -45,7 +46,7 @@ for (const [where, origin] of [
       await expect(frame.getByRole('button', { name: 'Lift' })).toBeVisible()
 
       // Nothing so far was worth a word in the console: not the frame's start, not its fonts, not the mistake.
-      expect(problems).toEqual([])
+      expect(said(problems)).toEqual([])
 
       // What the snippet throws when it is drawn is said in the page. React also writes it to the
       // console, where its author finds the place it was thrown from.

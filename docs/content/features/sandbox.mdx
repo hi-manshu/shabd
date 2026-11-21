@@ -203,7 +203,10 @@ Things to know about frames:
 ## Things to know
 
 - Snippets are TypeScript, but they are not type-checked. Types are removed and the code runs.
-- The compiler is downloaded when a page with a sandbox is opened, not before.
+- The editor and the compiler are downloaded when a page with a sandbox is opened, not before. Until the editor
+  arrives the code is shown as plain text.
+- The code is coloured as it is typed, in the colours of the theme. In the editor Tab indents, so to move on by
+  keyboard press Esc, then Tab. The editor says so while it has the focus.
 - A snippet runs in the page, with the page's permissions, like any other script on it, unless it is
   [`isolated`](#a-snippet-in-a-frame-of-its-own). A site with a Content-Security-Policy that forbids `unsafe-eval`
   cannot run sandboxes, in the page or in a frame.

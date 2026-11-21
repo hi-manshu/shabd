@@ -519,29 +519,11 @@
     border-block-start: var(--sb-line) solid var(--sb-border);
   }
 
+  /* The snippet's editor: the code editor (see "editor"), as tall as its text, on the surface the
+     pane is drawn on. Long lines wrap rather than hide behind a scrollbar in a narrow pane. */
   .sb-sandbox-editor {
-    display: block;
-    inline-size: 100%;
+    --sb-editor-padding: 0.95rem;
     min-block-size: 100%;
-    padding: 0.85rem 0.95rem;
-    border: 0;
-    outline: 0;
-    resize: none;
-    background: none;
-    color: var(--sb-text);
-    font-family: var(--sb-font-mono);
-    font-size: 0.84rem;
-    line-height: 1.65;
-    tab-size: 2;
-    /* Long lines wrap rather than hide behind a scrollbar in a narrow pane;
-       where supported, the field grows to fit what wrapping adds. */
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    field-sizing: content;
-  }
-
-  .sb-sandbox-editor:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--sb-accent-soft);
   }
 
   .sb-sandbox-result {

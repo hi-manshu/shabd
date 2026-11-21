@@ -23,6 +23,7 @@
 import { Component, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from 'react'
 import { useMDXComponents } from 'virtual:shabd/mdx-components'
 import { modules as declared } from 'virtual:shabd/sandbox-modules'
+import { CodeEditor } from '../editor/CodeEditor.js'
 import { compileSnippet } from './compile.js'
 import { Frame } from './Frame.js'
 import { sharedGroup, SharedGroupContext, useShared, type SharedGroup } from './shared-state.js'
@@ -87,15 +88,6 @@ export default function Sandbox({ code: authored, title, group: groupName, isola
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, components, isolated])
 
-  const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== 'Tab' || event.shiftKey) return
-    event.preventDefault()
-    const area = event.currentTarget
-    const { selectionStart, selectionEnd, value } = area
-    setCode(`${value.slice(0, selectionStart)}  ${value.slice(selectionEnd)}`)
-    requestAnimationFrame(() => area.setSelectionRange(selectionStart + 2, selectionStart + 2))
-  }
-
   return (
     <figure className="sb-sandbox">
       <figcaption className="sb-code-bar">
@@ -110,16 +102,13 @@ export default function Sandbox({ code: authored, title, group: groupName, isola
       </figcaption>
 
       <div className="sb-sandbox-panes">
-        <textarea
+        {/* The same editor as the Studio's, with the grammar of a snippet: the code is coloured as it is typed. */}
+        <CodeEditor
           className="sb-sandbox-editor"
-          aria-label="Code for this example. Edit it to change the result."
+          language="tsx"
+          label="Code for this example. Edit it to change the result."
           value={code}
-          rows={code.split('\n').length}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoCorrect="off"
-          onChange={(event) => setCode(event.target.value)}
-          onKeyDown={onKeyDown}
+          onChange={setCode}
         />
 
         <div className="sb-sandbox-result">

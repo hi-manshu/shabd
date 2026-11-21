@@ -3,6 +3,7 @@
  * `features.sandbox.modules`. The fixture names a package and a file of its own.
  */
 import type { Page } from '@playwright/test'
+import { said, snippetEditor } from './support/editor.js'
 import { BUILT, DEV, expect, open, test } from './support/fixtures.js'
 
 const sandbox = (page: Page, title: string) => page.locator('.sb-sandbox', { has: page.locator('.sb-code-label', { hasText: title }) })
@@ -22,7 +23,7 @@ for (const [where, origin] of [
       await expect(file.locator('.sb-sandbox-stage [data-gauge]')).toHaveText('3 bar', { timeout: 20_000 })
       await expect(file.locator('.sb-sandbox-stage small')).toHaveText('in bar')
       await expect(page.locator('.sb-sandbox-problem')).toHaveCount(0)
-      expect(problems).toEqual([])
+      expect(said(problems)).toEqual([])
     })
 
     test('a module is fetched when a reader writes its name into a snippet', async ({ page }) => {
@@ -30,11 +31,11 @@ for (const [where, origin] of [
       const first = page.locator('.sb-sandbox').first()
       await expect(first.locator('.sb-sandbox-stage button')).toHaveText('Clicked 0 times', { timeout: 20_000 })
 
-      await first.locator('.sb-sandbox-editor').fill("import Gauge from 'fixture/gauge'\n\nexport default () => <Gauge value={12} />")
+      await snippetEditor(first).fill("import Gauge from 'fixture/gauge'\n\nexport default () => <Gauge value={12} />")
       await expect(first.locator('.sb-sandbox-stage [data-gauge]')).toHaveText('12 bar')
 
       // A name the site has not given is refused, and the answer says which names there are.
-      await first.locator('.sb-sandbox-editor').fill("import pad from 'left-pad'\n\nexport default () => <p>{pad('a', 3)}</p>")
+      await snippetEditor(first).fill("import pad from 'left-pad'\n\nexport default () => <p>{pad('a', 3)}</p>")
       await expect(first.locator('.sb-sandbox-problem')).toHaveText(
         'Live snippets cannot import "left-pad". Available: react, shabd/client, @himanshoe/shabd/client, github-slugger, fixture/gauge.',
       )
