@@ -102,6 +102,9 @@ three places where the time grew with the square of the number of pages.
   so cached pages are rebuilt.
 - Anything that runs in the browser must not import `src/shared/schema.ts` except for types. It would pull Zod into
   every page.
+- A file in `src/client/` that exports a component exports nothing else: a hook, a helper or a table goes in a
+  file beside it. React can then take a change to the component in place while `shabd dev` runs, where a file
+  that mixes the two starts the whole page again. `test/refresh.test.ts` holds every file to this.
 - A new host adapter needs a name in `src/shared/adapters.ts` and a module in `src/node/adapters/`. The registry's
   type makes the compiler insist on both. The module's header says which page of the host's documentation each
   detail comes from. What runs on the host is in `src/node/adapters/function/`. It is bundled into one file, so it

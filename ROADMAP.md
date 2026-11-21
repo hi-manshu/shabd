@@ -137,6 +137,7 @@ GitHub, what the first run on Windows asked for, and tests of a dev server that 
 | Studio: a code editor, making, renaming and deleting pages, and pasted images | Built, tested in three browser engines |
 | Sandboxes: modules named in the config, a frame of its own for a snippet, colours in the editor | Built, tested in three browser engines |
 | `shabd check`: a live snippet that cannot run, or that imports what the site has not named | Built, tested |
+| Fast Refresh while the theme's own source is edited | Built. A component is in a file of its own, and a test holds the client to that. Tried by hand in Chromium: a change to a link, an icon, a hook or the router's provider is taken in place and the page keeps its state. A change to the router's own file still starts the page again, because the app's entry imports it |
 | A benchmark for large sites (`npm run bench`) | Built. Its numbers are below |
 
 ### What the accessibility pass found
@@ -185,7 +186,7 @@ What it found that is not fixed:
 
 ### What has been checked, and what has not
 
-- 716 unit and integration tests pass, after the merge.
+- 721 unit and integration tests pass, after the merge.
 - 427 browser tests pass in Playwright's Chromium, Firefox and WebKit, on the last commit of the branch before
   the merge. 41 more are skipped: where an engine lacks what a test needs, and the tests that belong to a
   variation that was not switched on for that run. After the merge the same run was cut short on that machine,
@@ -205,6 +206,9 @@ Not checked:
   connection, so the two tests that cut it are skipped there.
 - Firefox now and then warns that the layout of an isolated snippet's frame was forced before the frame had loaded,
   on a page that also has a code editor. Nothing was seen to be wrong, and what asks for the layout was not found.
+- Hot updates of the theme's own source in Firefox and WebKit. They were tried in Chromium. A hot update cannot
+  hand out a second copy of one of the app's stores: none of them stands above a component's file, and a test
+  reads what every file of the client imports to keep it so.
 - In the Studio: an image is not moved, renamed or deleted with its page; pasting and dropping are tested with
   events the test makes, not with the real clipboard or a real drag; and while a page is renamed its breadcrumbs
   and its mark in the sidebar are gone for as long as the next page takes to draw.
@@ -223,8 +227,6 @@ Not checked:
 - Listen to the site with a screen reader.
 - From the benchmark: compile pages on more than one core, and send a reader the part of the site's data that a
   page needs.
-- Keep React Fast Refresh working while editing the theme's own source. A few client modules export both components
-  and helpers, which forces a page reload when they change. This affects contributors, not site authors.
 
 ### 0.3: Finish the four headline features
 

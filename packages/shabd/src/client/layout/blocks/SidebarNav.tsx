@@ -4,7 +4,7 @@ import { Icon } from '../../app/icons.js'
 import { usePage } from '../../app/router.js'
 import { useSidebar } from '../../app/sidebar.js'
 import { Badge } from '../../ui/Badge.js'
-import { useHref } from '../../ui/Link.js'
+import { useHref } from '../../ui/href.js'
 
 function contains(group: SidebarGroup, path: string): boolean {
   return group.items.some((item) =>

@@ -1,5 +1,5 @@
 import { usePage } from '../../app/router.js'
-import { useHref } from '../../ui/Link.js'
+import { useHref } from '../../ui/href.js'
 
 /** The opening of a `layout: splash` page, from `hero:` frontmatter. */
 export function Hero() {
