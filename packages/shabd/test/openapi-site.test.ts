@@ -147,9 +147,9 @@ describe('a site with a description', () => {
     // They compile and are checked like any page, and the browser is told which ones they are.
     expect((await compilePage(context, listed)).code).toContain('Responses')
     expect(await collectProblems(context)).toEqual({ problems: [], detailed: [] })
-    const data = store.siteData({ dev: false })
-    expect(data.pages['/api/pets/list-pets']).toMatchObject({ id: 'api/pets/list-pets.md', generated: true })
-    expect(data.pages['/guide/intro']).not.toHaveProperty('generated')
+    const data = store.siteData({ dev: true })
+    expect(data.pagesInDev?.['/api/pets/list-pets']).toMatchObject({ id: 'api/pets/list-pets.md', generated: true })
+    expect(data.pagesInDev?.['/guide/intro']).not.toHaveProperty('generated')
     // And so are llms.txt and everything else that reads pages.
     expect(renderLlmsTxt(context)).toContain('[List pets](/api/pets/list-pets.md)')
   })

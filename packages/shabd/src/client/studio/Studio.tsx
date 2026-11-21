@@ -71,7 +71,7 @@ function describe(status: Status): string {
 }
 
 export default function Studio() {
-  const { features, contentDir, pages } = useSite()
+  const { features, contentDir, pagesInDev: pages = {} } = useSite()
   const { id, path, title } = usePage()
   /** A page made from an OpenAPI description is written again whenever the description changes, so it is not edited here. */
   const generated = pages[path]?.generated === true

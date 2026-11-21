@@ -6,7 +6,7 @@
  * with one older than the source, they are skipped and say why. The first
  * test needs no build: it is what happens when there is none.
  */
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, statSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -19,12 +19,14 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const BUILT = path.join(here, '..', 'dist', 'node')
 const SOURCE = path.join(here, '..', 'src', 'node')
 
-/** Is the built file there, and no older than the source it was built from? */
-const fresh = (file: string) => {
-  const built = path.join(BUILT, file.replace(/\.ts$/, '.js'))
-  return existsSync(built) && statSync(built).mtimeMs >= statSync(path.join(SOURCE, file)).mtimeMs
-}
-const built = ['markdown/compile-pool.ts', 'markdown/compile-worker.ts', 'markdown/compile.ts', 'markdown/cache.ts', 'context.ts', 'check.ts', 'build/build.ts'].every(fresh)
+/**
+ * Is the build there, and no older than the source it was built from? Every file of the source counts:
+ * the workers run the whole of the node side, and a build runs the browser's source through it.
+ */
+const newest = (folder: string): number =>
+  Math.max(0, ...readdirSync(folder, { recursive: true, withFileTypes: true }).flatMap((entry) => (entry.isFile() && /\.tsx?$/.test(entry.name) ? [statSync(path.join(entry.parentPath, entry.name)).mtimeMs] : [])))
+const worker = path.join(BUILT, 'markdown', 'compile-worker.js')
+const built = existsSync(worker) && statSync(worker).mtimeMs >= Math.max(newest(SOURCE), newest(path.join(SOURCE, '..', 'shared')))
 if (!built) console.warn('compile-pool.test.ts: the build of this package is missing or older than its source, so the tests of the worker threads are skipped. Run `npm run build`.')
 
 type Context = Awaited<ReturnType<typeof createContext>>

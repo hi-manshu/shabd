@@ -41,6 +41,7 @@ import { codeBackgrounds } from '../../shared/presets.js'
 import { renderDocument } from '../build/html.js'
 import { isShabdError } from '../config/errors.js'
 import { loadConfig, loadSidebar, type ResolvedConfig } from '../config/load.js'
+import { pageMeta } from '../content/store.js'
 import { substituteVars } from '../content/vars.js'
 import { compilePage, createContext, isSplit, type ShabdContext } from '../context.js'
 import { MDX_COMPONENTS_ID } from '../markdown/compile.js'
@@ -92,6 +93,8 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
   let secondLook: SecondLook | undefined
   /** The script for the frames of isolated snippets, once a page of the dev server has asked for it. */
   let frame: Promise<FrameRuntime> | undefined
+  /** The file a build writes the table of routes into, once the build has named its files. */
+  let routesChunk: string | undefined
 
   const ctx = (): ShabdContext => {
     if (!context) throw new Error('shabd: plugin used before its config hook ran')
@@ -159,6 +162,14 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
             emptyOutDir: true,
             manifest: true,
             rolldownOptions: { input: { app: CLIENT_ENTRY } },
+            // Vite has every import that is made on demand also fetch, at the same moment, the files the
+            // imported one will ask for. For the table of routes that list was the page's own file and
+            // the few files every page imports, which a reader who can click a link already has: said
+            // again for each route, with the name of every page's file in a second table. At 5,000 pages
+            // that was a third of the first script. A page's stylesheets are still fetched with it.
+            modulePreload: {
+              resolveDependencies: (_file, deps, { hostId }) => (hostId === routesChunk ? deps.filter((dep) => dep.endsWith('.css')) : deps),
+            },
             // Mermaid comes in pieces, one per kind of diagram, and a reader's browser fetches the pieces a
             // diagram needs. Two of them are large, and Vite would warn about each on every build of a
             // site that draws diagrams, with advice that does not apply: they are already loaded on demand.
@@ -325,7 +336,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
         hotFiles.delete(file)
         this.environment.logger.error(error.pretty(context.config.root), { timestamp: true })
         return {
-          code: toErrorModule(error, path.relative(context.config.root, file), page.frontmatter, page.id),
+          code: toErrorModule(error, path.relative(context.config.root, file), pageMeta(page), page.frontmatter, page.id),
           map: { mappings: '' },
         }
       }
@@ -346,6 +357,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
         code: page
           ? toPageModule(
               compiled,
+              pageMeta(page),
               page.frontmatter,
               context.dev ? page.id : undefined,
               page.updated,
@@ -508,6 +520,13 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       }
       // Fall through to Vite's default: the page module accepts its own update.
       return undefined
+    },
+
+    generateBundle(_options, bundle) {
+      // Before Vite works out what each import made on demand should fetch with it (`modulePreload`, above).
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type === 'chunk' && chunk.moduleIds.includes(resolved(VIRTUAL.routes))) routesChunk = chunk.fileName
+      }
     },
 
     closeBundle() {

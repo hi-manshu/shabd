@@ -197,8 +197,9 @@ export function RouterProvider({ initial, children }: { initial: LoadedPage; chi
     () =>
       onPageUpdate((id, module) => {
         // The body is rendered again from the new module, so the text a search result's marks were on is gone.
-        if (siteStore.get().pages[pathRef.current]?.id === id) clearMarks()
-        setPage((current) => (siteStore.get().pages[current.path]?.id === id ? { path: current.path, module } : current))
+        const fileOf = (path: string) => siteStore.get().pagesInDev?.[path]?.id
+        if (fileOf(pathRef.current) === id) clearMarks()
+        setPage((current) => (fileOf(current.path) === id ? { path: current.path, module } : current))
       }),
     [],
   )

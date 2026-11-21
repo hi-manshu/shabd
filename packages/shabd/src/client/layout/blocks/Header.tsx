@@ -313,11 +313,11 @@ export function ThemeMenu() {
 
 /** Opens the Studio. Only exists in `shabd dev`; production builds render nothing. */
 export function StudioToggle() {
-  const { features, pages } = useSite()
+  const { features, pagesInDev } = useSite()
   const { studioOpen } = useUi()
   const { path, notFound } = usePage()
   // A page made from an OpenAPI description has no file of its own to edit.
-  if (!import.meta.env.DEV || !features.studio.enabled || notFound || pages[path]?.generated) return null
+  if (!import.meta.env.DEV || !features.studio.enabled || notFound || pagesInDev?.[path]?.generated) return null
   return (
     <button
       type="button"

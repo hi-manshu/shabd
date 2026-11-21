@@ -61,7 +61,7 @@ function typedPath(typed: string): string {
 }
 
 /** What stands in the way of a page at `id`. `moving` is the page being renamed, which may keep its own address. */
-function placeProblem(id: string, pages: SiteData['pages'], moving?: string): string | undefined {
+function placeProblem(id: string, pages: Record<string, PageMeta>, moving?: string): string | undefined {
   // A folder and no file yet: said more plainly than the general rule would.
   if (id.endsWith('/')) return 'Give the file a name, such as guide/new-page.md.'
   const problem = pagePathProblem(id)
@@ -88,7 +88,8 @@ function neighbour(site: SiteData, path: string): string | undefined {
   const at = order.indexOf(path)
   const beside = at === -1 ? undefined : (order[at - 1] ?? order[at + 1])
   if (beside !== undefined) return beside
-  return path !== '/' && site.pages['/'] ? '/' : Object.keys(site.pages).find((other) => other !== path)
+  const pages = site.pagesInDev ?? {}
+  return path !== '/' && pages['/'] ? '/' : Object.keys(pages).find((other) => other !== path)
 }
 
 /**
@@ -97,7 +98,7 @@ function neighbour(site: SiteData, path: string): string | undefined {
  */
 function known(id: string, present: boolean): Promise<PageMeta | undefined> {
   const find = () => {
-    const meta = Object.values(siteStore.get().pages).find((page) => page.id === id)
+    const meta = Object.values(siteStore.get().pagesInDev ?? {}).find((page) => page.id === id)
     // A page can be gone to only once its route has arrived as well.
     return meta && routeStore.get()[meta.path] ? meta : undefined
   }
@@ -217,7 +218,7 @@ export function PageActions({ backend, page, settle, discard, version, acting }:
   const create = () =>
     run(async () => {
       const id = typedPath(typed)
-      const invalid = placeProblem(id, siteStore.get().pages)
+      const invalid = placeProblem(id, siteStore.get().pagesInDev ?? {})
       if (invalid) throw new Error(invalid)
       if (!(await settle())) throw new Error(UNSAVED)
       before.current = await checkSite().catch(() => null)
@@ -231,7 +232,7 @@ export function PageActions({ backend, page, settle, discard, version, acting }:
     run(async () => {
       if (!page) throw new Error('There is no page here to rename.')
       const to = typedPath(typed)
-      const invalid = placeProblem(to, siteStore.get().pages, page.id)
+      const invalid = placeProblem(to, siteStore.get().pagesInDev ?? {}, page.id)
       if (invalid) throw new Error(invalid)
       if (!(await settle())) throw new Error(UNSAVED)
       // A page that could not be shown where it went could not be opened here again to be mended.
@@ -306,7 +307,7 @@ export function PageActions({ backend, page, settle, discard, version, acting }:
   const id = typedPath(typed)
   // Nothing is called wrong while only a folder has been typed: the name is still to come.
   const named = id !== '' && !id.endsWith('/')
-  const invalid = form && form !== 'delete' && named ? placeProblem(id, site.pages, form === 'rename' ? page?.id : undefined) : undefined
+  const invalid = form && form !== 'delete' && named ? placeProblem(id, site.pagesInDev ?? {}, form === 'rename' ? page?.id : undefined) : undefined
   const address = pageRoute(id)
 
   const opener = (which: Form, label: string) => (

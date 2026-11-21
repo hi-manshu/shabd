@@ -175,10 +175,16 @@ It also found that pages were compiled on one core: about 59 s of the 128 at 5,0
 pages or more now has them compiled on up to eight threads (`build.threads`). `shabd check` on 2,000 made-up pages,
 from an empty cache, took 21.8 s on one thread and 6.8 s on eight. The table above is from before that.
 
+It found that every reader was sent the data of the whole site: at 5,000 pages, 2.5 MB (436 KB compressed) in one
+chunk of the first script. That chunk is now 0.92 MB (157 KB compressed). The table of every page, with its file
+and its description, is no longer in it: a page brings its own, and the dev server keeps the table for the Studio.
+And the routes no longer carry a list of what to fetch with each page. With both changes, the 5,000-page site
+built in 64 s where it took 128 s, on the same machine with less else running.
+
 What it found that is not fixed:
 
-- Every reader is sent the data of the whole site. At 5,000 pages it is 2.5 MB (436 KB compressed) in the first
-  script.
+- That chunk still holds the whole sidebar and a route for every page, which is why it grows with the site: about
+  450 KB and 375 KB of it at 5,000 pages.
 - The bundler's time grows faster than the number of pages, and most of the memory is the bundler's.
 
 ### What has been checked, and what has not
@@ -218,7 +224,8 @@ Not checked:
 - Peer editing between two machines on different networks.
 - The adapters for Cloudflare, Vercel and Netlify, each on its host.
 - Listen to the site with a screen reader.
-- From the benchmark: send a reader the part of the site's data that a page needs.
+- From the benchmark: send a reader the sidebar of the part of the site they are in, and the routes as they are
+  needed. Both are still whole in the first script.
 
 ### 0.3: Finish the four headline features
 

@@ -201,8 +201,12 @@ export default function Announcement({ message }: { message?: string }) {
 }
 ```
 
-`useSite()` returns the site data and `usePage()` returns the current page: its path, title, frontmatter and outline.
-A block registered under a built-in block's name replaces it.
+`useSite()` returns the site data and `usePage()` returns the current page: its path, title, description,
+frontmatter and outline. A block registered under a built-in block's name replaces it.
+
+The site data is what every page needs: the config, the layouts and the sidebar. It has no list of every page with
+its description: a reader is sent the data with the first script, and such a list was most of it on a large site.
+`useSidebar()` has the pages of the current sidebar in their order, each with its title and its address.
 
 What `@himanshoe/shabd/client` exports has type declarations, so a site that checks its own TypeScript can check its
 blocks and components against them. Add `@types/react` to the site for that. Shabd compiles a `.tsx` file whether

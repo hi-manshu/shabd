@@ -237,7 +237,7 @@ async function isTaken(directory: FileSystemDirectoryHandle, name: string): Prom
 
 /** Only a page the site knows is moved or deleted, as with the dev server: never some other file in the folder. */
 function assertPage(id: string): void {
-  const known = Object.values(siteStore.get().pages).some((page) => page.id === id)
+  const known = Object.values(siteStore.get().pagesInDev ?? {}).some((page) => page.id === id)
   if (!known) throw new Error('There is no page with that name.')
 }
 

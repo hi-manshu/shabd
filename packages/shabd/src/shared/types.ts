@@ -111,8 +111,13 @@ export interface SiteData {
    * with one sidebar.
    */
   sidebars?: { prefix: string; sidebar: SidebarNode[] }[]
-  /** Keyed by route path. */
-  pages: Record<string, PageMeta>
+  /**
+   * Every page by its route, while the dev server runs: the Studio and the hot updates find a page by
+   * its file. A build leaves it out. At thousands of pages it was half of the first script every reader
+   * is sent, and a reader's page needs none of it: a page brings its own title and description
+   * (`usePage()`), and the sidebar has the pages in their order.
+   */
+  pagesInDev?: Record<string, PageMeta>
   /** Content directory relative to the site root, used to build edit links. */
   contentDir: string
   /** Present in dev only, so token edits hot-swap without a reload. */
@@ -133,6 +138,8 @@ export interface PageUpdated {
 
 /** What a compiled .md/.mdx module exports besides its default component. */
 export interface PageExports {
+  /** What the site knows of the page: its file, its address, its title and its description. */
+  meta: PageMeta
   frontmatter: Frontmatter
   toc: TocEntry[]
   /** The colours of the page's code tokens, as a stylesheet. */

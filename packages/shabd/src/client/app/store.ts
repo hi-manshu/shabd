@@ -47,7 +47,7 @@ export type RouteTable = Record<string, () => Promise<PageModule>>
 export const siteStore = createStore<SiteData>(initialData)
 export const routeStore = createStore<RouteTable>(initialRoutes)
 
-/** Site config, layouts, sidebar and the page index. Re-renders when YAML changes in dev. */
+/** Site config, layouts and sidebar. Re-renders when YAML changes in dev. */
 export function useSite(): SiteData {
   return useStore(siteStore)
 }
@@ -62,7 +62,7 @@ if (import.meta.hot) {
   })
 
   // A page that has gone takes its module with it (see hmr.ts).
-  siteStore.subscribe(() => keepPages(new Set(Object.values(siteStore.get().pages).map((page) => page.id))))
+  siteStore.subscribe(() => keepPages(new Set(Object.values(siteStore.get().pagesInDev ?? {}).map((page) => page.id))))
 
   import.meta.hot.accept('virtual:shabd/data', (next) => {
     if (next) siteStore.set(next.default as SiteData)

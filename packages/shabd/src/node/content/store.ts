@@ -88,6 +88,17 @@ export async function scanContent(contentDir: string): Promise<string[]> {
     .sort()
 }
 
+/** What the site knows of a page, as the page's own module carries it to the browser. */
+export function pageMeta(page: PageRecord): PageMeta {
+  return {
+    id: page.id,
+    path: page.path,
+    title: page.title,
+    description: page.description,
+    ...(page.generated ? { generated: true } : {}),
+  }
+}
+
 export class ContentStore {
   config: ResolvedConfig
   readonly options: StoreOptions
@@ -235,15 +246,7 @@ export class ContentStore {
   siteData(options: { dev: boolean }): SiteData {
     const { config, layouts } = this.config
     const pages: Record<string, PageMeta> = {}
-    for (const page of this.pages()) {
-      pages[page.path] = {
-        id: page.id,
-        path: page.path,
-        title: page.title,
-        description: page.description,
-        ...(page.generated ? { generated: true } : {}),
-      }
-    }
+    if (options.dev) for (const page of this.pages()) pages[page.path] = pageMeta(page)
     // The tags for <head> are written into each document. Leaving them out here keeps them out of the script.
     const { head: _head, ...site } = config.site
     return {
@@ -255,9 +258,9 @@ export class ContentStore {
       layouts,
       sidebar: this.sidebar.sidebar,
       ...(this.sidebar.sections.length ? { sidebars: this.sidebar.sections } : {}),
-      pages,
       contentDir: config.content.dir,
-      ...(options.dev ? { themeCss: themeToCss(config.theme) } : {}),
+      // The whole table of pages is for the dev server. A build sends each page what is known of it, with the page.
+      ...(options.dev ? { pagesInDev: pages, themeCss: themeToCss(config.theme) } : {}),
     }
   }
 

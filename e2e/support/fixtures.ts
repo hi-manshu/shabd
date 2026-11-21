@@ -110,9 +110,9 @@ async function pagesSettled(): Promise<void> {
     try {
       // The module the site's own pages read their list of pages from.
       const module = await (await fetch(`${DEV}/@id/__x00__virtual:shabd/data`)).text()
-      const data = JSON.parse(module.slice(module.indexOf('{'), module.lastIndexOf('}') + 1)) as { pages: Record<string, { id: string; generated?: boolean }> }
+      const data = JSON.parse(module.slice(module.indexOf('{'), module.lastIndexOf('}') + 1)) as { pagesInDev: Record<string, { id: string; generated?: boolean }> }
       // Pages made from an OpenAPI description have no file among the content: no test makes or removes one.
-      const written = Object.values(data.pages).filter((page) => !page.generated)
+      const written = Object.values(data.pagesInDev).filter((page) => !page.generated)
       known = JSON.stringify(written.map((page) => page.id).sort())
       if (known === onDisk) return
     } catch {

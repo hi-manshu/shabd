@@ -25,14 +25,15 @@ import type { LoadedPage } from './types.js'
 /* ───────────────────────────── loading ───────────────────────────── */
 
 export async function loadPage(path: string): Promise<LoadedPage> {
-  const meta = siteStore.get().pages[path]
   const load = routeStore.get()[path]
-  if (!meta || !load) return { path, module: null }
-  // Prefer a hot-updated module over the browser's cached copy of the import.
-  let module = pageModules.get(meta.id)
+  if (!load) return { path, module: null }
+  // While the dev server runs, a hot-updated module is preferred over the browser's cached copy of the
+  // import. It is kept by the page's file, which the dev server's table of pages gives.
+  const id = siteStore.get().pagesInDev?.[path]?.id
+  let module = id === undefined ? undefined : pageModules.get(id)
   if (!module) {
     module = await load()
-    pageModules.set(meta.id, module)
+    if (id !== undefined) pageModules.set(id, module)
   }
   return { path, module }
 }
@@ -80,7 +81,8 @@ export interface PageView {
 const NO_FRONTMATTER = { sidebar: {}, badges: [], draft: false, noindex: false, toc: undefined } as Frontmatter
 
 export function toPageView(site: SiteData, page: LoadedPage): PageView {
-  const meta = site.pages[page.path]
+  // What the site knows of the page comes with the page.
+  const meta = page.module?.meta
   if (!page.module || !meta) {
     const frontmatter = { ...NO_FRONTMATTER, pagination: false, editLink: false, toc: false } as Frontmatter
     return {

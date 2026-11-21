@@ -6,9 +6,13 @@
  * `toc`, and `codeCss`, the colours of its code. They travel with the
  * content, so when a page hot-updates, its layout, table of contents, body
  * and code colours all change in the same frame.
+ *
+ * It also exports `meta`: the page's file, address, title and description.
+ * Those used to reach the browser in one table of every page, in the first
+ * script each reader is sent. A reader needs them of the page they are on.
  */
 import type { Frontmatter } from '../../shared/schema.js'
-import type { PageUpdated } from '../../shared/types.js'
+import type { PageMeta, PageUpdated } from '../../shared/types.js'
 import { codeFrame, type ShabdError } from '../config/errors.js'
 import type { CompiledPage } from './compile.js'
 
@@ -19,6 +23,8 @@ export const PAGE_ERROR_ID = 'virtual:shabd/page-error'
 
 export function toPageModule(
   compiled: CompiledPage,
+  /** What the site knows of the page. */
+  meta: PageMeta,
   frontmatter: Frontmatter,
   /** Page id to register for hot updates. Omit in production builds. */
   hotId?: string,
@@ -32,6 +38,7 @@ export function toPageModule(
   themedCodeCss = '',
 ): string {
   let code = compiled.code
+  code += `\nexport const meta = ${JSON.stringify(meta)};`
   code += `\nexport const frontmatter = ${JSON.stringify(frontmatter)};`
   code += `\nexport const toc = ${JSON.stringify(compiled.toc)};`
   code += `\nexport const codeCss = ${JSON.stringify(compiled.codeCss + themedCodeCss)};\n`
@@ -58,7 +65,7 @@ export function toPageModule(
  * line. Instead the page renders its own error where its content would be,
  * inside its usual layout, and hot-updates back when the file is fixed.
  */
-export function toErrorModule(error: ShabdError, displayFile: string, frontmatter: Frontmatter, hotId: string): string {
+export function toErrorModule(error: ShabdError, displayFile: string, meta: PageMeta, frontmatter: Frontmatter, hotId: string): string {
   const issues = error.issues.map((issue) => ({
     message: issue.message,
     where: issue.line !== undefined ? `${displayFile}:${issue.line}:${issue.column ?? 1}` : displayFile,
@@ -72,5 +79,5 @@ export function toErrorModule(error: ShabdError, displayFile: string, frontmatte
     `  return __shabdElement(__ShabdPageError, { issues: __shabdIssues });\n` +
     `}\n`
   const nothing = { toc: [], sections: [], links: [], linkLines: [], external: [], unlabelled: [], strays: [], snippets: [], anchors: [], codeCss: '', codeColours: {} }
-  return toPageModule({ code, ...nothing }, frontmatter, hotId)
+  return toPageModule({ code, ...nothing }, meta, frontmatter, hotId)
 }
