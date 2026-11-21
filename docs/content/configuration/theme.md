@@ -160,7 +160,11 @@ To change what is printed, write rules for `@media print` in [your own CSS](#you
 
 ## Colours
 
-Each colour is one value for both modes, or `{ light, dark }`. A preset defines these twelve:
+Each colour is one value for both modes, or `{ light, dark }`. To try colours on the page itself and see their
+contrast before writing them here, open the Studio's [Theme tab](../features/studio.md#trying-a-theme) while
+`shabd dev` runs.
+
+A preset defines these twelve:
 
 | Token | Used for |
 | --- | --- |

@@ -136,6 +136,38 @@ export async function closeInvitation(room: string): Promise<void> {
   await fetch(endpoint(`signal/${room}`), { method: 'DELETE', headers: await serverHeaders() }).catch(() => {})
 }
 
+/** The theme as the config has it, and the presets it could start from. */
+export interface ThemeNow {
+  preset: string
+  presets: { name: string; label: string }[]
+  colors: Record<string, { light: string; dark: string }>
+}
+
+/** What is tried of a theme: another preset, and colours laid over it. */
+export interface ThemeChange {
+  preset?: string
+  colors?: Record<string, { light: string; dark: string }>
+}
+
+export interface ThemeTried {
+  /** The stylesheet the theme would make. */
+  css: string
+  colors: ThemeNow['colors']
+  /** The lines of the config that say the change. */
+  yaml: string
+  /** Whether those lines can be put into the config with everything else left as it is. */
+  writable: boolean
+}
+
+export function themeNow(): Promise<ThemeNow> {
+  return ask<ThemeNow>('theme', 'GET')
+}
+
+/** What the theme would be with a change made. With `write`, the change is written to the config as well. */
+export function tryTheme(change: ThemeChange, write = false): Promise<ThemeTried> {
+  return ask<ThemeTried>('theme', 'POST', { ...change, ...(write ? { write: true } : {}) })
+}
+
 /** One line of what `shabd check` reports. */
 export interface CheckProblem {
   level: 'error' | 'warning' | 'note'

@@ -19,10 +19,15 @@ import { normalizePath, type Connect, type ViteDevServer } from 'vite'
 import { IMAGE_BYTES_LIMIT, IMAGE_TOO_LARGE } from '../../shared/image-file.js'
 import { leftBehindProblem, pagePathProblem, pageRoute } from '../../shared/page-path.js'
 import { stripBase } from '../../shared/paths.js'
+import { COLOR_TOKENS, OPTIONAL_COLOR_TOKENS, PRESET_NAMES, THEME_PRESETS } from '../../shared/presets.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
 import { FEED_FILE, renderFeed } from '../build/feed.js'
 import { collectProblems, type Problem } from '../check.js'
+import { isShabdError } from '../config/errors.js'
+import { resolveConfig } from '../config/load.js'
 import { planRedirect } from '../config/redirect-edit.js'
+import { themeToCss } from '../config/theme-css.js'
+import { laidOver, themeYaml, writeTheme, type ThemeChange } from '../config/theme-edit.js'
 import type { PageRecord } from '../content/store.js'
 import type { ShabdContext } from '../context.js'
 import { readBody, readBytes, sendJson, sendText, sendWebResponse, toWebRequest } from '../http.js'
@@ -486,7 +491,65 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
       return
     }
 
+    /*
+     * The theme, tried before it is kept. A GET says what the theme is. A POST says what it would be with
+     * a preset or some colours changed: the stylesheet, for the page to be drawn in, and the colours, for
+     * their contrast to be measured. Nothing is written unless the POST asks for it, and then only where
+     * the change can be put into the config with every other character left as it was.
+     */
+    if (action === 'theme' && req.method === 'GET') {
+      const { theme } = config.config
+      sendJson(res, { preset: theme.preset, presets: PRESET_NAMES.map((name) => ({ name, label: THEME_PRESETS[name].label })), colors: theme.colors })
+      return
+    }
+    if (action === 'theme' && req.method === 'POST') {
+      const body = await jsonBody(req)
+      const change = themeChange(body)
+      const source = await readFile(config.configFile, 'utf8')
+      let tried
+      try {
+        // Read as any config is, so that a colour the config would refuse is refused here, in the same words.
+        tried = resolveConfig(config.root, config.configFile, laidOver(source, change))
+      } catch (error) {
+        if (!isShabdError(error)) throw error
+        throw new StudioRefusal(error.issues[0]?.message ?? 'The config would not be valid with that change.', 400)
+      }
+      const written = writeTheme(source, change)
+      const yaml = themeYaml(change)
+      if (body.write === true) {
+        if (written === undefined) {
+          throw new StudioRefusal('This cannot be put into shabd.config.yaml without rewriting part of it. Add the lines below yourself.', 409)
+        }
+        // The watcher brings the file in a moment later, and the page is drawn in the theme it then has.
+        await writeFile(config.configFile, written)
+      }
+      sendJson(res, { css: themeToCss(tried.config.theme), colors: tried.config.theme.colors, yaml, writable: written !== undefined, written: body.write === true })
+      return
+    }
+
     sendJson(res, { error: 'Unknown Studio request.' }, 404)
+  }
+
+  /** What a request asks to change of the theme. Its values are looked at when the config is read with them in it. */
+  const THEME_TOKENS: ReadonlySet<string> = new Set([...COLOR_TOKENS, ...OPTIONAL_COLOR_TOKENS])
+  const themeChange = (body: Record<string, unknown>): ThemeChange => {
+    const change: ThemeChange = {}
+    if (body.preset !== undefined) {
+      if (typeof body.preset !== 'string' || !(PRESET_NAMES as readonly string[]).includes(body.preset)) throw new StudioRefusal('There is no preset of that name.', 400)
+      change.preset = body.preset
+    }
+    if (body.colors !== undefined) {
+      if (typeof body.colors !== 'object' || body.colors === null || Array.isArray(body.colors)) throw new StudioRefusal('Expected `colors` as a mapping.', 400)
+      change.colors = {}
+      for (const [token, colour] of Object.entries(body.colors)) {
+        const { light, dark } = (colour ?? {}) as { light?: unknown; dark?: unknown }
+        if (!THEME_TOKENS.has(token) || typeof light !== 'string' || typeof dark !== 'string') {
+          throw new StudioRefusal(`"${token}" is not a colour of the theme, or is not given for both modes.`, 400)
+        }
+        change.colors[token] = { light: light.trim(), dark: dark.trim() }
+      }
+    }
+    return change
   }
 
   /** The body of a request as a JSON object. */

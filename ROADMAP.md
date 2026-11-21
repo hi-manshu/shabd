@@ -135,6 +135,7 @@ GitHub's machines have not run any of it.
 | Versions of the docs (`versions:`) and languages of the site (`languages:`) | Built, tested in three browser engines, one of the languages written from right to left. Each is a folder of the content, with a sidebar and a search of its own, and a menu leads to the same page in the others. A language can say the site's own words, the header's links and the footer in its own way. What stays as it is written is under "Not checked" below |
 | Studio: drafts that merge (Yjs). Two people type in one page at the same moment and both keep what they typed | Built, tested between two tabs in three browser engines and between two browser sessions on one machine. Not tried between two machines |
 | Studio: an invitation by link. The dev server holds the two notes the browsers need, where two codes were pasted by hand | Built, tested between two browser sessions on one dev server, in three engines. Not opened from a second machine. The codes remain for a machine that cannot reach the dev server |
+| Studio: a tab where a theme's colours are tried beside the page, with their contrast, and written to the config | Built, tested in three browser engines. Only the lines that say the change are written. Colours and the preset, not fonts or sizes |
 | A benchmark for large sites (`npm run bench`) | Built. Its numbers are below |
 
 ### What the accessibility pass found
@@ -246,9 +247,10 @@ link. What is left:
 
 ### Later
 
-- A place to try a theme's tokens and see their contrast, before they are written to the config.
+- In the Theme tab: the rest of a theme's tokens. It tries colours and the preset today.
 
-The rest of what stood here is built: versioned docs and translations, more than one sidebar chosen by section, addresses with a trailing slash or
+The rest of what stood here is built: a place to try a theme's colours and see their contrast, versioned docs and
+translations, more than one sidebar chosen by section, addresses with a trailing slash or
 `.html`, conditions on layout blocks and a two-column `api` layout, pages made from an OpenAPI file, remark and
 rehype plugins named in YAML, and "last updated" from Git history, an RSS feed and social pictures.
 

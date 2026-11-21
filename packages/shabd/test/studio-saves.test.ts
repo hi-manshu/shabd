@@ -104,6 +104,42 @@ describe('saves from editors that share a draft', () => {
     expect((await save('The first draft, late.\n', second.hash!, 'draft-one')).status).toBe(409)
   })
 
+  it('is asked what a theme would be without the config being touched, and writes it only when told to', async () => {
+    await start()
+    const headers = { 'x-shabd-studio': token }
+    const config = () => readFile(path.join(dir, 'shabd.config.yaml'), 'utf8')
+    const before = await config()
+    const ask = (body: unknown) => fetch(`${origin}/_shabd/studio/theme`, { method: 'POST', headers, body: JSON.stringify(body) })
+
+    const now = (await (await fetch(`${origin}/_shabd/studio/theme`, { headers })).json()) as { preset: string; presets: { name: string }[]; colors: Record<string, unknown> }
+    expect(now.preset).toBe('shabd')
+    expect(now.presets.map((preset) => preset.name)).toContain('ocean')
+    expect(now.colors.accent).toEqual({ light: '#2b36a8', dark: '#b3bbff' })
+
+    // Tried: the stylesheet the theme would make, its colours, and the lines that say the change.
+    const change = { colors: { accent: { light: '#123456', dark: '#abcdef' } } }
+    const tried = (await (await ask(change)).json()) as { css: string; colors: Record<string, unknown>; yaml: string; writable: boolean }
+    expect(tried.css).toContain('#123456')
+    expect(tried.colors.accent).toEqual(change.colors.accent)
+    expect(tried.yaml).toBe('theme:\n  colors:\n    accent: { light: "#123456", dark: "#abcdef" }\n')
+    expect(tried.writable).toBe(true)
+    expect(await config()).toBe(before)
+
+    // What the config would refuse is refused here, and so is anyone but the site's own pages.
+    const refused = await ask({ colors: { accent: { light: 'red; color: blue', dark: '#ffffff' } } })
+    expect(refused.status).toBe(400)
+    expect(((await refused.json()) as { error: string }).error).toContain('must be a single CSS value')
+    expect((await ask({ colors: { nonsense: { light: '#ffffff', dark: '#ffffff' } } })).status).toBe(400)
+    expect((await ask({ colors: { accent: { light: '#ffffff' } } })).status).toBe(400)
+    expect((await ask({ preset: 'no-such-preset' })).status).toBe(400)
+    expect((await fetch(`${origin}/_shabd/studio/theme`)).status).toBe(403)
+    expect(await config()).toBe(before)
+
+    // Written: the lines are put in, and what was there is as it was.
+    expect((await ask({ preset: 'ocean', ...change, write: true })).status).toBe(200)
+    expect(await config()).toBe(`${before}theme:\n  preset: ocean\n  colors:\n    accent: { light: "#123456", dark: "#abcdef" }\n`)
+  })
+
   it('take their turn: none reads the file while another is half way through writing it', async () => {
     await start()
     const opened = await read()

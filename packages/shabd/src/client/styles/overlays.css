@@ -369,6 +369,193 @@
     font-size: 0.82rem;
   }
 
+  /* ── the two things the Studio edits: the page, and the theme ── */
+
+  .sb-studio-tabs {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0 1rem;
+    border-block-end: var(--sb-line) solid var(--sb-border);
+  }
+
+  .sb-studio-tabs [role='tab'] {
+    padding: 0.4rem 0.7rem;
+    border-block-end: var(--sb-rule) solid transparent;
+    margin-block-end: calc(-1 * var(--sb-line));
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--sb-muted);
+  }
+
+  .sb-studio-tabs [role='tab'][aria-selected='true'] {
+    border-block-end-color: var(--sb-bar);
+    color: var(--sb-text);
+  }
+
+  /* A panel adds nothing to the layout: its parts are the Studio's own rows, as they were before there were tabs. */
+  .sb-studio-panel {
+    display: contents;
+  }
+
+  .sb-studio-panel[hidden] {
+    display: none;
+  }
+
+  .sb-studio-theme {
+    display: block;
+    flex: 1;
+    overflow-y: auto;
+    min-block-size: 0;
+  }
+
+  .sb-theme-studio {
+    display: grid;
+    gap: 0.9rem;
+    padding: 0.9rem 1rem 1.2rem;
+    font-size: 0.82rem;
+  }
+
+  .sb-theme-studio p {
+    margin: 0;
+    color: var(--sb-muted);
+  }
+
+  .sb-theme-preset,
+  .sb-theme-yaml {
+    display: grid;
+    gap: 0.25rem;
+    color: var(--sb-muted);
+  }
+
+  .sb-theme-studio select,
+  .sb-theme-studio input[type='text'],
+  .sb-theme-studio textarea {
+    min-inline-size: 0;
+    padding: 0.3rem 0.45rem;
+    border: var(--sb-line) solid var(--sb-border);
+    border-radius: min(4px, var(--sb-radius));
+    background: var(--sb-surface);
+    color: var(--sb-text);
+    font-family: var(--sb-font-mono);
+    font-size: 0.74rem;
+  }
+
+  .sb-theme-studio textarea {
+    resize: vertical;
+  }
+
+  .sb-theme-tokens {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .sb-theme-tokens details {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .sb-theme-tokens details[open] summary {
+    margin-block-end: 0.3rem;
+  }
+
+  .sb-theme-tokens summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--sb-muted);
+  }
+
+  /* The name of a colour, then a field for each mode: a swatch to pick with, and the value to type. */
+  .sb-theme-token {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr 1fr;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .sb-theme-token + .sb-theme-token {
+    margin-block-start: 0.1rem;
+  }
+
+  .sb-theme-token > span {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-inline-size: 0;
+    color: var(--sb-muted);
+  }
+
+  .sb-theme-token > span:first-child {
+    color: var(--sb-text);
+    font-weight: 500;
+  }
+
+  .sb-theme-token input[type='color'] {
+    flex: none;
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+    padding: 0;
+    border: var(--sb-line) solid var(--sb-border);
+    border-radius: min(4px, var(--sb-radius));
+    background: none;
+  }
+
+  .sb-theme-token input[type='color']:disabled {
+    opacity: 0.35;
+  }
+
+  .sb-theme-token input[type='text'] {
+    flex: 1;
+    inline-size: 100%;
+  }
+
+  .sb-theme-contrast {
+    inline-size: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+  }
+
+  .sb-theme-contrast caption {
+    padding-block-end: 0.35rem;
+    font-weight: 600;
+    text-align: start;
+    color: var(--sb-text);
+  }
+
+  .sb-theme-contrast caption span {
+    display: block;
+    font-weight: 400;
+    color: var(--sb-muted);
+  }
+
+  .sb-theme-contrast caption span:not([data-faint='0']) {
+    color: var(--sb-danger);
+  }
+
+  .sb-theme-contrast th,
+  .sb-theme-contrast td {
+    padding: 0.2rem 0.3rem;
+    border-block-end: var(--sb-line) solid var(--sb-border);
+    text-align: start;
+    font-weight: 400;
+    color: var(--sb-muted);
+  }
+
+  .sb-theme-contrast tbody th {
+    color: var(--sb-text);
+  }
+
+  /* Said in words as well as in colour: the colours here are the ones being judged. */
+  .sb-theme-contrast td[data-ok='false'] {
+    color: var(--sb-danger);
+    font-weight: 600;
+  }
+
+  .sb-theme-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
   .sb-studio-peers summary {
     display: flex;
     justify-content: space-between;

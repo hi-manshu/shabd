@@ -32,6 +32,7 @@ import {
 import { SharedDraft, type Link } from './draft.js'
 import { PageActions } from './PageActions.js'
 import { answerAt, isInviteLink, offerAt, PeerChannel, PeerError, peerId, tabChannel, type PeerState, type StudioChannel } from './sync.js'
+import { ThemeStudio } from './ThemeStudio.js'
 
 /** How long typing must pause before the file is written. */
 const SAVE_DELAY = 250
@@ -76,6 +77,8 @@ export default function Studio() {
   /** The page whose text is in the editor. It trails `id` for as long as the next page's file takes to read. */
   const [shown, setShown] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>({ kind: 'loading' })
+  /** What the Studio is showing: the page's source, or the theme. The page's editor stays as it is behind the theme. */
+  const [tab, setTab] = useState<'page' | 'theme'>('page')
 
   /** State the save loop needs without re-subscribing effects on every keystroke. */
   const live = useRef({ text: '', saved: '', version: '', crlf: false, saveStarted: 0, timer: 0 })
@@ -388,66 +391,101 @@ export default function Studio() {
         </button>
       </header>
 
-      {backend && (
-        <PageActions backend={backend} page={id && !generated ? { id, path } : null} settle={settle} discard={discard} version={version} acting={setActing} />
+      <div
+        className="sb-studio-tabs"
+        role="tablist"
+        aria-label="What to edit"
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+          const next = tab === 'page' ? 'theme' : 'page'
+          setTab(next)
+          document.getElementById(`sb-studio-tab-${next}`)?.focus()
+        }}
+      >
+        {(['page', 'theme'] as const).map((name) => (
+          <button
+            key={name}
+            type="button"
+            role="tab"
+            id={`sb-studio-tab-${name}`}
+            aria-selected={tab === name}
+            aria-controls={`sb-studio-panel-${name}`}
+            tabIndex={tab === name ? 0 : -1}
+            onClick={() => setTab(name)}
+          >
+            {name === 'page' ? 'Page' : 'Theme'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'theme' && (
+        <div className="sb-studio-panel sb-studio-theme" role="tabpanel" id="sb-studio-panel-theme" aria-labelledby="sb-studio-tab-theme">
+          <ThemeStudio />
+        </div>
       )}
 
-      {generated ? (
-        <p className="sb-studio-empty">This page is made from an OpenAPI description. Change the description, and the page follows.</p>
-      ) : id ? (
-        // The key makes each page a document of its own: a new page starts with nothing to undo.
-        <CodeEditor
-          key={shown ?? ''}
-          className="sb-studio-editor"
-          language="markdown"
-          label={`Markdown source of ${title}`}
-          value={text}
-          readOnly={status.kind === 'loading' || acting}
-          onChange={edit}
-          handle={setEditor}
-          onSave={() => void save()}
-          onFiles={addImages}
-        />
-      ) : (
-        <p className="sb-studio-empty">There is no page at this address to edit.</p>
-      )}
-
-      {features.studio.sync === 'peers' && id && (
-        <PeerPanel
-          onChannel={(peer) => {
-            links.current.set('peer', peer)
-            const stopMessages = peer.subscribe((message) => draft.current?.receive(message, 'peer'))
-            // Once the two are connected, each says what it holds of the page it is on.
-            const stopState = peer.onState((state) => {
-              if (state === 'connected') draft.current?.greet('peer')
-            })
-            return () => {
-              stopMessages()
-              stopState()
-              if (links.current.get('peer') === peer) links.current.delete('peer')
-            }
-          }}
-        />
-      )}
-
-      <footer className="sb-studio-footer" data-state={status.kind}>
-        {imageProblem && (
-          <p className="sb-studio-problem" role="alert">
-            {imageProblem}
-          </p>
+      <div className="sb-studio-panel" role="tabpanel" id="sb-studio-panel-page" aria-labelledby="sb-studio-tab-page" hidden={tab !== 'page'}>
+        {backend && (
+          <PageActions backend={backend} page={id && !generated ? { id, path } : null} settle={settle} discard={discard} version={version} acting={setActing} />
         )}
-        <p role="status">{describe(status)}</p>
-        {status.kind === 'conflict' && (
-          <p className="sb-studio-choices">
-            <button type="button" className="sb-studio-action" onClick={() => resolveConflict('disk')}>
-              Load the file from disk
-            </button>
-            <button type="button" className="sb-studio-action" onClick={() => resolveConflict('mine')}>
-              Keep my version
-            </button>
-          </p>
+
+        {generated ? (
+          <p className="sb-studio-empty">This page is made from an OpenAPI description. Change the description, and the page follows.</p>
+        ) : id ? (
+          // The key makes each page a document of its own: a new page starts with nothing to undo.
+          <CodeEditor
+            key={shown ?? ''}
+            className="sb-studio-editor"
+            language="markdown"
+            label={`Markdown source of ${title}`}
+            value={text}
+            readOnly={status.kind === 'loading' || acting}
+            onChange={edit}
+            handle={setEditor}
+            onSave={() => void save()}
+            onFiles={addImages}
+          />
+        ) : (
+          <p className="sb-studio-empty">There is no page at this address to edit.</p>
         )}
-      </footer>
+
+        {features.studio.sync === 'peers' && id && (
+          <PeerPanel
+            onChannel={(peer) => {
+              links.current.set('peer', peer)
+              const stopMessages = peer.subscribe((message) => draft.current?.receive(message, 'peer'))
+              // Once the two are connected, each says what it holds of the page it is on.
+              const stopState = peer.onState((state) => {
+                if (state === 'connected') draft.current?.greet('peer')
+              })
+              return () => {
+                stopMessages()
+                stopState()
+                if (links.current.get('peer') === peer) links.current.delete('peer')
+              }
+            }}
+          />
+        )}
+
+        <footer className="sb-studio-footer" data-state={status.kind}>
+          {imageProblem && (
+            <p className="sb-studio-problem" role="alert">
+              {imageProblem}
+            </p>
+          )}
+          <p role="status">{describe(status)}</p>
+          {status.kind === 'conflict' && (
+            <p className="sb-studio-choices">
+              <button type="button" className="sb-studio-action" onClick={() => resolveConflict('disk')}>
+                Load the file from disk
+              </button>
+              <button type="button" className="sb-studio-action" onClick={() => resolveConflict('mine')}>
+                Keep my version
+              </button>
+            </p>
+          )}
+        </footer>
+      </div>
     </aside>
   )
 }

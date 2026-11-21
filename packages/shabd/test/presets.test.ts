@@ -17,21 +17,13 @@ import {
   contrast,
   type ColorToken,
 } from '../src/shared/presets.js'
+import { CONTRAST_FLOORS } from '../src/shared/theme-check.js'
 import { renderCompiled } from './helpers/render.js'
 
 const MODES = ['light', 'dark'] as const
 
-/** What a colour is read against, and how much contrast that takes. */
-const FLOORS: Partial<Record<ColorToken, number>> = {
-  text: 7,
-  muted: 4.5,
-  accent: 4.5,
-  note: 4.5,
-  tip: 4.5,
-  success: 4.5,
-  caution: 4.5,
-  danger: 4.5,
-}
+/** What a colour is read against, and how much contrast that takes: the same floors the Studio shows a theme against. */
+const FLOORS: Partial<Record<ColorToken, number>> = CONTRAST_FLOORS
 
 describe('theme presets', () => {
   it('measures contrast as WCAG does', () => {

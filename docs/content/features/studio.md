@@ -116,6 +116,26 @@ comments, your quoting and the order of your keys stay as they are, and the resu
 it. Where a line cannot be put in like that, for example because the redirects are written between braces on one
 line, the Studio makes no offer and shows you the line to add yourself.
 
+## Trying a theme
+
+The Studio has a second tab, **Theme**. It lists the colours of the site's [theme](../configuration/theme.md#colours),
+each for the light mode and for the dark one, and the preset the theme starts from. Change one, and the page beside
+the Studio is drawn in it at once. The config is not touched.
+
+Under the colours is their contrast: each colour that is read, against the page and against a panel, as a ratio
+from 1 to 21 beside the least it should be. Text is held to 7, and links, secondary text and the five colours of
+callouts to 4.5: the numbers every built-in preset is held to. A colour that falls short is marked "too faint", in
+the mode where it does.
+
+When the colours are right, **Write to shabd.config.yaml** puts them into the config. Only the lines that say the
+change are written. A colour that is there is replaced where it stands, one that is not is added on a line of its
+own, and your comments and everything else are left as they are. Where that cannot be done, as when `colors:` is
+written on one line, the Studio shows the lines for you to add yourself. **Put back**, or leaving the tab, returns
+the page to the theme the config has.
+
+A value can be anything the config takes for a colour. Contrast is measured for what is written as hex or as
+`rgb()`. Another form, such as `oklch()`, is drawn and shown as "not measured".
+
 ## Editing with someone else
 
 `features.studio.sync` decides whether drafts are shared before they are saved.
@@ -204,7 +224,10 @@ The Studio's endpoints exist only in the dev server, and they are narrow on purp
   twelve characters made up for it, lasts ten minutes and is used up by the first answer. Making an invitation,
   waiting on it and taking it back are for the site's own pages, like everything else here.
 - One file outside the content folder can change: `shabd.config.yaml` gains a line when you accept the offer of a
-  redirect. The redirect must lead from an address that has no page to one that has.
+  redirect, and the lines of a theme when you write one from the Theme tab. The redirect must lead from an address
+  that has no page to one that has. The theme is read as the config reads one before a line is written, so a
+  value the config would refuse is refused there, and what is written is read back and has to say the change and
+  nothing else.
 
 In a connected folder the browser does this work, and holds a name and an image to the same rules before it
 touches a file. It cannot make a file in one step that fails if the name is taken: it looks first and then writes.
@@ -243,6 +266,12 @@ Set `features.studio: false` to remove the Studio and its endpoints.
 - An image is saved as it is, at the size it has. When its link is deleted from the page, the file stays.
 - Pasting and dropping are tested with events that the test makes and attaches files to, because a test cannot
   use the real clipboard of every browser or drag a file in from outside the page.
+- The Theme tab tries the preset and the colours. Fonts, sizes, corners and the rest of the theme are changed in
+  the config. A colour can be changed there and not taken out: to go back to the preset's, delete its line.
+- Code keeps the colours it was compiled with until a theme is written. They are worked out against what code is
+  drawn on, so a trial that changes that shows the page's code as it was.
+- Beside the open Studio a page has the width that is left, and on a screen narrower than about 1,500 pixels that
+  is too little for its outline as well: the text is squeezed. Close the Studio to read the page as readers do.
 - You do not see where the other person's cursor is, and undo takes back what you typed, not what they typed.
 - Typing at the same moment is tested between two tabs in Chromium, Firefox and WebKit, and between two browser
   sessions on one machine. It has not been tried between two machines, or with more than two editors on a page

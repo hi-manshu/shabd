@@ -1232,6 +1232,78 @@ test.describe('studio', () => {
     await late.close()
   })
 
+  test('a theme is tried beside the page, with its contrast, before it is written to the config', async ({ page, site }) => {
+    await site.track('shabd.config.yaml')
+    await openStudio(page, '/guide/intro')
+    await page.getByRole('tab', { name: 'Theme' }).click()
+    const theme = page.locator('.sb-theme-studio')
+    const accent = theme.locator('[data-pair="accent on background"]')
+    const verdict = theme.locator('caption [role="status"]')
+    await expect(accent.locator('[data-mode="light"]')).toHaveAttribute('data-ok', 'true')
+    await expect(verdict).toHaveText('Every colour can be read against what it is on.')
+
+    // A colour is tried: the page beside the Studio is drawn in it, and the config is as it was.
+    // The colour that links and the marks of the page are drawn in, as the page has it now.
+    const colourOf = () =>
+      page.evaluate(() => {
+        const probe = document.body.appendChild(document.createElement('span'))
+        probe.style.color = 'var(--sb-accent)'
+        const colour = getComputedStyle(probe).color
+        probe.remove()
+        return colour
+      })
+    const before = await colourOf()
+    const field = theme.getByLabel('accent, light', { exact: true })
+    await field.fill('#bbbbbb')
+    await expect.poll(colourOf).toBe('rgb(187, 187, 187)')
+    // It is too faint to read on the page and on a panel, which is said in words, and its dark form is not.
+    await expect(accent.locator('[data-mode="light"]')).toHaveAttribute('data-ok', 'false')
+    await expect(accent.locator('[data-mode="light"]')).toContainText('too faint')
+    await expect(accent.locator('[data-mode="dark"]')).toHaveAttribute('data-ok', 'true')
+    await expect(verdict).toHaveText('Too faint in 2 places.')
+    expect(await site.read('shabd.config.yaml')).not.toContain('bbbbbb')
+
+    // What the config would not take as a colour is refused in the config's own words, and cannot be written.
+    await field.fill('red; color: blue')
+    await expect(theme.getByRole('alert')).toContainText('must be a single CSS value')
+    await expect(theme.getByRole('button', { name: 'Write to shabd.config.yaml' })).toBeDisabled()
+
+    // Put back: the page is in the config's theme again.
+    await theme.getByRole('button', { name: 'Put back' }).click()
+    await expect.poll(colourOf).toBe(before)
+    await expect(verdict).toHaveText('Every colour can be read against what it is on.')
+
+    // A colour the theme does not have is the same in both modes until the other is typed in, and is
+    // measured against what it is drawn on once it is there.
+    await theme.getByText('More colours').click()
+    await theme.getByLabel('link, light', { exact: true }).pressSequentially('#cccccc')
+    await expect(theme.getByLabel('link, dark', { exact: true })).toHaveValue('#cccccc')
+    await theme.getByLabel('link, dark', { exact: true }).fill('#ffffff')
+    await expect(theme.getByLabel('link, light', { exact: true })).toHaveValue('#cccccc')
+    const linkRow = theme.locator('[data-pair="link on background"]')
+    await expect(linkRow.locator('[data-mode="light"]')).toHaveAttribute('data-ok', 'false')
+    await expect(linkRow.locator('[data-mode="dark"]')).toHaveAttribute('data-ok', 'true')
+    await theme.getByRole('button', { name: 'Put back' }).click()
+    await expect(linkRow).toHaveCount(0)
+
+    // A colour that can be read, written to the config: its line is put in, and every other line is as it was.
+    const config = await site.read('shabd.config.yaml')
+    await field.fill('#7a1fa2')
+    await expect(theme.getByLabel('What the config would say')).toHaveValue(/accent: \{ light: "#7a1fa2", dark: "#[0-9a-f]{6}" \}/)
+    await theme.getByRole('button', { name: 'Write to shabd.config.yaml' }).click()
+    await expect(theme.getByText('Written to shabd.config.yaml.')).toBeVisible()
+    const written = await site.read('shabd.config.yaml')
+    expect(written.split('\n').filter((line) => !config.split('\n').includes(line))).toEqual([expect.stringMatching(/^    accent: \{ light: "#7a1fa2", dark: "#[0-9a-f]{6}" \}$/)])
+    expect(config.split('\n').filter((line) => !written.split('\n').includes(line))).toEqual([])
+
+    // The page stays in it once the config has come round, and the page's editor is as it was behind the theme.
+    await expect.poll(colourOf).toBe('rgb(122, 31, 162)')
+    await page.getByRole('tab', { name: 'Page' }).click()
+    await expect(editorOf(page)).toBeEditable()
+    await expect(page.locator('.sb-theme-studio')).toHaveCount(0)
+    await expect.poll(colourOf).toBe('rgb(122, 31, 162)')
+  })
+
   test('the write endpoint refuses other websites and requests without its token', async ({ request, site }) => {
     const before = await site.read('content/guide/setup.md')
     const write = (headers: Record<string, string>) =>
