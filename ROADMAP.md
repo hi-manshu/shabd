@@ -1,14 +1,14 @@
 # Roadmap
 
 Four parts: where the project lives and what is left to set up there, where version 0.1 stands, what has been
-built since on a branch, and what to build next.
+built since, and what to build next.
 
 ## Part 1: Where the project lives
 
 | | State |
 | --- | --- |
 | Repository | Public, at <https://github.com/hi-manshu/shabd>, under the MIT licence |
-| Tests on GitHub | `ci.yml` runs on every push and pull request, on Linux: one job builds, typechecks and runs the unit tests, another runs the browser tests in Chromium, Firefox and WebKit. First green on 17 November 2026 |
+| Tests on GitHub | `ci.yml` runs on every push and pull request. One job builds, typechecks and runs the unit tests, on Linux, macOS and Windows. Another runs the browser tests in Chromium, Firefox and WebKit, on Linux. First green on 17 November 2026 |
 | Documentation | <https://hi-manshu.github.io/shabd/>, on GitHub Pages. `docs.yml` deploys it again whenever `main` changes |
 | npm | Version 0.1.0, published on 17 November 2026 and tagged `v0.1.0`, under two names (below) |
 | Releases | `release.yml`, started by hand with a version, by the repository's owner only. It has been run as a dry run; no release has gone out through it yet. `npm run release` does the same from a machine |
@@ -33,7 +33,8 @@ What is left to set up:
 2. **Protect `main`.** In the repository: Settings → Rules → Rulesets → New branch ruleset, targeting `main`, with
    the `test` and `browsers` jobs required. The release workflow pushes the commit that sets the version straight
    to `main`: if pull requests become required, let the owner bypass that, or release from a machine.
-3. **Tests on macOS and Windows.** `ci.yml` runs on Linux only. File paths are the likely trouble on Windows.
+3. **Browser tests on macOS and Windows.** `ci.yml` runs the unit tests, the docs check and a build on Linux,
+   macOS and Windows, and all three have to pass. The browser tests run on Linux only.
 4. **The copyright holder.** `LICENSE` says "Shabd contributors". Check that this is the name you want.
 5. **Community files:** `SECURITY.md` with a private way to report vulnerabilities, which matters here because the
    dev server can write files; `CODE_OF_CONDUCT.md`; issue forms and a pull request template; a changelog.
@@ -107,11 +108,16 @@ Not yet checked:
 - The MCP handler on a serverless or edge host.
 - Sites with thousands of real pages.
 
-## Part 3: Built since 0.1, on a branch
+## Part 3: Built since 0.1
 
-Everything in this part is on the branch `worktree-feature-buildout`. None of it is released, none of it is on
-`main`, and nothing was pushed. Each row was committed when its tests passed on one machine (macOS 26, Node 22.16).
-GitHub's machines have not run any of it.
+Everything in this part was built after 0.1.0, on a branch, `worktree-feature-buildout`. The branch and `main`
+were merged on 21 November 2026, and the result is offered to `main` as a pull request. None of it is released.
+Each row was committed when its tests passed on one machine (macOS 26, Node 22.16).
+
+In the same days, `main` got some of the same things built a second time: the adapters, the code editor, making
+and renaming pages, and the mend for a site with a base. The merge kept the branch's version of each, because more
+was built on top of it there, and kept from `main` what the branch did not have: the tests on three systems on
+GitHub, what the first run on Windows asked for, and tests of a dev server that is told of pages coming and going.
 
 | Area | State |
 | --- | --- |
@@ -193,17 +199,18 @@ What it found that is not fixed:
 
 ### What has been checked, and what has not
 
-- 775 unit and integration tests pass.
-- 471 browser tests pass in Playwright's Chromium, Firefox and WebKit, on the last commit that changes code. 42
-  more are skipped: where an engine lacks what a test needs, the tests that belong to a variation that was not
-  switched on for that run, and one that skips itself when two pages of a browser cannot reach each other. That
-  one is peer editing by codes, in Chromium. It passed in the run before, and twice on its own after this one.
-- The four variations of the browser tests were run once the Theme tab was finished. The whole suite with the
-  search index in SQLite: 480 pass, 32 are skipped and one failed, where a test pressed an arrow key before a
-  search had answered. Search was running twice on a site with versions or languages. It runs once now, and
-  that test and the other tests of search then passed three times over in each engine, on SQLite. Semantic
-  search with the real embedding model: 6 pass, 6 skipped. The same with the model served by the site: 12 pass.
-  Reading offline: 10 pass, 2 skipped in Firefox.
+- 783 unit and integration tests pass, on the branch with `main` merged into it.
+- 484 browser tests pass in Playwright's Chromium, Firefox and WebKit, on the same code. 41 more are skipped:
+  where an engine lacks what a test needs, and the tests that belong to a variation that was not switched on for
+  that run.
+- The four variations of the browser tests were run on the branch before `main` was merged into it, and not
+  again after. The whole suite with the search index in SQLite: 480 pass, 32 are skipped and one failed, where a
+  test pressed an arrow key before a search had answered. Search was running twice on a site with versions or
+  languages. It runs once now, and that test and the other tests of search then passed three times over in each
+  engine, on SQLite. Semantic search with the real embedding model: 6 pass, 6 skipped. The same with the model
+  served by the site: 12 pass. Reading offline: 10 pass, 2 skipped in Firefox.
+- GitHub's machines run all of it for the first time on that pull request: the unit tests on Linux, macOS and
+  Windows, and the browser tests on Linux.
 - The docs site builds and passes `shabd check` with every feature above switched on that it can use.
 
 Not checked:
@@ -237,8 +244,8 @@ Not checked:
 
 ### 0.2: Make what exists dependable
 
-- Run the tests on Windows and macOS on GitHub. They run on Linux there today.
-- Run this branch's tests on GitHub at all, and the second look at a file on Linux.
+- Run the browser tests on Windows and macOS on GitHub. The unit tests run on all three there, the browser tests
+  on Linux.
 - Try the real browsers by hand, Safari above all. WebKit under test did not offer its private file system to the
   search worker; whether Safari does needs checking. So do frosted panels in Firefox and Safari as people install
   them, and the logo's animation under "Reduce motion" in Safari.

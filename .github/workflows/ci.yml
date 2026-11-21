@@ -7,9 +7,12 @@ on:
 
 jobs:
   test:
-    # Shabd is developed on macOS, so Linux is the platform worth checking here.
-    # Add macos-latest and windows-latest as a matrix once this passes.
-    runs-on: ubuntu-latest
+    # The unit tests, the docs check and a build, on Linux, macOS and Windows. All three have to pass.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

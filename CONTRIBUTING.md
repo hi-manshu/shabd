@@ -50,6 +50,12 @@ On macOS the tests keep the display awake while they run. Without that, WebKit s
 where the display had gone to sleep. The cause was not proven; the note in `e2e/support/global-setup.ts` has the
 evidence.
 
+The log of a run is full of `Invalid page` and `Invalid configuration` messages from `[WebServer]`. They are not
+failures. Several tests break a page or the config on purpose, to see that the mistake is shown and that fixing it
+clears it, and the dev server reports each one as it would to you. The count at the end is what says how the run
+went. Some tests are skipped where a browser lacks what they need: the clipboard and the File System Access API
+outside Chromium, and the SQLite and semantic tests unless they are switched on.
+
 A new feature that has something to click belongs in these tests. They have caught bugs the unit tests could not:
 a hydration error, a hot update that reloaded into a blank page, and a watcher that reported deleted files as
 changed.

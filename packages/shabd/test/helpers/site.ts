@@ -14,7 +14,9 @@ export function temporarySites(): (files: Record<string, string>) => Promise<str
   beforeAll(async () => {
     root = await mkdtemp(path.join(tmpdir(), 'shabd-test-'))
   })
-  afterAll(() => rm(root, { recursive: true, force: true }))
+  // A site that was compiled may still be writing its cache when its tests are done. Removing the folder then
+  // fails now and then with "directory not empty", on a busy machine: try again a few times.
+  afterAll(() => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))
 
   return async (files) => {
     const dir = await mkdtemp(path.join(root, 'site-'))

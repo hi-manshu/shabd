@@ -4,11 +4,15 @@ declare module 'virtual:shabd/data' {
   import type { SiteData } from '@himanshoe/shabd/client'
   const data: SiteData
   export default data
+  /** When the dev server made this answer. Later answers have a higher number; a build says 0. */
+  export const revision: number
 }
 
 declare module 'virtual:shabd/routes' {
   import type { PageModule } from '@himanshoe/shabd/client'
   export const routes: Record<string, () => Promise<PageModule>>
+  /** As for `virtual:shabd/data`. */
+  export const revision: number
 }
 
 declare module 'virtual:shabd/blocks' {

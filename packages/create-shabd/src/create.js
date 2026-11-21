@@ -67,10 +67,11 @@ function packageName(directory) {
   return name || 'docs'
 }
 
+/** Every file below a directory, named with forward slashes on every system. */
 async function filesUnder(directory, prefix = '') {
   const found = []
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const relative = path.join(prefix, entry.name)
+    const relative = path.posix.join(prefix, entry.name)
     if (entry.isDirectory()) found.push(...(await filesUnder(path.join(directory, entry.name), relative)))
     else found.push(relative)
   }
@@ -111,7 +112,7 @@ export async function create(options) {
 
   const files = new Map()
   for (const file of await filesUnder(TEMPLATE)) {
-    const target = path.join(path.dirname(file), RENAMED[path.basename(file)] ?? path.basename(file))
+    const target = path.posix.join(path.posix.dirname(file), RENAMED[path.posix.basename(file)] ?? path.posix.basename(file))
     files.set(target, fill(await readFile(path.join(TEMPLATE, file), 'utf8')))
   }
   files.set(

@@ -39,7 +39,7 @@ export interface BuiltSite {
  */
 export function temporaryBuilds(): (files: Record<string, string>, options?: BuildOptions) => Promise<BuiltSite> {
   const dirs: string[] = []
-  afterAll(() => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true }))))
+  afterAll(() => Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))))
 
   return async (files, options = {}) => {
     await mkdir(WORK, { recursive: true })

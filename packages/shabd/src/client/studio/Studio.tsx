@@ -81,7 +81,16 @@ export default function Studio() {
   const [tab, setTab] = useState<'page' | 'theme'>('page')
 
   /** State the save loop needs without re-subscribing effects on every keystroke. */
-  const live = useRef({ text: '', saved: '', version: '', crlf: false, saveStarted: 0, timer: 0 })
+  const live = useRef({
+    text: '',
+    saved: '',
+    version: '',
+    crlf: false,
+    saveStarted: 0,
+    /** How long the page took to follow the save in flight, when it followed before the save was confirmed. */
+    updatedIn: undefined as number | undefined,
+    timer: 0,
+  })
   /** The page's text as the editors that are connected share it (draft.ts), and the ways to those editors. */
   const draft = useRef<SharedDraft | null>(null)
   const links = useRef(new Map<Link, StudioChannel>())
@@ -194,9 +203,15 @@ export default function Studio() {
   const save = useCallback(async () => {
     const state = live.current
     window.clearTimeout(state.timer)
-    if (!backend || !id || state.text === state.saved) return
+    if (!backend || !id) return
+    if (state.text === state.saved) {
+      // Typed and taken back before it was written: nothing is unsaved after all.
+      setStatus((current) => (current.kind === 'unsaved' ? { kind: 'idle' } : current))
+      return
+    }
     const writing = state.text
     state.saveStarted = performance.now()
+    state.updatedIn = undefined
     setStatus({ kind: 'saving' })
     try {
       // The draft is named, so that editors that share it and save to the same file do not take each
@@ -207,7 +222,8 @@ export default function Studio() {
       // More was typed while the write was in flight: go again.
       if (state.text !== writing) state.timer = window.setTimeout(() => void save(), SAVE_DELAY)
       else {
-        setStatus({ kind: 'saved' })
+        // The page can follow the file before the write is confirmed: where the watcher is quick, it does.
+        setStatus(state.updatedIn === undefined ? { kind: 'saved' } : { kind: 'saved', updatedIn: state.updatedIn })
         // An editor that waited for this before it would hand over a newer text is asked again.
         draft.current?.settled()
       }
@@ -285,7 +301,8 @@ export default function Studio() {
       const state = live.current
       const sinceSave = performance.now() - state.saveStarted
       if (state.saveStarted && sinceSave < 2000) {
-        // Our own save came back as a rendered page.
+        // Our own save came back as a rendered page. It is kept for a save that is still waiting for its answer.
+        state.updatedIn = sinceSave
         setStatus((current) => (current.kind === 'saved' ? { kind: 'saved', updatedIn: sinceSave } : current))
         state.saveStarted = 0
       } else if (state.text === state.saved) {

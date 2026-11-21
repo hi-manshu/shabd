@@ -41,7 +41,9 @@ export const PLACES = [
     (text, _from, to) => {
       const lock = JSON.parse(text)
       for (const workspace of ['packages/shabd', 'packages/create-shabd']) lock.packages[workspace].version = to
-      return `${JSON.stringify(lock, null, 2)}\n`
+      // Written back with the line endings it had: Git on Windows may have checked it out with CRLF.
+      const written = `${JSON.stringify(lock, null, 2)}\n`
+      return text.includes('\r\n') ? written.replace(/\n/g, '\r\n') : written
     },
   ],
 ]
