@@ -38,8 +38,8 @@ export interface PageData {
   unlabelled: ({ src: string } & Located)[]
   /** Tags in a `.md` page that are written like components, which only work in `.mdx`. */
   strays: ({ name: string } & Located)[]
-  /** The live snippets of the page as they are written, each with the line its fence opens on. */
-  snippets: ({ code: string } & Located)[]
+  /** The live snippets of the page as they are written, each with the line its fence opens on. `isolated` ones run in a frame of their own. */
+  snippets: ({ code: string; isolated?: boolean } & Located)[]
   /** The colours of the page's code tokens in the site's own two syntax themes, as a stylesheet. Empty when the page has no highlighted code. */
   codeCss: string
   /** Each token class of the page with its colour under every syntax theme the theme menu can reach. Empty without a menu. */

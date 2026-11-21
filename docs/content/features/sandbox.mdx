@@ -138,12 +138,75 @@ export default function Size() {
 - `react`, `shabd/client` and `@himanshoe/shabd/client` are taken, and cannot be given another meaning.
 - Any other import is refused, with a message that lists the names there are.
 
+## A snippet in a frame of its own
+
+A snippet runs in the page, and can do what the page can. Add `isolated` to the fence, and it runs in a frame that
+can reach nothing of the page:
+
+````md
+```tsx live isolated
+```
+````
+
+```tsx live isolated
+export default function Apart() {
+  const [count, setCount] = useShared('count', 0)
+  let title = 'out of reach'
+  try {
+    title = window.parent.document.title
+  } catch {}
+  return (
+    <p>
+      <button className="sb-button" onClick={() => setCount(count + 1)}>
+        Clicked {count} times
+      </button>{' '}
+      The title of this page, asked for from in here: {title}.
+    </p>
+  )
+}
+```
+
+The frame is allowed scripts and nothing else. It has an origin of its own, so the snippet cannot read the page,
+its cookies or what the site has stored in the browser, and it cannot send the reader to another address, open a
+window or post a form.
+
+It still behaves like a sandbox. The code is edited in the page, an error is shown under the result, and
+`useShared` keeps its values in the page: the state panel lists them, and an isolated snippet shares them with
+the other sandboxes of its group.
+
+What a snippet has in a frame:
+
+- React and its hooks, and `useShared`.
+- The modules named under `features.sandbox.modules`, with the stylesheets they import.
+- How the page looks: its stylesheets, its theme, and the fonts the page has loaded. It follows the reader when
+  they change the colour mode or pick another theme.
+
+What it does not have:
+
+- The components of `components:` by name, and Shabd's own, such as `Callout` and `Tabs`. Those belong to the page.
+  To use a component of yours, name its file under `modules` and import it.
+- The rest of `shabd/client`. In a frame it has `useShared` and nothing more, so a file that takes `Link` or
+  `usePage` from it will not work there.
+
+Things to know about frames:
+
+- The frame runs one script, which holds a copy of React and every module under `modules`. It is built for a site
+  that has an isolated snippet and for no other, and a page fetches it when it first shows one.
+- A shared value crosses between the page and the frame as a copy. A value that cannot be copied, a function for
+  one, stays where it was set.
+- A link in the frame opens nothing, and `alert` shows nothing: the frame is not allowed either.
+- A font is given to the frame once the page itself has loaded it. Text in a weight or a script that the page
+  does not use is drawn in the reader's own font.
+- A frame keeps a snippet away from the page. It does not keep it off the network: a snippet can still fetch
+  whatever any page may fetch.
+
 ## Things to know
 
 - Snippets are TypeScript, but they are not type-checked. Types are removed and the code runs.
 - The compiler is downloaded when a page with a sandbox is opened, not before.
-- A snippet runs in the page, with the page's permissions, like any other script on it. A site with a
-  Content-Security-Policy that forbids `unsafe-eval` cannot run sandboxes.
+- A snippet runs in the page, with the page's permissions, like any other script on it, unless it is
+  [`isolated`](#a-snippet-in-a-frame-of-its-own). A site with a Content-Security-Policy that forbids `unsafe-eval`
+  cannot run sandboxes, in the page or in a frame.
 - An error in a snippet is shown under its result. The rest of the page carries on.
 - [`shabd check`](../reference/cli.md#what-check-looks-for) and a build read every live snippet as it is written,
   and report one that cannot be made into a script, or that imports a name the site has not given, with its page and

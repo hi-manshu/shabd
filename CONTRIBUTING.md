@@ -168,6 +168,8 @@ shabd/
 │   │   │   ├── mcp/                MCP server, HTTP handler, stdio
 │   │   │   ├── import/             shabd import: one module for each tool it reads
 │   │   │   ├── adapters/           what `shabd build --adapter` writes for a host, and the function it deploys
+│   │   │   ├── openapi/            pages made from an OpenAPI description
+│   │   │   ├── sandbox/            the script that runs in the frame of an isolated snippet
 │   │   │   └── cli.ts              dev, build, preview, check, mcp, import
 │   │   └── client/                 shipped as source, compiled by the site's build
 │   │       ├── app/                router, stores, hot-update hub
@@ -176,7 +178,7 @@ shabd/
 │   │       ├── search/             search worker and dialog
 │   │       ├── studio/             the Studio's panel, file backends, draft sync
 │   │       ├── editor/             the code editor (CodeMirror), fetched when one is shown
-│   │       ├── sandbox/            live code sandboxes
+│   │       ├── sandbox/            live code sandboxes, in the page and in a frame of their own
 │   │       └── styles/             the default theme
 │   └── test/                       unit and integration tests
 ├── packages/create-shabd/          the starter (npm package "@himanshoe/create-shabd")

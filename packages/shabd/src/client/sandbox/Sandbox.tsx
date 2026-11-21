@@ -15,11 +15,16 @@
  *   - the widget that renders and changes it
  *   - the state panel, which lists it and can set it
  * Editing the code keeps the state; changing the state re-renders the widget.
+ *
+ * A fence that also says `isolated` runs its snippet in a frame of its own,
+ * which can reach nothing of the page (Frame.tsx). The code and the state
+ * panel stay in the page either way.
  */
 import { Component, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from 'react'
 import { useMDXComponents } from 'virtual:shabd/mdx-components'
 import { modules as declared } from 'virtual:shabd/sandbox-modules'
 import { compileSnippet } from './compile.js'
+import { Frame } from './Frame.js'
 import { sharedGroup, SharedGroupContext, useShared, type SharedGroup } from './shared-state.js'
 
 interface SandboxProps {
@@ -28,12 +33,14 @@ interface SandboxProps {
   title?: string
   /** Sandboxes with the same group name share their state. */
   group?: string
+  /** Run the snippet in a frame that can reach nothing of the page. */
+  isolated?: boolean
 }
 
 /** How long typing must pause before the snippet is recompiled. */
 const COMPILE_DELAY = 150
 
-export default function Sandbox({ code: authored, title, group: groupName }: SandboxProps) {
+export default function Sandbox({ code: authored, title, group: groupName, isolated = false }: SandboxProps) {
   const id = useId()
   const group = useMemo(() => sharedGroup(groupName ?? `sandbox:${id}`), [groupName, id])
   const [code, setCode] = useState(authored)
@@ -46,6 +53,8 @@ export default function Sandbox({ code: authored, title, group: groupName }: San
   useEffect(() => setCode(authored), [authored])
 
   useEffect(() => {
+    // An isolated snippet is not run here: its frame is sent the code.
+    if (isolated) return undefined
     let current = true
     const timer = window.setTimeout(
       () => {
@@ -76,7 +85,7 @@ export default function Sandbox({ code: authored, title, group: groupName }: San
     }
     // `built` only decides the first compile's delay; recompiling when it changes would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, components])
+  }, [code, components, isolated])
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key !== 'Tab' || event.shiftKey) return
@@ -114,8 +123,10 @@ export default function Sandbox({ code: authored, title, group: groupName }: San
         />
 
         <div className="sb-sandbox-result">
-          <div className="sb-sandbox-stage">
-            {built ? (
+          <div className="sb-sandbox-stage" data-isolated={isolated ? '' : undefined}>
+            {isolated ? (
+              <Frame code={code} group={group} quiet={!problem} onProblem={setProblem} />
+            ) : built ? (
               <SharedGroupContext value={group}>
                 <RenderBoundary key={built.version} onError={setProblem}>
                   <built.Example />

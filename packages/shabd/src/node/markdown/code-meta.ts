@@ -12,7 +12,7 @@ export interface CodeMeta {
   /** 1-based line numbers marked as added, and as removed: `ins={3-4}`, `del={2}`. */
   inserted: number[]
   deleted: number[]
-  /** Bare words: `live`, `showLineNumbers`, `noLineNumbers`, `wrap`, `noWrap`, `noVars`. */
+  /** Bare words: `live`, `isolated`, `showLineNumbers`, `noLineNumbers`, `wrap`, `noWrap`, `noVars`. */
   flags: Set<string>
   /** `key="value"` pairs other than `title`, `ins` and `del`. */
   attrs: Record<string, string>

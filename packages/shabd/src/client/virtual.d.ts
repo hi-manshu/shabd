@@ -43,6 +43,15 @@ declare module 'virtual:shabd/sandbox-modules' {
   export const modules: Record<string, () => Promise<Record<string, unknown>>>
 }
 
+declare module 'virtual:shabd/sandbox-frame' {
+  /**
+   * The script that runs inside the frame of an isolated snippet, as text: React, what puts a snippet
+   * on the screen, and the modules of `features.sandbox.modules`. Empty on a site with no such snippet.
+   */
+  const script: string
+  export default script
+}
+
 declare module 'virtual:shabd/embedder' {
   /** False when semantic search is off or @huggingface/transformers is not installed. */
   export const available: boolean

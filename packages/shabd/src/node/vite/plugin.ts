@@ -48,6 +48,7 @@ import { HMR_RUNTIME_ID, PAGE_ERROR_ID, toErrorModule, toPageModule } from '../m
 import { themedCodeCss } from '../markdown/plugins/rehype-code.js'
 import { hasMermaid, mathStylesheet } from '../markdown/user-plugins.js'
 import { CLIENT_DIR, CLIENT_ENTRY, PACKAGE_ROOT, packageName, resolveFromPackage, SERVER_ENTRY } from '../paths.js'
+import { buildFrameRuntime, type FrameRuntime } from '../sandbox/frame.js'
 import { devMiddlewares } from './dev-middleware.js'
 import { SecondLook } from './second-look.js'
 
@@ -70,6 +71,7 @@ const VIRTUAL = {
   embedder: 'virtual:shabd/embedder',
   sqlite: 'virtual:shabd/sqlite',
   sandboxModules: 'virtual:shabd/sandbox-modules',
+  sandboxFrame: 'virtual:shabd/sandbox-frame',
 } as const
 
 const VIRTUAL_IDS = new Set<string>(Object.values(VIRTUAL))
@@ -88,10 +90,38 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
   let contentWatcher: FSWatcher | undefined
   /** Reads a changed file once more, in case a second save followed the first too closely to be reported. */
   let secondLook: SecondLook | undefined
+  /** The script for the frames of isolated snippets, once a page of the dev server has asked for it. */
+  let frame: Promise<FrameRuntime> | undefined
 
   const ctx = (): ShabdContext => {
     if (!context) throw new Error('shabd: plugin used before its config hook ran')
     return context
+  }
+
+  /**
+   * `virtual:shabd/sandbox-frame`: the script for the frames of isolated snippets, as text. Making it
+   * is a build of its own, so it is made when it is wanted: by the dev server when a page first shows
+   * such a snippet, and by a build only for a site that has one.
+   */
+  const frameModule = async (ssr: boolean): Promise<string> => {
+    const context = ctx()
+    const nothing = `export default ''\n`
+    // A page rendered ahead of time starts no frame.
+    if (ssr || !context.config.config.features.sandbox.enabled) return nothing
+    if (context.dev) {
+      frame ??= buildFrameRuntime(context.config, true)
+      try {
+        return `export default ${JSON.stringify((await frame).code)}\n`
+      } catch (error) {
+        // Asked again, it is tried again: what was wrong may have been put right.
+        frame = undefined
+        throw error
+      }
+    }
+    // The pages are compiled by now, so this reads what is kept of each. One that does not compile has stopped the build already.
+    const pages = await Promise.all(context.store.pages().map((page) => compilePage(context, page).catch(() => undefined)))
+    if (!pages.some((page) => page?.snippets.some((snippet) => snippet.isolated))) return nothing
+    return `export default ${JSON.stringify((await buildFrameRuntime(context.config, false)).code)}\n`
   }
 
   const core: Plugin = {
@@ -105,6 +135,8 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       if (!options.context) {
         context = await createContext(options.root ?? userConfig.root ?? process.cwd(), { dev })
       }
+      // Made for the config there was: the modules snippets may import are in it.
+      frame = undefined
       const { config } = ctx()
       if (dev) ctx().compiler.highlighter.warm()
 
@@ -180,7 +212,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       return undefined
     },
 
-    load(id) {
+    load(id, options) {
       if (!id.startsWith('\0virtual:shabd/')) return undefined
       const { config, store, dev } = ctx()
 
@@ -226,6 +258,9 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
           )
           return `export const modules = {\n${modules.join('\n')}\n}\n`
         }
+
+        case VIRTUAL.sandboxFrame:
+          return frameModule(options?.ssr === true)
 
         case VIRTUAL.fonts:
           return `${bundledFonts(config)
@@ -327,6 +362,20 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       const context = ctx()
       const { config, store } = context
       const client = server.environments.client
+
+      // A file that went into the script for isolated snippets. The script is made again when it is next
+      // asked for, and the frames on screen run the old one: the page starts again to ask.
+      if (frame) {
+        const built = await frame.catch(() => undefined)
+        if (built?.files.some((used) => normalizePath(used) === normalizePath(file))) {
+          frame = undefined
+          const module = client.moduleGraph.getModuleById(resolved(VIRTUAL.sandboxFrame))
+          if (module) {
+            client.moduleGraph.invalidateModule(module)
+            client.hot.send({ type: 'full-reload' })
+          }
+        }
+      }
       const reload = (id: string) => {
         const module = client.moduleGraph.getModuleById(resolved(id))
         if (!module) return

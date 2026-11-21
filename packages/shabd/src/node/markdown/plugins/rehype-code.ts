@@ -301,7 +301,11 @@ export function rehypeCode(highlighter: CodeHighlighter) {
         const live = highlighter.options.sandbox && block.meta.flags.has('live') && SANDBOX_LANGUAGES.has(block.lang)
         if (live) {
           block.parent.children[block.index] = sandboxElement(block)
-          pageData(file).snippets.push({ code: block.code, ...(block.line ? { line: block.line } : {}) })
+          pageData(file).snippets.push({
+            code: block.code,
+            ...(block.line ? { line: block.line } : {}),
+            ...(block.meta.flags.has('isolated') ? { isolated: true } : {}),
+          })
           return
         }
         if (highlighter.options.mermaid && block.lang === 'mermaid') {
@@ -351,6 +355,8 @@ function sandboxElement(block: Block): Element {
       lang: block.lang,
       ...(block.meta.title ? { title: block.meta.title } : {}),
       ...(block.meta.attrs.group ? { group: block.meta.attrs.group } : {}),
+      // `isolated`: the snippet runs in a frame of its own, which can reach nothing of the page.
+      ...(block.meta.flags.has('isolated') ? { isolated: true } : {}),
     },
     children: [],
   }

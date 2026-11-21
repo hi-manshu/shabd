@@ -56,7 +56,7 @@ function useHydrated(): boolean {
   )
 }
 
-function Sandbox(props: { code: string; lang?: string; title?: string; group?: string }) {
+function Sandbox(props: { code: string; lang?: string; title?: string; group?: string; isolated?: boolean }) {
   const { features } = useSite()
   const hydrated = useHydrated()
   const fallback = (

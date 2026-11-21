@@ -23,7 +23,7 @@ import { ShabdError, type SourceIssue } from './errors.js'
 import { locateIssues, parseYamlWithSchema } from './yaml.js'
 
 /** Bump when compiled page output changes shape, to invalidate on-disk caches. */
-export const PIPELINE_VERSION = 12
+export const PIPELINE_VERSION = 13
 
 export const CONFIG_FILE_NAMES = ['shabd.config.yaml', 'shabd.config.yml'] as const
 

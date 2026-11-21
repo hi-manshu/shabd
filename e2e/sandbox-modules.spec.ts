@@ -59,7 +59,9 @@ test('a page with no snippet on it fetches none of those modules', async ({ page
   page.on('response', async (response) => {
     if (!/\.js$/.test(new URL(response.url()).pathname)) return
     const body = await response.text().catch(() => '')
-    if (body.includes('of-the-fixture')) scripts.push(response.url())
+    // Not the script for the frames of isolated snippets, which has every such module in it and is
+    // fetched for a page that shows one (sandbox-frame.spec.ts).
+    if (body.includes('of-the-fixture') && !body.includes('what runs in the frame of an isolated snippet')) scripts.push(response.url())
   })
 
   await open(page, `${BUILT}/guide/intro`)
