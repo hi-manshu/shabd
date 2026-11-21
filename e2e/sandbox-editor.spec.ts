@@ -4,7 +4,7 @@
  * reached and left with the keyboard alone.
  */
 import AxeBuilder from '@axe-core/playwright'
-import { editorText, said, snippetEditor } from './support/editor.js'
+import { editorText, snippetEditor } from './support/editor.js'
 import { BUILT, expect, open, test } from './support/fixtures.js'
 
 test.describe('the editor of a sandbox', () => {
@@ -39,7 +39,7 @@ test.describe('the editor of a sandbox', () => {
     await page.getByRole('button', { name: 'Switch colour theme' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
     await expect.poll(() => colourOf('function')).not.toBe(keyword)
-    expect(said(problems)).toEqual([])
+    expect(problems).toEqual([])
   })
 
   test('is reached and left with the keyboard, and says how', async ({ page, browserName }) => {

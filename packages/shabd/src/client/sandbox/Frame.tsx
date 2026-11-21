@@ -45,6 +45,8 @@ export function Frame({ code, group, quiet, onProblem }: FrameProps) {
   const frame = useRef<HTMLIFrameElement>(null)
   const [height, setHeight] = useState(0)
   const [shown, setShown] = useState(false)
+  /** The frame's own document has been read to its end. */
+  const [loaded, setLoaded] = useState(false)
   // Addresses in the frame are read from where the page is, and its document is in the page's language.
   const source = useMemo(() => frameDocument(window.location.href, document.documentElement.lang || 'en'), [])
 
@@ -160,8 +162,14 @@ export function Frame({ code, group, quiet, onProblem }: FrameProps) {
         // Scripts, and nothing else: not the site's origin, no forms, no new windows, no leaving the page.
         sandbox="allow-scripts"
         srcDoc={source}
+        onLoad={() => setLoaded(true)}
         // Nothing of it is seen until the snippet is: before that it does not yet look like the page.
-        style={{ blockSize: `${height}px`, visibility: shown ? 'visible' : 'hidden' }}
+        //
+        // And it is not laid out at all until its document has been read. Firefox warns when a layout is
+        // asked of a document it is still reading, "Layout was forced before the page was fully loaded",
+        // and on a page that also draws a code editor something asked that of the frame now and then.
+        // What asked was not found. A frame that is not displayed has no layout to ask for.
+        style={{ blockSize: `${height}px`, visibility: shown ? 'visible' : 'hidden', display: loaded ? undefined : 'none' }}
       />
     </>
   )

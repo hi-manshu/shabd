@@ -17,17 +17,3 @@ export const editorText = (editor: Locator): Promise<string> =>
     .locator('.cm-line')
     .allTextContents()
     .then((lines) => lines.join('\n'))
-
-/**
- * What a page wrote to the console, without one warning of Firefox's.
- *
- * On a page that has both a code editor and the frame of an isolated snippet,
- * Firefox now and then says of the frame: "Layout was forced before the page
- * was fully loaded". It is a warning that a page may be drawn before its
- * styles are in. The frame is not shown until its snippet is, and nothing was
- * seen to be wrong with one. It began when the sandbox's text area became the
- * code editor, it comes in some runs and not in others, and what asks for the
- * layout was looked for and not found: not the frame's own script, which was
- * tried both starting later and measuring later.
- */
-export const said = (problems: string[]): string[] => problems.filter((text) => !text.includes('Layout was forced before the page was fully loaded'))

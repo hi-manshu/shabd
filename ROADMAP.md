@@ -196,8 +196,6 @@ Not checked:
 - The second look at a file, on Linux.
 - Reading offline in Firefox without a connection. The Firefox that the tests drive leaves a service worker its
   connection, so the two tests that cut it are skipped there.
-- Firefox now and then warns that the layout of an isolated snippet's frame was forced before the frame had loaded,
-  on a page that also has a code editor. Nothing was seen to be wrong, and what asks for the layout was not found.
 - Hot updates of the theme's own source in Firefox and WebKit. They were tried in Chromium. A hot update cannot
   hand out a second copy of one of the app's stores: none of them stands above a component's file, and a test
   reads what every file of the client imports to keep it so.

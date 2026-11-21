@@ -3,7 +3,7 @@
  * `features.sandbox.modules`. The fixture names a package and a file of its own.
  */
 import type { Page } from '@playwright/test'
-import { said, snippetEditor } from './support/editor.js'
+import { snippetEditor } from './support/editor.js'
 import { BUILT, DEV, expect, open, test } from './support/fixtures.js'
 
 const sandbox = (page: Page, title: string) => page.locator('.sb-sandbox', { has: page.locator('.sb-code-label', { hasText: title }) })
@@ -23,7 +23,7 @@ for (const [where, origin] of [
       await expect(file.locator('.sb-sandbox-stage [data-gauge]')).toHaveText('3 bar', { timeout: 20_000 })
       await expect(file.locator('.sb-sandbox-stage small')).toHaveText('in bar')
       await expect(page.locator('.sb-sandbox-problem')).toHaveCount(0)
-      expect(said(problems)).toEqual([])
+      expect(problems).toEqual([])
     })
 
     test('a module is fetched when a reader writes its name into a snippet', async ({ page }) => {
