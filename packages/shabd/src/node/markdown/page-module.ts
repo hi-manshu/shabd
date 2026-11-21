@@ -8,6 +8,7 @@
  * and code colours all change in the same frame.
  */
 import type { Frontmatter } from '../../shared/schema.js'
+import type { PageUpdated } from '../../shared/types.js'
 import { codeFrame, type ShabdError } from '../config/errors.js'
 import type { CompiledPage } from './compile.js'
 
@@ -21,11 +22,20 @@ export function toPageModule(
   frontmatter: Frontmatter,
   /** Page id to register for hot updates. Omit in production builds. */
   hotId?: string,
+  /** The day the page was last changed, when the site shows it. */
+  updated?: PageUpdated,
+  /**
+   * The page's code colours under the themes of the theme menu, as a
+   * stylesheet. The dev server gives it, so that each page is whole on its
+   * own. A build leaves it out: there one stylesheet holds them for the site.
+   */
+  themedCodeCss = '',
 ): string {
   let code = compiled.code
   code += `\nexport const frontmatter = ${JSON.stringify(frontmatter)};`
   code += `\nexport const toc = ${JSON.stringify(compiled.toc)};`
-  code += `\nexport const codeCss = ${JSON.stringify(compiled.codeCss)};\n`
+  code += `\nexport const codeCss = ${JSON.stringify(compiled.codeCss + themedCodeCss)};\n`
+  if (updated) code += `export const updated = ${JSON.stringify(updated)};\n`
 
   if (hotId !== undefined) {
     // The module accepts its own updates and hands the new version to the
@@ -61,5 +71,6 @@ export function toErrorModule(error: ShabdError, displayFile: string, frontmatte
     `export default function PageWithError() {\n` +
     `  return __shabdElement(__ShabdPageError, { issues: __shabdIssues });\n` +
     `}\n`
-  return toPageModule({ code, toc: [], sections: [], links: [], anchors: [], codeCss: '' }, frontmatter, hotId)
+  const nothing = { toc: [], sections: [], links: [], linkLines: [], external: [], unlabelled: [], strays: [], snippets: [], anchors: [], codeCss: '', codeColours: {} }
+  return toPageModule({ code, ...nothing }, frontmatter, hotId)
 }

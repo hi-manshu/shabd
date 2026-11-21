@@ -227,164 +227,111 @@
     background: var(--sb-surface);
   }
 
-  /* New page, rename and delete: a strip of buttons, or the form one of them opened. */
-  .sb-studio-pages {
-    padding: 0.5rem 1rem 0.55rem;
-    border-block-end: var(--sb-line) solid var(--sb-border);
-    font-size: 0.8rem;
+  .sb-studio-action:disabled {
+    color: var(--sb-muted);
+    cursor: default;
   }
 
-  .sb-studio-page-buttons {
+  .sb-studio-action:disabled:hover {
+    background: none;
+  }
+
+  /* Making, renaming and deleting pages: a row of buttons, the form one of them opens, and what the last one did. */
+  .sb-studio-pages {
+    border-block-end: var(--sb-line) solid var(--sb-border);
+    font-size: 0.82rem;
+  }
+
+  .sb-studio-tools {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
     gap: 0.4rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .sb-studio-form,
+  .sb-studio-outcome,
+  .sb-studio-problem {
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.1rem 1rem 0.75rem;
+  }
+
+  .sb-studio-form p,
+  .sb-studio-outcome p {
     margin: 0;
   }
 
-  .sb-studio-page-buttons [role='status'] {
+  .sb-studio-action[aria-expanded='true'] {
+    background: var(--sb-surface);
+  }
+
+  .sb-studio-form label,
+  .sb-studio-hint {
     color: var(--sb-muted);
   }
 
-  .sb-studio-action:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .sb-studio-page-form {
-    display: grid;
-    gap: 0.45rem;
-  }
-
-  .sb-studio-page-form p {
-    margin: 0;
-  }
-
-  .sb-studio-page-form label {
-    display: grid;
-    gap: 0.25rem;
-    color: var(--sb-muted);
-  }
-
-  .sb-studio-page-form input {
+  .sb-studio-form input {
+    min-inline-size: 0;
     padding: 0.35rem 0.5rem;
     border: var(--sb-line) solid var(--sb-border);
     border-radius: min(4px, var(--sb-radius));
     background: var(--sb-surface);
     color: var(--sb-text);
     font-family: var(--sb-font-mono);
-    font-size: 0.82rem;
+    font-size: 0.8rem;
   }
 
-  .sb-studio-page-problem {
+  .sb-studio-hint[data-invalid],
+  .sb-studio-problem {
     color: var(--sb-danger);
   }
 
-  /*
-   * The editor is a text area with a coloured copy of its text laid over it
-   * (studio/Editor.tsx). This box scrolls; the two layers inside it are as
-   * tall as the text, and at least as tall as the box.
-   */
-  .sb-studio-code {
-    flex: 1;
-    min-block-size: 0;
+  .sb-studio-form .sb-studio-choices,
+  .sb-studio-outcome .sb-studio-choices {
+    margin-block-start: 0.15rem;
+  }
+
+  .sb-studio-outcome code {
+    font-size: 0.92em;
+  }
+
+  /* What `shabd check` found. A page that many others link to makes a long list, which scrolls here and does not push the editor out. */
+  .sb-studio-found {
     display: grid;
-    overflow: auto;
-    background: var(--sb-surface);
-  }
-
-  .sb-studio-code:focus-within {
-    box-shadow: inset 0 0 0 2px var(--sb-accent-soft);
-  }
-
-  .sb-studio-sheet {
-    position: relative;
-    min-inline-size: 0;
-  }
-
-  /*
-   * Everything that decides where a letter stands is said once, for both
-   * layers. A text area does not inherit these from the page, and a letter
-   * that stood a pixel apart in the two would show as a caret in the wrong
-   * place.
-   */
-  .sb-studio-editor,
-  .sb-studio-colours {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 1rem;
-    border: 0;
-    font: normal 0.84rem / 1.7 var(--sb-font-mono);
-    font-kerning: none;
-    font-variant-ligatures: none;
-    font-feature-settings: normal;
-    letter-spacing: normal;
-    word-spacing: normal;
-    text-align: start;
-    text-indent: 0;
-    text-transform: none;
-    text-rendering: auto;
-    tab-size: 2;
-    white-space: pre-wrap;
+    gap: 0.3rem;
+    max-block-size: 9.5rem;
+    overflow-y: auto;
     overflow-wrap: anywhere;
   }
 
-  .sb-studio-editor {
-    position: absolute;
-    inset: 0;
-    inline-size: 100%;
-    block-size: 100%;
-    overflow: hidden;
-    outline: 0;
-    resize: none;
-    background: transparent;
-    /* The letters are drawn by the layer above. The caret is this one's. */
-    color: transparent;
-    caret-color: var(--sb-text);
+  .sb-studio-found strong {
+    font-weight: 600;
   }
 
-  .sb-studio-editor::selection {
-    background: color-mix(in oklab, var(--sb-accent) 24%, transparent);
-    color: transparent;
+  .sb-studio-found [data-level='error'] strong {
+    color: var(--sb-danger);
   }
 
-  .sb-studio-colours {
-    position: relative;
-    pointer-events: none;
-    color: var(--sb-text);
+  .sb-studio-found [data-level='warning'] strong {
+    color: var(--sb-caution);
   }
 
-  .sb-studio-editor:disabled + .sb-studio-colours {
-    opacity: 0.55;
-  }
-
-  /* Colour only: a heavier or slanted letter can be wider, and the caret would drift from the text. */
-  .sbs-mark,
-  .sbs-meta {
+  .sb-studio-found [data-level='note'] strong,
+  .sb-studio-found span {
     color: var(--sb-muted);
   }
 
-  /* A palette's accent can be close to one of the colours below. The line under a heading does not depend on it. */
-  .sbs-heading {
-    color: var(--sb-accent);
-    text-decoration: underline;
-    text-decoration-thickness: 1px;
-    text-underline-offset: 0.3em;
+  .sb-studio-found span {
+    font-family: var(--sb-font-mono);
+    font-size: 0.92em;
   }
 
-  .sbs-key,
-  .sbs-tag,
-  .sbs-link {
-    color: var(--sb-note);
-  }
-
-  .sbs-code {
-    color: var(--sb-tip);
-  }
-
-  .sbs-strong,
-  .sbs-em {
-    color: var(--sb-caution);
+  /* The editor takes the room that is left in the panel and scrolls inside it. Its own rules are under "editor". */
+  .sb-studio-editor {
+    flex: 1;
+    min-block-size: 0;
+    background: var(--sb-surface);
   }
 
   .sb-studio-empty {
@@ -403,6 +350,11 @@
   .sb-studio-footer[data-state='error'],
   .sb-studio-footer[data-state='conflict'] {
     color: var(--sb-danger);
+  }
+
+  /* Why an image that was pasted or dropped was not taken. */
+  .sb-studio-footer .sb-studio-problem {
+    padding: 0 0 0.3rem;
   }
 
   .sb-studio-choices {
@@ -472,6 +424,77 @@
 }
 
 @layer shabd.overlays {
+  /* ───────────── editor ───────────── */
+
+  /*
+   * The frame of a code editor (src/client/editor). What is inside it is
+   * CodeMirror, whose rules are in editor/theme.ts: its stylesheet is not in
+   * a cascade layer, so nothing written here can answer it.
+   *
+   * The frame has no background. The editor's colours are held to their
+   * contrast against the page and the surface colour only, so whatever puts
+   * an editor on screen gives it one of those two.
+   */
+  .sb-editor {
+    --sb-editor-padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    color: var(--sb-text);
+    font-family: var(--sb-font-mono);
+    font-size: 0.84rem;
+    line-height: 1.7;
+    font-variant-ligatures: none;
+  }
+
+  .sb-editor:focus-within {
+    box-shadow: inset 0 0 0 2px var(--sb-accent-soft);
+  }
+
+  /* In a frame with a height of its own the editor fills it and scrolls; in one without, it is as tall as its text. */
+  .sb-editor-view,
+  .sb-editor-plain,
+  .sb-editor .cm-editor {
+    flex: 1;
+    min-block-size: 0;
+  }
+
+  .sb-editor-view {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sb-editor .cm-scroller,
+  .sb-editor-plain {
+    overflow: auto;
+  }
+
+  /* The text as it is, until CodeMirror has loaded. Laid out as CodeMirror lays it out, so that nothing moves when it takes over. */
+  .sb-editor-plain {
+    margin: 0;
+    padding: var(--sb-editor-padding);
+    font: inherit;
+    tab-size: 2;
+    white-space: break-spaces;
+    overflow-wrap: anywhere;
+  }
+
+  /* How to leave the editor by keyboard. It is said when the editor has focus, and its room is kept so that nothing moves then. */
+  .sb-editor-hint {
+    padding: 0 var(--sb-editor-padding) 0.45rem;
+    font-family: var(--sb-font-sans);
+    font-size: 0.72rem;
+    line-height: 1.4;
+    color: var(--sb-muted);
+    visibility: hidden;
+  }
+
+  .sb-editor:not([data-readonly]):focus-within .sb-editor-hint {
+    visibility: visible;
+  }
+}
+
+@layer shabd.overlays {
   /* ───────────── sandbox ───────────── */
 
   .sb-sandbox {
@@ -496,29 +519,11 @@
     border-block-start: var(--sb-line) solid var(--sb-border);
   }
 
+  /* The snippet's editor: the code editor (see "editor"), as tall as its text, on the surface the
+     pane is drawn on. Long lines wrap rather than hide behind a scrollbar in a narrow pane. */
   .sb-sandbox-editor {
-    display: block;
-    inline-size: 100%;
+    --sb-editor-padding: 0.95rem;
     min-block-size: 100%;
-    padding: 0.85rem 0.95rem;
-    border: 0;
-    outline: 0;
-    resize: none;
-    background: none;
-    color: var(--sb-text);
-    font-family: var(--sb-font-mono);
-    font-size: 0.84rem;
-    line-height: 1.65;
-    tab-size: 2;
-    /* Long lines wrap rather than hide behind a scrollbar in a narrow pane;
-       where supported, the field grows to fit what wrapping adds. */
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    field-sizing: content;
-  }
-
-  .sb-sandbox-editor:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--sb-accent-soft);
   }
 
   .sb-sandbox-result {
@@ -540,6 +545,23 @@
 
   .sb-sandbox-stage > :last-child {
     margin-block-end: 0;
+  }
+
+  /* An isolated snippet's frame fills the stage, and has the stage's padding inside it: what the
+     snippet draws up to its edge, a focus ring for one, is then not cut off by the frame. */
+  .sb-sandbox-stage[data-isolated] {
+    padding: 0;
+  }
+
+  .sb-sandbox-stage[data-isolated] .sb-sandbox-wait {
+    margin: 0;
+    padding: 1rem;
+  }
+
+  .sb-sandbox-frame {
+    display: block;
+    inline-size: 100%;
+    border: 0;
   }
 
   .sb-sandbox-wait {

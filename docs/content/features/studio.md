@@ -8,9 +8,48 @@ The Studio is an editor that opens beside the page you are reading. It is part o
 does not contain it.
 
 Open it with **Edit page** in the header. It shows the Markdown source of the current page. When you stop typing, it
-writes the file, and the page next to it updates.
+writes the file, and the page next to it updates. It can also make a new page, and rename or delete the one on
+screen.
 
 There is no preview pane. The page beside the editor is the real page, rendered from the file that was just saved.
+
+## The editor
+
+The editor is [CodeMirror](https://codemirror.net/). It colours a page's frontmatter and its Markdown, and the code
+inside a fence that names JavaScript, TypeScript, JSX, TSX, YAML or Markdown.
+
+Its colours are the theme's own. It is drawn in the same custom properties as the page, and only in the eight that
+[a test holds to a contrast floor](../configuration/theme.md#presets) in every preset. Switching between light and
+dark, or picking another palette from the theme menu, changes the editor with everything else.
+
+| Key | In the editor |
+| --- | --- |
+| <kbd>Tab</kbd> | Indents the line. <kbd>Shift</kbd> + <kbd>Tab</kbd> takes the indent back |
+| <kbd>Esc</kbd>, then <kbd>Tab</kbd> | Moves on to the next control. Tab alone cannot, because it indents. A line under the text says so while the editor has focus |
+| <kbd>Enter</kbd> | In a list or a quote, starts the next item |
+| <kbd>Ctrl</kbd> or <kbd>⌘</kbd> + <kbd>Z</kbd> | Undoes what you typed. Text that came from the file, or from another editor, is not undone |
+| <kbd>Ctrl</kbd> or <kbd>⌘</kbd> + <kbd>S</kbd> | Saves now |
+
+CodeMirror is downloaded the first time the Studio is opened, not with the page.
+
+### Images
+
+Paste an image into the editor, or drop one on it. The Studio saves the file beside the page and puts a Markdown
+image where the cursor was, or where the image was dropped:
+
+```md
+![](./screenshot.png)
+```
+
+The cursor is left between the square brackets, for the words that describe the picture to someone who cannot
+see it. Shabd bundles an image that a page refers to by a relative path, so the picture shows in the page beside
+the editor as soon as the page is saved, and is part of a build.
+
+- PNG, JPEG, GIF, WebP and AVIF are taken, up to 10 MB each. What a file is, is read from its first bytes, not
+  from its name.
+- The file is named after what it was called, in lower case, with hyphens where there was anything but a letter
+  or a digit, and with the extension of what it is: `Screen Shot 1.PNG` becomes `screen-shot-1.png`.
+- A name that is taken is not written over. The next one is used: `screen-shot-1-2.png`.
 
 ## Where the file is written
 
@@ -26,73 +65,56 @@ once, and remembers the folder for later visits. From then on the dev server has
 
 Either way the result is a normal file on disk. Your editor, `git diff` and everything else see the change.
 
-## The editor
-
-The editor is a text area. Typing, selecting, undo and input methods work as they do in any text area of your
-browser. On top of that it shows the source in colour and gives a few keys a meaning.
-
-The colours mark what a writer looks for: frontmatter keys, headings, emphasis, code, where a link goes, the tags of
-HTML and MDX, and the characters of the syntax itself. They are the theme's own colours, so they follow the palette
-and the light or dark mode of the page beside the editor. A code block is one colour; the language inside it is not
-coloured.
-
-| Key | What it does |
-| --- | --- |
-| <kbd>Tab</kbd> | Types two spaces. With several lines selected, moves them in |
-| <kbd>Shift</kbd> + <kbd>Tab</kbd> | Moves the line, or the selected lines, out |
-| <kbd>Enter</kbd> | Goes on with a list or a quote: the next bullet, the next number, an unticked task. On an item with nothing in it, ends the list. Any other line keeps its indentation |
-| <kbd>Ctrl</kbd> or <kbd>⌘</kbd> + <kbd>B</kbd> | Puts `**` around the selection, or takes it away |
-| <kbd>Ctrl</kbd> or <kbd>⌘</kbd> + <kbd>I</kbd> | The same with `_` |
-| <kbd>Esc</kbd>, then <kbd>Tab</kbd> | Leaves the editor with the keyboard. Tab alone would indent |
-
-Undo is the browser's own, and takes back what these keys did as well.
-
 ## Saving
 
 - A pause of a quarter of a second saves. <kbd>Ctrl</kbd> or <kbd>⌘</kbd> + <kbd>S</kbd> saves at once.
 - The line under the editor says when the save happened and how long the page took to update.
-- If the file changes on disk while the Studio has no unsaved edits, the editor follows the file.
+- If the file changes on disk while the Studio has no unsaved edits, the editor follows the file. Only the part
+  that changed is replaced, so the cursor stays where it was unless it was inside that part.
 - If the file changes on disk while you *do* have unsaved edits, the Studio stops and asks which version to keep.
+- A file whose lines end the way Windows writes them keeps those line endings.
 - A half-typed line can be invalid for a moment, for example a `layout:` name you have not finished. The page then
   shows what is wrong where its content would be, keeps its title and layout, and returns as soon as the line is
   valid. Nothing reloads and the editor stays open.
 
-## Adding, renaming and deleting pages
+## Making, renaming and deleting pages
 
-Under the Studio's header are three buttons. Each changes a file in the content folder.
+Three buttons under the Studio's header work on whole pages.
 
 | Button | What it does |
 | --- | --- |
-| **New page** | Asks for a path, creates the file, and opens the new page |
-| **Rename** | Asks for the new path, moves the file, and opens the page at its new address |
-| **Delete** | Asks once, removes the file from disk, and goes to the home page |
+| **New page** | Asks for a file in the content folder, such as `guide/new-page.md`, and makes it. `.md` is added if you leave it out, and folders that are missing are made. The page starts with a title taken from its file name, and the Studio goes to it |
+| **Rename** | Moves the file of the page on screen. What you had typed and not saved goes with it, and the Studio follows the page to its new address |
+| **Delete** | Asks first. Then it removes the file from disk and goes to the page before it in the sidebar |
 
-A path is written from the content folder, with forward slashes, and ends in `.md` or `.mdx`: `guide/new-page.md`.
-A new file holds a title made from its name and one line of text to replace.
+A name is refused while you type it if the file would not be a page: it would be outside the content folder, it
+does not end in `.md` or `.mdx`, a part of it starts with `_` or `.`, or a page already has the address it would
+get. Nothing is written over a file that is there.
 
-The Studio refuses a path that is taken, a path whose address another page already has, and a name that could not
-be a page, and says which it was. Each part of a path starts with a letter or a digit, and has only letters, digits,
-hyphens, underscores and dots.
+A page is not moved to another folder if it would not find there what it uses by a path relative to itself: an
+image beside it, shown as `./shot.png`, or a file that an `.mdx` page imports. The Studio moves the page and
+nothing else, and a page whose image is missing cannot be shown at all, so the Studio could not be opened on it
+again to mend the link. It says which files they are when you send the name. Move the page and those files
+together in your file manager, or keep the page in its folder, where any name will do.
 
-**Rename** is off while the page has edits that are not saved yet.
+While one of the three is under way the page stays on screen and the editor cannot be typed into, until the
+Studio has gone to the page that comes next.
 
-These three always go through the dev server, also when a folder is connected, because the dev server is what
-keeps `sidebar.yaml` in step.
+### What a rename leaves behind
 
-### What happens to sidebar.yaml
+A page's address comes from its file name, so a renamed page has a new address, and a deleted one has none. Links
+to the old address in other pages still point there. The Studio does not rewrite them.
 
-| After | The sidebar file |
-| --- | --- |
-| **New page** | Is not changed. The page appears in the sidebar where its folder is [generated](../configuration/sidebar.md#folders-you-did-not-mention). In a folder you list by hand, add a line for it |
-| **Rename** | Every entry that names the page names it under its new path. Nothing else in the file changes |
-| **Delete** | The page's entry is taken out, where it stands on lines of its own and is not the only entry of its list |
+It tells you about them. Before and after each of the three, it asks the dev server what
+[`shabd check`](../reference/cli.md) reports, and lists what was not reported before: a link that now leads
+nowhere, an entry in `sidebar.yaml` that names the old file, a redirect that led to the old address, a new page
+that the sidebar does not list.
 
-Where a deleted page's entry cannot be taken out that way, the file is left as it is and the Studio says that it
-still lists the page. The dev server's log names the line, as it does for
-[any entry that matches nothing](../configuration/sidebar.md#when-an-entry-matches-nothing).
-
-Links to the page from other pages are not rewritten. `shabd check` lists the ones that lead nowhere after a
-rename or a delete.
+After a rename it also offers to add a [redirect](../configuration/site.md#redirects) from the old address to the
+new one. That is one line more under `redirects:` in `shabd.config.yaml`. Nothing else in the file changes: your
+comments, your quoting and the order of your keys stay as they are, and the result is read back to make sure of
+it. Where a line cannot be put in like that, for example because the redirects are written between braces on one
+line, the Studio makes no offer and shows you the line to add yourself.
 
 ## Editing with someone else
 
@@ -103,6 +125,9 @@ rename or a delete.
 | `off` | Nobody |
 | `tabs` | Other tabs and windows of the same browser. The default |
 | `peers` | Another person's browser, directly, over WebRTC |
+
+A draft arrives as the whole page. The editor puts in only the part that differs from what it shows, so your
+cursor stays where it is.
 
 With `peers`, the Studio gets an **Edit together** section. One person creates an invite and sends it; the other
 pastes it and sends back the reply. The two codes are how the browsers find each other. After that, drafts travel
@@ -123,22 +148,63 @@ connection is possible.
 
 ## Is it safe to leave on?
 
-The Studio's write endpoint exists only in the dev server, and it is narrow on purpose:
+The Studio's endpoints exist only in the dev server, and they are narrow on purpose:
 
-- It only accepts requests from the docs site itself, and requires a token that only that site can read.
-- It can save, rename and delete only files that are already pages. The page is looked up by name.
-- It can create only a new `.md` or `.mdx` file inside the content folder, and never writes over a file that is
-  there. The same check applies to the path a page is renamed to.
-- The only other file it changes is `sidebar.yaml`, and only where that names the page.
+- They only accept requests from the docs site itself, and require a token that only that site can read.
+- A page that exists is looked up by its name. Saving, renaming and deleting take no path from the request for the
+  file they act on, so they cannot reach a file that is not a page.
+- A new page, and the new name of a renamed one, do come as a path. It is refused unless it names an `.md` or
+  `.mdx` file inside the content folder, with no part that is `..` or that starts with `_` or `.`. The folder it
+  names is then followed through any symbolic link, and has to be inside the content folder still.
+- A new file is made in a way that fails if anything has that name already, a symbolic link included. Nothing is
+  written over, and a page is not deleted if the file has changed since the Studio last read it.
+- An image is saved in the folder of a page that exists, and nowhere else. Nothing that is sent with it chooses
+  its folder, its name or its kind: the name is made by the dev server from letters, digits and hyphens, the
+  extension follows from what the first bytes say the file is, and a file that is not one of the five kinds of
+  image, or is larger than 10 MB, is refused.
+- One file outside the content folder can change: `shabd.config.yaml` gains a line when you accept the offer of a
+  redirect. The redirect must lead from an address that has no page to one that has.
 
-Set `features.studio: false` to remove the Studio and its endpoint.
+In a connected folder the browser does this work, and holds a name and an image to the same rules before it
+touches a file. It cannot make a file in one step that fails if the name is taken: it looks first and then writes.
+
+Set `features.studio: false` to remove the Studio and its endpoints.
 
 ## Limits
 
-- A deleted file is gone from disk. The Studio keeps no copy; Git is how you get it back.
-- A folder left empty by a rename or a delete is not removed.
-- The editor has no autocomplete and no line numbers.
-- The colours are a reading aid. They come from a small reader of Markdown that goes line by line, not from the
-  compiler that makes the page. It follows frontmatter, code blocks and comments over as many lines as they have;
-  a tag whose attributes go on to the next line is coloured on its first line only. Where the colours and the page
-  disagree, the page is right.
+- A rename or a delete does not change other pages, the sidebar file or existing redirects. What it broke is
+  listed, and mending it is yours to do.
+- A deleted page is gone from disk. The Studio keeps no copy, and its undo does not bring a file back: that is
+  what version control is for.
+- It renames one page at a time and does not move or rename folders. A folder left empty stays.
+- An image beside a page is not moved, renamed or deleted with the page. A page that uses one stays in its
+  folder, as said above, and the images of a deleted page stay where they were. What a page would not find from
+  another folder is worked out from its imports: an image written as an HTML tag in an `.mdx` page, with a path
+  in `src`, is not one of them and is not noticed.
+- For a moment while a page is renamed or deleted, its breadcrumbs, its previous and next links and its mark in
+  the sidebar are gone: the page is still on screen, and the site no longer lists it at its old address. That
+  lasts as long as the browser takes to fetch and draw the page that comes next: about a hundredth of a second
+  for a short page, and most of a second for a very long one.
+- A rename that changes only capitals is refused on a disk that does not tell them apart, such as the usual
+  one on macOS and Windows: to the disk the new name is taken.
+- The list of what `shabd check` reports comes from the dev server, which also shows drafts. `shabd check` itself
+  leaves drafts out, so the two can differ for a link to a draft.
+- With a connected folder, the list and the redirect still come from the dev server. The config is not in the
+  content folder, so the browser could not write to it.
+- Making, renaming and deleting through a connected folder is tested with a folder in the browser's private file
+  system standing in for a real one, because a test cannot click the folder picker.
+- An SVG is not taken as an image. It is text, it can hold a script, and nothing in its first bytes tells one
+  from any other text. Put it in the folder yourself. HEIC pictures are not taken either: browsers do not show
+  them.
+- A picture is pasted only when it was copied as a picture: a screenshot, or "Copy image" in a browser. What is
+  copied in a file manager or a spreadsheet arrives with text, and the text is what is pasted, as before. Drop
+  the file instead.
+- An image is saved as it is, at the size it has. When its link is deleted from the page, the file stays.
+- Pasting and dropping are tested with events that the test makes and attaches files to, because a test cannot
+  use the real clipboard of every browser or drag a file in from outside the page.
+- The editor has no autocomplete and no search of its own. The browser's find only sees the lines near the ones
+  on screen, because the editor draws no more of a long page than that.
+- Code in a fence is coloured for the six languages named above and no others. An `.mdx` page is coloured as
+  Markdown: its JSX as the HTML it resembles, and its `import` and `export` lines not at all.
+- The editor has been driven by keyboard and mouse in Chromium, Firefox and WebKit. It has not been tried with a
+  screen reader, on a phone, or with an input method such as the ones for Chinese and Japanese.

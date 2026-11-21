@@ -147,8 +147,17 @@
     line-height: 1.5;
     white-space: nowrap;
     vertical-align: middle;
-    color: var(--sb-badge-color, var(--sb-muted));
-    background: color-mix(in oklab, var(--sb-badge-color, var(--sb-muted)) 13%, transparent);
+    /*
+     * A badge is a word in its colour on a tint of the same colour. The
+     * colour was chosen to be read on the page, and on its own tint it is
+     * read less well: in some palettes less than 4.5:1. So a fifth of the
+     * page's text colour is mixed into the word. Both numbers are also in
+     * shared/presets.ts (BADGE_LABEL, BADGE_TINT), where a test holds every
+     * palette to them.
+     */
+    --sb-badge-label: color-mix(in srgb, var(--sb-badge-color, var(--sb-muted)) 80%, var(--sb-text));
+    color: var(--sb-badge-label);
+    background: color-mix(in srgb, var(--sb-badge-color, var(--sb-muted)) 13%, transparent);
   }
 
   .sb-badge[data-variant='note'] {

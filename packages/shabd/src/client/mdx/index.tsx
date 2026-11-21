@@ -11,17 +11,27 @@
 import { lazy, Suspense, useSyncExternalStore, type ComponentProps, type ComponentType } from 'react'
 import { useSite } from '../app/store.js'
 import { Badge } from '../ui/Badge.js'
-import { Link, useHref } from '../ui/Link.js'
+import { useHref } from '../ui/href.js'
+import { Link } from '../ui/Link.js'
+import { Accordion } from './Accordion.js'
 import { Callout } from './Callout.js'
 import { Card, CardGrid } from './Card.js'
 import { CodeBlock } from './CodeBlock.js'
+import { FileTree } from './FileTree.js'
 import { heading } from './Heading.js'
+import { Steps } from './Steps.js'
 import { Tab, Tabs } from './Tabs.js'
 
-/** Wide tables scroll inside their own box instead of stretching the page. */
+/**
+ * Wide tables scroll inside their own box instead of stretching the page.
+ * The box can take the keyboard's focus, so that it can be scrolled without
+ * a pointer, and so it has a name. It is a group and not a region: a region
+ * is a landmark of the page, and a page with several tables would have
+ * several landmarks called the same.
+ */
 function Table(props: ComponentProps<'table'>) {
   return (
-    <div className="sb-table-scroll" tabIndex={0} role="region" aria-label="Table">
+    <div className="sb-table-scroll" tabIndex={0} role="group" aria-label="Table">
       <table {...props} />
     </div>
   )
@@ -47,7 +57,7 @@ function useHydrated(): boolean {
   )
 }
 
-function Sandbox(props: { code: string; lang?: string; title?: string; group?: string }) {
+function Sandbox(props: { code: string; lang?: string; title?: string; group?: string; isolated?: boolean }) {
   const { features } = useSite()
   const hydrated = useHydrated()
   const fallback = (
@@ -66,6 +76,27 @@ function Sandbox(props: { code: string; lang?: string; title?: string; group?: s
   )
 }
 
+// Mermaid is large, so it loads only on pages that have a diagram.
+const LazyMermaid = lazy(() => import('../mermaid/Mermaid.js'))
+
+function Mermaid(props: { code: string }) {
+  const hydrated = useHydrated()
+  const source = (
+    <figure className="sb-mermaid" data-pending="">
+      <pre className="sb-mermaid-source">
+        <code>{props.code}</code>
+      </pre>
+    </figure>
+  )
+  // A diagram is drawn in the browser. The prerendered page carries its source, for the reason a sandbox does.
+  if (!hydrated) return source
+  return (
+    <Suspense fallback={source}>
+      <LazyMermaid {...props} />
+    </Suspense>
+  )
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const components: Record<string, ComponentType<any>> = {
   h1: heading(1),
@@ -80,9 +111,13 @@ export const components: Record<string, ComponentType<any>> = {
   img: Image,
   Callout,
   Sandbox,
+  Mermaid,
   Badge,
   Card,
   CardGrid,
   Tabs,
   Tab,
+  Steps,
+  FileTree,
+  Accordion,
 }

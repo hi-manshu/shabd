@@ -94,15 +94,125 @@ In scope without importing anything:
 - `useShared`
 - Every component from `components:` in the config. `Counter` above is one
 
-`import` works for `react` and for Shabd's own client entry, written `shabd/client` or `@himanshoe/shabd/client`. Any other
-import is refused with a message that says so.
+`import` works for `react` and for Shabd's own client entry, written `shabd/client` or `@himanshoe/shabd/client`.
+What else a snippet may import is for the site to say.
+
+## Modules a snippet may import
+
+Name them under `features.sandbox.modules`: packages the site has installed, and files of its own.
+
+```yaml title="shabd.config.yaml"
+features:
+  sandbox:
+    modules:
+      - date-fns # a package
+      - date-fns/locale # a path inside one
+      - { name: docs/units, file: ./components/units.ts } # a file of the site's, under a name
+```
+
+A snippet imports each by the name written there. This one imports a file of this site, which the config of these
+docs names `docs/units`:
+
+```tsx live
+import { bytes } from 'docs/units'
+
+export default function Size() {
+  const [size, setSize] = useShared('size', 1536)
+  const set = (event) => setSize(Number(event.target.value))
+  return (
+    <p>
+      <label>
+        Size <input type="range" max="5000000" step="512" value={size} onChange={set} />
+      </label>{' '}
+      <output>{bytes(size)}</output>
+    </p>
+  )
+}
+```
+
+- A module is fetched when a snippet on the page imports it, and not before. A page with no such snippet does not
+  pay for it, and a reader who types an `import` of one into a snippet gets it then.
+- A package has to be installed where the site is, for example with `npm install date-fns`. A package that is not
+  installed, or a file that is not there, is an error when the config loads, and the error says which line names it.
+- A file is bundled like the rest of the site, so it can import other files and packages of its own.
+- `react`, `shabd/client` and `@himanshoe/shabd/client` are taken, and cannot be given another meaning.
+- Any other import is refused, with a message that lists the names there are.
+
+## A snippet in a frame of its own
+
+A snippet runs in the page, and can do what the page can. Add `isolated` to the fence, and it runs in a frame that
+can reach nothing of the page:
+
+````md
+```tsx live isolated
+```
+````
+
+```tsx live isolated
+export default function Apart() {
+  const [count, setCount] = useShared('count', 0)
+  let title = 'out of reach'
+  try {
+    title = window.parent.document.title
+  } catch {}
+  return (
+    <p>
+      <button className="sb-button" onClick={() => setCount(count + 1)}>
+        Clicked {count} times
+      </button>{' '}
+      The title of this page, asked for from in here: {title}.
+    </p>
+  )
+}
+```
+
+The frame is allowed scripts and nothing else. It has an origin of its own, so the snippet cannot read the page,
+its cookies or what the site has stored in the browser, and it cannot send the reader to another address, open a
+window or post a form.
+
+It still behaves like a sandbox. The code is edited in the page, an error is shown under the result, and
+`useShared` keeps its values in the page: the state panel lists them, and an isolated snippet shares them with
+the other sandboxes of its group.
+
+What a snippet has in a frame:
+
+- React and its hooks, and `useShared`.
+- The modules named under `features.sandbox.modules`, with the stylesheets they import.
+- How the page looks: its stylesheets, its theme, and the fonts the page has loaded. It follows the reader when
+  they change the colour mode or pick another theme.
+
+What it does not have:
+
+- The components of `components:` by name, and Shabd's own, such as `Callout` and `Tabs`. Those belong to the page.
+  To use a component of yours, name its file under `modules` and import it.
+- The rest of `shabd/client`. In a frame it has `useShared` and nothing more, so a file that takes `Link` or
+  `usePage` from it will not work there.
+
+Things to know about frames:
+
+- The frame runs one script, which holds a copy of React and every module under `modules`. It is built for a site
+  that has an isolated snippet and for no other, and a page fetches it when it first shows one.
+- A shared value crosses between the page and the frame as a copy. A value that cannot be copied, a function for
+  one, stays where it was set.
+- A link in the frame opens nothing, and `alert` shows nothing: the frame is not allowed either.
+- A font is given to the frame once the page itself has loaded it. Text in a weight or a script that the page
+  does not use is drawn in the reader's own font.
+- A frame keeps a snippet away from the page. It does not keep it off the network: a snippet can still fetch
+  whatever any page may fetch.
 
 ## Things to know
 
 - Snippets are TypeScript, but they are not type-checked. Types are removed and the code runs.
-- The compiler is downloaded when a page with a sandbox is opened, not before.
-- A snippet runs in the page, with the page's permissions, like any other script on it. A site with a
-  Content-Security-Policy that forbids `unsafe-eval` cannot run sandboxes.
+- The editor and the compiler are downloaded when a page with a sandbox is opened, not before. Until the editor
+  arrives the code is shown as plain text.
+- The code is coloured as it is typed, in the colours of the theme. In the editor Tab indents, so to move on by
+  keyboard press Esc, then Tab. The editor says so while it has the focus.
+- A snippet runs in the page, with the page's permissions, like any other script on it, unless it is
+  [`isolated`](#a-snippet-in-a-frame-of-its-own). A site with a Content-Security-Policy that forbids `unsafe-eval`
+  cannot run sandboxes, in the page or in a frame.
 - An error in a snippet is shown under its result. The rest of the page carries on.
+- [`shabd check`](../reference/cli.md#what-check-looks-for) and a build read every live snippet as it is written,
+  and report one that cannot be made into a script, or that imports a name the site has not given, with its page and
+  line. They do not run the snippet, so a mistake that only shows when it runs is not found.
 
 Set `features.sandbox: false` to render `live` fences as ordinary code blocks.

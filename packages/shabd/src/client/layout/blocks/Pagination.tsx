@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
 import { flattenSidebar } from '../../../shared/sidebar.js'
 import { usePage } from '../../app/router.js'
-import { useSite } from '../../app/store.js'
-import { useHref } from '../../ui/Link.js'
+import { useSidebar } from '../../app/sidebar.js'
+import { useHref } from '../../ui/href.js'
 
-/** Previous and next page, in sidebar order. */
+/** Previous and next page, in the order of the sidebar the page is shown with. */
 export function Pagination() {
-  const { sidebar } = useSite()
+  const sidebar = useSidebar()
   const { path } = usePage()
   const href = useHref()
   const pages = useMemo(() => flattenSidebar(sidebar), [sidebar])

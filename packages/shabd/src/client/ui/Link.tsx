@@ -1,14 +1,8 @@
 import type { ComponentProps } from 'react'
-import { isExternal, withBase } from '../../shared/paths.js'
-import { useSite } from '../app/store.js'
+import { isExternal } from '../../shared/paths.js'
+import { useHref } from './href.js'
 
 const WEB_LINK = /^(?:https?:)?\/\//i
-
-/** Turn a route path into an href under the site's base path. */
-export function useHref(): (path: string) => string {
-  const base = useSite().site.base
-  return (path) => withBase(base, path)
-}
 
 /**
  * The link every Markdown `[text](href)` renders as. Internal paths get the

@@ -53,6 +53,8 @@ export interface PageMeta {
   path: string
   title: string
   description: string
+  /** The page was made by Shabd, from an OpenAPI description: there is no file of it to edit. */
+  generated?: true
 }
 
 /** A section of a page, as indexed for search and served to AI agents. */
@@ -72,6 +74,8 @@ export type LayoutWidth = 'content' | 'wide' | 'full'
 export interface ResolvedLayout {
   name: string
   width: LayoutWidth
+  /** Pages of this layout are compiled with their code beside their prose. */
+  split: boolean
   regions: Partial<Record<RegionName, BlockRef[]>>
 }
 
@@ -91,14 +95,22 @@ export interface PaletteChoice {
 }
 
 export interface SiteData {
-  site: ShabdConfig['site']
+  /** `site:` from the config, without what only the HTML document needs. */
+  site: Omit<ShabdConfig['site'], 'head'>
   colorMode: ShabdConfig['theme']['colorMode']
   /** The site's own palette first. Empty when `theme.picker` is off. */
   palettes: PaletteChoice[]
   defaults: ShabdConfig['defaults']
   features: ShabdConfig['features']
   layouts: Record<string, ResolvedLayout>
+  /** The sidebar. On a site with several, the one for pages that are in none of `sidebars`. */
   sidebar: SidebarNode[]
+  /**
+   * Parts of the site that have a sidebar of their own, longest path first,
+   * so that the first one a page is under is its own. Left out on a site
+   * with one sidebar.
+   */
+  sidebars?: { prefix: string; sidebar: SidebarNode[] }[]
   /** Keyed by route path. */
   pages: Record<string, PageMeta>
   /** Content directory relative to the site root, used to build edit links. */
@@ -107,12 +119,26 @@ export interface SiteData {
   themeCss?: string
 }
 
+/** The day a page was last changed. */
+export interface PageUpdated {
+  /** As a machine reads it: `2026-11-17`. */
+  day: string
+  /**
+   * As a reader of the site's language reads it: "17 November 2026". It is
+   * written out when the page is compiled, so that the server and every
+   * browser show the same words.
+   */
+  text: string
+}
+
 /** What a compiled .md/.mdx module exports besides its default component. */
 export interface PageExports {
   frontmatter: Frontmatter
   toc: TocEntry[]
   /** The colours of the page's code tokens, as a stylesheet. */
   codeCss: string
+  /** Left out when the site does not show the day, or has none for this page. */
+  updated?: PageUpdated
 }
 
 /** What the prerender bundle returns for one route. */

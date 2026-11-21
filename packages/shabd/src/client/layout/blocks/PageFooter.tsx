@@ -2,19 +2,32 @@ import { Icon } from '../../app/icons.js'
 import { usePage } from '../../app/router.js'
 import { useSite } from '../../app/store.js'
 
-/** "Edit this page", linking to the file in the repository named in the config. */
+/**
+ * What a reader may want to know at the end of a page: where to change it
+ * ("Edit this page", linking to the file in the repository named in the
+ * config) and when it was last changed. Either can be missing; with neither,
+ * the block draws nothing.
+ */
 export function PageFooter() {
   const { site, defaults, contentDir } = useSite()
-  const { id, frontmatter } = usePage()
+  const { id, frontmatter, updated } = usePage()
   const repo = site.repo
-  if (!repo || !id || !(frontmatter.editLink ?? defaults.editLink)) return null
-  const file = [repo.dir, contentDir, id].filter(Boolean).join('/')
+  const editable = repo && id && (frontmatter.editLink ?? defaults.editLink)
+  if (!editable && !updated) return null
+  const file = [repo?.dir, contentDir, id].filter(Boolean).join('/')
   return (
     <footer className="sb-page-footer">
-      <a href={`${repo.url.replace(/\/$/, '')}/edit/${repo.branch}/${file}`} target="_blank" rel="noreferrer">
-        <Icon name="edit" size={15} />
-        Edit this page
-      </a>
+      {editable && (
+        <a href={`${repo.url.replace(/\/$/, '')}/edit/${repo.branch}/${file}`} target="_blank" rel="noreferrer">
+          <Icon name="edit" size={15} />
+          Edit this page
+        </a>
+      )}
+      {updated && (
+        <p className="sb-page-updated">
+          Last updated <time dateTime={updated.day}>{updated.text}</time>
+        </p>
+      )}
     </footer>
   )
 }

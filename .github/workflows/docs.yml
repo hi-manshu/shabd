@@ -24,7 +24,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # The whole history: each page shows the day of its last commit, which a shallow clone does not have.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
