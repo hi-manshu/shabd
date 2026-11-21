@@ -1,7 +1,7 @@
 # Roadmap
 
-Three parts: where the project lives and what is left to set up there, where version 0.1 stands, and what to build
-next.
+Four parts: where the project lives and what is left to set up there, where version 0.1 stands, what has been
+built since on a branch, and what to build next.
 
 ## Part 1: Where the project lives
 
@@ -107,72 +107,132 @@ Not yet checked:
 - The MCP handler on a serverless or edge host.
 - Sites with thousands of real pages.
 
-## Part 3: What comes next
+## Part 3: Built since 0.1, on a branch
+
+Everything in this part is on the branch `worktree-feature-buildout`. None of it is released, none of it is on
+`main`, and nothing was pushed. Each row was committed when its tests passed on one machine (macOS 26, Node 22.16).
+GitHub's machines have not run any of it.
+
+| Area | State |
+| --- | --- |
+| API pages: a form that sends the request ("Try it") | Built, tested in three browser engines |
+| Pages made from an OpenAPI description (`openapi:`) | Built, tested in three browser engines. The docs describe their own files this way |
+| Search: the passage a result was found in, words typed nearly right, and Chinese, Japanese and Thai by keyword | Built, tested |
+| Search: vectors compared outside SQL in the SQLite store, and the embedding model served by the site | Built, tested with the real model |
+| MCP: adapters for Cloudflare, Vercel and Netlify, written by `shabd build --adapter <name>` | Built, with unit tests of what each writes. Not deployed to any of the three |
+| MCP: search by meaning behind `shabd preview`, the dev route and stdio | Built, tested |
+| A header with ink of its own (`theme.headerText`), which the Windows XP preset uses for a blue bar | Built, tested in three browser engines |
+| Type declarations for `shabd/client` | Built. A site's own type check follows them |
+| Lighter pages on a site with a theme menu | Built. The colours of code under the themes a reader has to pick are in one stylesheet, fetched when one is picked. On the docs site the page with the most code went from 98 KB of HTML to 61 KB |
+| A second look at a file that is saved twice in quick succession | Built, tested on macOS. The fault it answers was seen on Linux, where it has not been run |
+| Accessibility: a pass with a checker (axe) and with the keyboard | Built into the browser tests, with what it found fixed. See below |
+| Reading a built site offline (`features.offline`) | Built, tested in three browser engines; without a connection in Chromium and WebKit only |
+| `shabd dev` on a site with a base | Mended. Such a site showed an empty page: it had done so since the first commit. A test now starts the dev server on one |
+| Studio: a code editor, making, renaming and deleting pages, and pasted images | Built, tested in three browser engines |
+| Sandboxes: modules named in the config, a frame of its own for a snippet, colours in the editor | Built, tested in three browser engines |
+| `shabd check`: a live snippet that cannot run, or that imports what the site has not named | Built, tested |
+| A benchmark for large sites (`npm run bench`) | Built. Its numbers are below |
+
+### What the accessibility pass found
+
+All of it is fixed, and each has a test:
+
+- A badge's word had too little contrast with the tint behind it, in 74 places across the presets.
+- The search dialog: its field had no name, the number of results was not announced, and focus was lost when the
+  dialog closed.
+- Tabs did not answer Home and End, and a panel could not be reached with Tab.
+- On a small screen, what was under the open sidebar panel could still be reached with the keyboard, and Escape
+  did not close the panel.
+- The wrapper that lets a wide table scroll sideways had no role.
+- The frame of an isolated snippet had no colour of its own behind its text.
+
+It was a checker and a keyboard. Nobody has listened to the site with a screen reader.
+
+### Numbers from the benchmark
+
+On an Apple M2 Pro with 10 cores and 16 GB, Node 22.16, while other work was running on the machine. The made-up
+sites are `npm run bench`; the third column is 5,001 pages of MDN's content.
+
+| | 1,000 pages, made up | 5,000 pages, made up | 5,001 pages of MDN |
+| --- | --- | --- | --- |
+| Words | 848,000 | 4.3 million | 3.6 million |
+| Build | 16 s, 1.4 GB of memory | 128 s, 2.7 GB | 154 s, 3.8 GB |
+| Search index | 5.8 MB (1.1 MB compressed), 7,275 sections | 29.6 MB (5.7 MB), 37,089 sections | 30.4 MB (6.2 MB), 51,024 sections |
+| A build with nothing changed | 5.7 s | 50 to 65 s | 66 s |
+| `shabd check` | 0.36 s | 2.2 s | 3.0 s |
+| Dev server listening | 0.18 s | 0.52 s | 1.2 s |
+| A saved edit on screen | 43 ms | about 80 ms | not measured |
+| The first search, then each one after | 0.84 s, then 27 ms | 2.1 s, then 30 ms | not measured |
+
+The benchmark found faults that are fixed. The sidebars took time that grew with the square of the number of
+pages. The list of pages was made again each time it was asked for. And a folder that holds only its own index
+page became a group of one in the sidebar: on MDN's layout, where every page is such a folder, that made the HTML
+of 1,001 pages 224 MB, and it is 71 MB now. At 5,000 pages `shabd check` went from 6.7 s to 2.2 s, and the dev
+server listens after 0.52 s where it took 5.2 s.
+
+What it found that is not fixed:
+
+- Pages are compiled on one core. At 5,000 pages that is about 59 s of the 128.
+- Every reader is sent the data of the whole site. At 5,000 pages it is 2.5 MB (436 KB compressed) in the first
+  script.
+- The bundler's time grows faster than the number of pages, and most of the memory is the bundler's.
+
+### What has been checked, and what has not
+
+- 708 unit and integration tests pass.
+- 427 browser tests pass in Playwright's Chromium, Firefox and WebKit, on the last commit of the branch. 41 more
+  are skipped: where an engine lacks what a test needs, and the tests that belong to a variation that was not
+  switched on for that run.
+- The four variations of the browser tests pass on the same commit: the whole suite with the search index in
+  SQLite (436 pass, 32 skipped), semantic search with the real embedding model (6 pass, 6 skipped), the same with
+  the model served by the site (12 pass), and reading offline (10 pass, 2 skipped in Firefox).
+- The docs site builds and passes `shabd check` with every feature above switched on that it can use.
+
+Not checked:
+
+- Everything under "Not yet checked" in Part 2, except sites with thousands of pages.
+- The three adapters on their hosts.
+- The second look at a file, on Linux.
+- Reading offline in Firefox without a connection. The Firefox that the tests drive leaves a service worker its
+  connection, so the two tests that cut it are skipped there.
+- Firefox now and then warns that the layout of an isolated snippet's frame was forced before the frame had loaded,
+  on a page that also has a code editor. Nothing was seen to be wrong, and what asks for the layout was not found.
+- In the Studio: an image is not moved, renamed or deleted with its page; pasting and dropping are tested with
+  events the test makes, not with the real clipboard or a real drag; and while a page is renamed its breadcrumbs
+  and its mark in the sidebar are gone for as long as the next page takes to draw.
+
+## Part 4: What comes next
 
 ### 0.2: Make what exists dependable
 
 - Run the tests on Windows and macOS on GitHub. They run on Linux there today.
-- On Linux, a file saved twice within 50 ms is seen once: the dev server's file watcher drops the second change.
-  An editor that saves in two writes could leave the server one save behind. Reading the file again a moment
-  after each change would close that. It was found because a test did exactly this.
-- A setting for the colour of the header's text, so that a theme can have a dark header. The Windows XP theme
-  would use it for a blue taskbar.
+- Run this branch's tests on GitHub at all, and the second look at a file on Linux.
 - Try the real browsers by hand, Safari above all. WebKit under test did not offer its private file system to the
-  search worker; whether Safari does needs checking.
+  search worker; whether Safari does needs checking. So do frosted panels in Firefox and Safari as people install
+  them, and the logo's animation under "Reduce motion" in Safari.
 - Peer editing between two machines on different networks.
-- An accessibility pass: the sidebar panel on small screens, the search dialog, tabs.
-- A benchmark with 1,000 and 5,000 real pages: startup, build time, index size. The design scans and holds every
-  page in memory, which is fine for hundreds and unmeasured beyond. The search stores have been measured on their
-  own, up to 20,000 synthetic sections.
-- Frosted panels in real browsers. The Firefox and WebKit builds the tests drive do not blur what is behind a
-  translucent header or sidebar; Chromium does. The themes are readable either way, which the contrast test
-  checks, but whether Firefox and Safari as people install them blur it has not been looked at.
-- The logo's animation under "Reduce motion" in Safari. It was checked in Chromium and Firefox.
-- Lighter pages on a site with a theme menu. Each page carries the colours of its own code for every syntax theme
-  the menu can reach, in its HTML and again in its script. On the docs site, which offers all 23 presets, that is
-  about 39 KB in each on the page with the most code. The themes a reader has to pick could live in one shared
-  stylesheet, fetched when one is picked; for the docs site it would be an estimated 78 KB, fetched once.
-- Type declarations for `shabd/client`. It ships as TypeScript source today, which a site's own type check cannot
-  follow into the generated `virtual:` modules.
+- The adapters for Cloudflare, Vercel and Netlify, each on its host.
+- Listen to the site with a screen reader.
+- From the benchmark: compile pages on more than one core, and send a reader the part of the site's data that a
+  page needs.
 - Keep React Fast Refresh working while editing the theme's own source. A few client modules export both components
   and helpers, which forces a page reload when they change. This affects contributors, not site authors.
 
 ### 0.3: Finish the four headline features
 
-**Search**
+Search, MCP and the sandboxes have what was listed for them. What is left is in the Studio:
 
-- Serve the embedding model from the site, so nothing is fetched from Hugging Face.
-- In the SQLite store, compare vectors outside SQL. Semantic queries took 72 ms at 20,000 sections against 19 ms in
-  the memory store, because each row crosses from SQLite into JavaScript.
-- Word segmentation for Chinese, Japanese and Thai keyword search.
-
-**MCP**
-
-- Adapters for Cloudflare, Vercel and Netlify, written by `shabd build --adapter <name>`.
-- Semantic search behind the endpoint where the host can afford the model.
-
-**Studio**
-
-- A real code editor in place of the text area.
-- Create, rename and delete pages. Paste images.
 - A CRDT (Yjs) for drafts, so two people can type at once. Today the newest draft replaces the other.
 - Signalling that does not need two codes pasted by hand.
 
-**Sandboxes**
-
-- Syntax colours in the editor.
-- An option to run a snippet in an isolated frame.
-- More modules to import, declared in the config.
-
 ### Later
 
-- Translations and versioned docs
-- More than one sidebar, chosen by section
-- `trailingSlash` and `.html` output options
-- Conditions on layout blocks, and a two-column `api` layout with prose beside code
-- Pages generated from an OpenAPI file
-- Remark and rehype plugins named in YAML
-- "Last updated" from Git history, an RSS feed, social images
+- Translations and versioned docs.
+- A place to try a theme's tokens and see their contrast, before they are written to the config.
+
+The rest of what stood here is built: more than one sidebar chosen by section, addresses with a trailing slash or
+`.html`, conditions on layout blocks and a two-column `api` layout, pages made from an OpenAPI file, remark and
+rehype plugins named in YAML, and "last updated" from Git history, an RSS feed and social pictures.
 
 ### 1.0
 
