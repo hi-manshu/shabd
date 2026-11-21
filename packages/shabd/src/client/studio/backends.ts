@@ -9,7 +9,13 @@
  *
  * Either way the write lands in the real file, the dev server notices, and
  * the page hot-updates: the "preview" is the actual page.
+ *
+ * Both can also make a page, move one and delete one. The dev server checks
+ * the path it is sent (src/node/vite/studio-files.ts). In a connected folder
+ * there is nobody else to check, so the folder backend holds every path to
+ * the same rule before it touches a file.
  */
+import { pagePathProblem } from '../../shared/page-path.js'
 import { withBase } from '../../shared/paths.js'
 import { siteStore } from '../app/store.js'
 
@@ -35,17 +41,87 @@ export interface StudioBackend {
   read(id: string): Promise<SourceFile>
   /** Throws ConflictError if the file no longer matches `baseVersion`. */
   write(id: string, source: string, baseVersion: string): Promise<SourceFile>
+  /** Make a page. Throws if the path cannot be a page's, or a file is already there. */
+  create(id: string, source: string): Promise<void>
+  /** Move a page's file to `to`. Throws if that path cannot be a page's, or a file is already there. */
+  rename(id: string, to: string): Promise<void>
+  /** Delete a page's file. Throws if the file no longer matches `baseVersion`: it is not what the Studio showed. */
+  remove(id: string, baseVersion: string): Promise<void>
 }
 
 /* ───────────────────────── dev-server backend ────────────────────────── */
 
 const endpoint = (path: string) => withBase(siteStore.get().site.base, `/_shabd/studio/${path}`)
 
+let session: Promise<Record<string, string>> | undefined
+
+/**
+ * What every request to the Studio's endpoints carries: the token that shows
+ * it comes from a page of this site. Asked for once. A connected folder
+ * writes the files itself, but what the site as a whole looks like is still
+ * the dev server's to say, so the token is needed with either backend.
+ */
+function serverHeaders(): Promise<Record<string, string>> {
+  session ??= fetch(endpoint('session'))
+    .then(async (response) => {
+      if (!response.ok) throw new Error('The dev server did not start a Studio session.')
+      const { token } = (await response.json()) as { token: string }
+      return { 'content-type': 'application/json', 'x-shabd-studio': token }
+    })
+    .catch((error: unknown) => {
+      // Not kept, so that the next request asks again.
+      session = undefined
+      throw error
+    })
+  return session
+}
+
+/** Send JSON to an endpoint and read JSON back. A refusal is thrown in the server's own words. */
+async function ask<Answer>(path: string, method: string, body?: unknown): Promise<Answer> {
+  const response = await fetch(endpoint(path), {
+    method,
+    headers: await serverHeaders(),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  })
+  const answer = (await response.json()) as Answer & { error?: string }
+  if (!response.ok) throw new Error(answer.error ?? 'The dev server refused the request.')
+  return answer
+}
+
+/** One line of what `shabd check` reports. */
+export interface CheckProblem {
+  level: 'error' | 'warning' | 'note'
+  /** Relative to the site's folder. */
+  file: string
+  line?: number
+  message: string
+}
+
+/** What `shabd check` would report as the files are now. The dev server compiles every page to answer. */
+export async function checkSite(): Promise<CheckProblem[]> {
+  return (await ask<{ problems: CheckProblem[] }>('check', 'GET')).problems
+}
+
+export interface RedirectOffer {
+  /** False when the line cannot be put into the config without rewriting part of it. */
+  possible: boolean
+  /** The line itself, to add by hand when it cannot be added for the author. */
+  line: string
+  reason?: string
+}
+
+/** Can a redirect from an address that a page has left be added to shabd.config.yaml? */
+export function redirectOffer(from: string, to: string): Promise<RedirectOffer> {
+  return ask(`redirect?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, 'GET')
+}
+
+/** Add it. The config is outside the content folder, so this goes through the dev server with either backend. */
+export async function addRedirect(from: string, to: string): Promise<void> {
+  await ask('redirect', 'POST', { from, to })
+}
+
 export async function connectServer(): Promise<StudioBackend> {
-  const session = await fetch(endpoint('session'))
-  if (!session.ok) throw new Error('The dev server did not start a Studio session.')
-  const { token } = (await session.json()) as { token: string }
-  const headers = { 'content-type': 'application/json', 'x-shabd-studio': token }
+  const headers = await serverHeaders()
 
   return {
     kind: 'server',
@@ -69,6 +145,15 @@ export async function connectServer(): Promise<StudioBackend> {
       if (!response.ok || !body.hash) throw new Error(body.error ?? 'The file could not be saved.')
       return { source, version: body.hash }
     },
+    async create(id, source) {
+      await ask('page', 'POST', { id, source })
+    },
+    async rename(id, to) {
+      await ask('page', 'PATCH', { id, to })
+    },
+    async remove(id, baseVersion) {
+      await ask('page', 'DELETE', { id, baseHash: baseVersion })
+    },
   }
 }
 
@@ -86,18 +171,57 @@ const picker = (): DirectoryPicker | undefined =>
 
 export const folderAccessSupported = (): boolean => picker() !== undefined
 
-async function fileIn(root: FileSystemDirectoryHandle, id: string): Promise<FileSystemFileHandle> {
+/** The folder a file is in, and the file's name there. With `make`, folders that are missing are made. */
+async function folderOf(
+  root: FileSystemDirectoryHandle,
+  id: string,
+  make = false,
+): Promise<{ directory: FileSystemDirectoryHandle; name: string }> {
   const segments = id.split('/')
   const name = segments.pop()!
   let directory = root
-  for (const segment of segments) directory = await directory.getDirectoryHandle(segment)
+  for (const segment of segments) directory = await directory.getDirectoryHandle(segment, { create: make })
+  return { directory, name }
+}
+
+async function fileIn(root: FileSystemDirectoryHandle, id: string): Promise<FileSystemFileHandle> {
+  const { directory, name } = await folderOf(root, id)
   return directory.getFileHandle(name)
+}
+
+/** Is anything called `name` in a folder: a file, or a folder? */
+async function isTaken(directory: FileSystemDirectoryHandle, name: string): Promise<boolean> {
+  try {
+    await directory.getFileHandle(name)
+    return true
+  } catch (error) {
+    // A folder has the name. That is taken too.
+    if ((error as DOMException).name === 'TypeMismatchError') return true
+    if ((error as DOMException).name === 'NotFoundError') return false
+    throw error
+  }
+}
+
+/** Only a page the site knows is moved or deleted, as with the dev server: never some other file in the folder. */
+function assertPage(id: string): void {
+  const known = Object.values(siteStore.get().pages).some((page) => page.id === id)
+  if (!known) throw new Error('There is no page with that name.')
 }
 
 function folderBackend(root: DirectoryHandle): StudioBackend {
   const read = async (id: string): Promise<SourceFile> => {
     const file = await (await fileIn(root, id)).getFile()
     return { source: await file.text(), version: String(file.lastModified) }
+  }
+  /** Make a file that is not there yet. The browser cannot be told to refuse a name that is taken, so that is looked up first. */
+  const create = async (id: string, source: string): Promise<void> => {
+    const problem = pagePathProblem(id)
+    if (problem) throw new Error(problem)
+    const { directory, name } = await folderOf(root, id, true)
+    if (await isTaken(directory, name)) throw new Error(`There is already a file at ${id}.`)
+    const writable = await (await directory.getFileHandle(name, { create: true })).createWritable()
+    await writable.write(source)
+    await writable.close()
   }
   return {
     kind: 'folder',
@@ -116,6 +240,23 @@ function folderBackend(root: DirectoryHandle): StudioBackend {
       await writable.write(source)
       await writable.close()
       return { source, version: String((await handle.getFile()).lastModified) }
+    },
+    create,
+    async rename(id, to) {
+      assertPage(id)
+      const { directory, name } = await folderOf(root, id)
+      const text = await (await (await directory.getFileHandle(name)).getFile()).text()
+      // The new file first, and the old one only once that is written: the page is never in neither place.
+      await create(to, text)
+      await directory.removeEntry(name)
+    },
+    async remove(id, baseVersion) {
+      assertPage(id)
+      const { directory, name } = await folderOf(root, id)
+      // `getFileHandle` refuses a folder, so this cannot take one away.
+      const current = await (await directory.getFileHandle(name)).getFile()
+      if (String(current.lastModified) !== baseVersion) throw new Error('The file changed on disk since it was opened.')
+      await directory.removeEntry(name)
     },
   }
 }

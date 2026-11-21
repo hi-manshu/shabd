@@ -24,6 +24,7 @@ import {
   type SourceFile,
   type StudioBackend,
 } from './backends.js'
+import { PageActions } from './PageActions.js'
 import {
   isNewer,
   PeerChannel,
@@ -69,8 +70,10 @@ function describe(status: Status): string {
 }
 
 export default function Studio() {
-  const { features, contentDir } = useSite()
-  const { id, title } = usePage()
+  const { features, contentDir, pages } = useSite()
+  const { id, path, title } = usePage()
+  /** A page made from an OpenAPI description is written again whenever the description changes, so it is not edited here. */
+  const generated = pages[path]?.generated === true
   const [backend, setBackend] = useState<StudioBackend | null>(null)
   const [text, setText] = useState('')
   /** The page whose text is in the editor. It trails `id` for as long as the next page's file takes to read. */
@@ -163,6 +166,18 @@ export default function Studio() {
     },
     [id, save],
   )
+
+  /* ── for making, renaming and deleting pages, which must not start with a draft on its way ── */
+
+  const settle = useCallback(async () => {
+    await save()
+    return live.current.text === live.current.saved
+  }, [save])
+
+  /** A page that is about to be deleted is not saved first. */
+  const discard = useCallback(() => window.clearTimeout(live.current.timer), [])
+
+  const version = useCallback(() => live.current.version, [])
 
   /* ── the page hot-updated ── */
 
@@ -293,7 +308,11 @@ export default function Studio() {
         </button>
       </header>
 
-      {id ? (
+      {backend && <PageActions backend={backend} page={id && !generated ? { id, path } : null} settle={settle} discard={discard} version={version} />}
+
+      {generated ? (
+        <p className="sb-studio-empty">This page is made from an OpenAPI description. Change the description, and the page follows.</p>
+      ) : id ? (
         // The key makes each page a document of its own: a new page starts with nothing to undo.
         <CodeEditor
           key={shown ?? ''}

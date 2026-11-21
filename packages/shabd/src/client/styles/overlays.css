@@ -227,6 +227,106 @@
     background: var(--sb-surface);
   }
 
+  .sb-studio-action:disabled {
+    color: var(--sb-muted);
+    cursor: default;
+  }
+
+  .sb-studio-action:disabled:hover {
+    background: none;
+  }
+
+  /* Making, renaming and deleting pages: a row of buttons, the form one of them opens, and what the last one did. */
+  .sb-studio-pages {
+    border-block-end: var(--sb-line) solid var(--sb-border);
+    font-size: 0.82rem;
+  }
+
+  .sb-studio-tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .sb-studio-form,
+  .sb-studio-outcome,
+  .sb-studio-problem {
+    display: grid;
+    gap: 0.4rem;
+    padding: 0.1rem 1rem 0.75rem;
+  }
+
+  .sb-studio-form p,
+  .sb-studio-outcome p {
+    margin: 0;
+  }
+
+  .sb-studio-action[aria-expanded='true'] {
+    background: var(--sb-surface);
+  }
+
+  .sb-studio-form label,
+  .sb-studio-hint {
+    color: var(--sb-muted);
+  }
+
+  .sb-studio-form input {
+    min-inline-size: 0;
+    padding: 0.35rem 0.5rem;
+    border: var(--sb-line) solid var(--sb-border);
+    border-radius: min(4px, var(--sb-radius));
+    background: var(--sb-surface);
+    color: var(--sb-text);
+    font-family: var(--sb-font-mono);
+    font-size: 0.8rem;
+  }
+
+  .sb-studio-hint[data-invalid],
+  .sb-studio-problem {
+    color: var(--sb-danger);
+  }
+
+  .sb-studio-form .sb-studio-choices,
+  .sb-studio-outcome .sb-studio-choices {
+    margin-block-start: 0.15rem;
+  }
+
+  .sb-studio-outcome code {
+    font-size: 0.92em;
+  }
+
+  /* What `shabd check` found. A page that many others link to makes a long list, which scrolls here and does not push the editor out. */
+  .sb-studio-found {
+    display: grid;
+    gap: 0.3rem;
+    max-block-size: 9.5rem;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
+  }
+
+  .sb-studio-found strong {
+    font-weight: 600;
+  }
+
+  .sb-studio-found [data-level='error'] strong {
+    color: var(--sb-danger);
+  }
+
+  .sb-studio-found [data-level='warning'] strong {
+    color: var(--sb-caution);
+  }
+
+  .sb-studio-found [data-level='note'] strong,
+  .sb-studio-found span {
+    color: var(--sb-muted);
+  }
+
+  .sb-studio-found span {
+    font-family: var(--sb-font-mono);
+    font-size: 0.92em;
+  }
+
   /* The editor takes the room that is left in the panel and scrolls inside it. Its own rules are under "editor". */
   .sb-studio-editor {
     flex: 1;

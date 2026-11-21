@@ -124,8 +124,11 @@ interface RouterValue {
   /**
    * Go to a page of the site. `passage` is what a search result passes on: the
    * page then opens at that passage, with the words of the query marked.
+   *
+   * `keepFocus` leaves focus where it is. A new page normally takes it; the Studio keeps it when it is
+   * the Studio that moved the reader, to a page it has just made or renamed.
    */
-  navigate(to: string, options?: { replace?: boolean; passage?: PassageTarget }): Promise<void>
+  navigate(to: string, options?: { replace?: boolean; passage?: PassageTarget; keepFocus?: boolean }): Promise<void>
 }
 
 const RouterContext = createContext<RouterValue | null>(null)
@@ -266,7 +269,7 @@ export function RouterProvider({ initial, children }: { initial: LoadedPage; chi
       const state: EntryState = { key: keyRef.current, ...(passage ? { passage } : {}) }
       history[options.replace ? 'replaceState' : 'pushState'](state, '', url.href)
       setUi({ sidebarOpen: false })
-      show(next, { hash: url.hash, top: null, focus: path !== pathRef.current, passage })
+      show(next, { hash: url.hash, top: null, focus: !options.keepFocus && path !== pathRef.current, passage })
     },
     [show],
   )

@@ -14,11 +14,15 @@ import { createHash, randomUUID } from 'node:crypto'
 import { createReadStream } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { extname } from 'node:path'
+import path, { extname } from 'node:path'
 import { normalizePath, type Connect, type ViteDevServer } from 'vite'
+import { pagePathProblem, pageRoute } from '../../shared/page-path.js'
 import { stripBase } from '../../shared/paths.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
 import { FEED_FILE, renderFeed } from '../build/feed.js'
+import { collectProblems, type Problem } from '../check.js'
+import { planRedirect } from '../config/redirect-edit.js'
+import type { PageRecord } from '../content/store.js'
 import type { ShabdContext } from '../context.js'
 import { readBody, sendJson, sendText, sendWebResponse, toWebRequest } from '../http.js'
 import { renderLlmsFull, renderLlmsTxt } from '../llms/llms-txt.js'
@@ -28,6 +32,7 @@ import { liveDocs } from '../mcp/live.js'
 import { SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, toRoutePath } from '../mcp/source.js'
 import { modelFiles, runtimeFiles } from '../search/model-files.js'
 import { SearchService } from '../search/service.js'
+import { createPage, deletePage, movePage, StudioRefusal } from './studio-files.js'
 
 const STUDIO_PREFIX = '/_shabd/studio/'
 
@@ -233,7 +238,122 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
       return
     }
 
+    /*
+     * Making, moving and deleting pages. A page that exists is still found by
+     * its name. The place of a new one is a path from the request, and what
+     * that path may be is settled in studio-files.ts.
+     */
+
+    /** Two files with one address cannot both be served: a new file may not take the address of a page that is there. */
+    const refuseTakenAddress = (id: string, moving?: PageRecord) => {
+      const other = store.byPath(pageRoute(id))
+      if (other && other !== moving) throw new StudioRefusal(`${other.id} already has the address ${other.path}.`, 409)
+    }
+    /** A path that could be a page's, or a refusal that says what is wrong with it. */
+    const newPlace = (id: unknown): string => {
+      const problem = pagePathProblem(id)
+      if (problem) throw new StudioRefusal(problem, 400)
+      return id as string
+    }
+    const existingPage = (id: unknown): PageRecord => {
+      const page = typeof id === 'string' ? store.byId(id) : undefined
+      if (!page) throw new StudioRefusal('There is no page with that name.', 404)
+      // A page made from an OpenAPI description is written again whenever the description changes:
+      // moved or deleted, it would come back where it was.
+      if (page.generated) throw new StudioRefusal(`This page is made from ${page.generated}. Change the description, and the page follows.`, 403)
+      return page
+    }
+
+    if (action === 'page' && req.method === 'POST') {
+      const body = await jsonBody(req)
+      const id = newPlace(body.id)
+      if (typeof body.source !== 'string') throw new StudioRefusal('Expected { id, source }.', 400)
+      refuseTakenAddress(id)
+      const file = await createPage(config.contentDir, id, body.source)
+      // As for a save: the routes and the navigation follow now, not when the watcher gets to it.
+      server.watcher.emit('add', normalizePath(file))
+      sendJson(res, { id, path: pageRoute(id) }, 201)
+      return
+    }
+
+    if (action === 'page' && req.method === 'PATCH') {
+      const body = await jsonBody(req)
+      const page = existingPage(body.id)
+      const to = newPlace(body.to)
+      if (to === page.id) throw new StudioRefusal('That is the name the page has.', 400)
+      refuseTakenAddress(to, page)
+      const file = await movePage(config.contentDir, page.file, to)
+      // One hot update for the move, not one for each file. The new file is entered here, and the update that
+      // follows the removal of the old one carries both: the browser's list of pages goes from the old state
+      // to the new one, with no state in between in which the page is in two places or in none.
+      await store.upsert(file)
+      server.watcher.emit('unlink', normalizePath(page.file))
+      sendJson(res, { id: to, path: pageRoute(to), from: page.path })
+      return
+    }
+
+    if (action === 'page' && req.method === 'DELETE') {
+      const body = await jsonBody(req)
+      const page = existingPage(body.id)
+      // What is deleted is what the Studio last showed, not something written to the file since.
+      if (typeof body.baseHash === 'string' && body.baseHash !== sha1(await readFile(page.file, 'utf8'))) {
+        throw new StudioRefusal('The file changed on disk since it was opened.', 409)
+      }
+      await deletePage(page.file)
+      server.watcher.emit('unlink', normalizePath(page.file))
+      sendJson(res, { id: page.id })
+      return
+    }
+
+    // What `shabd check` reports as things stand. The Studio asks before and after it moves a page, and shows what is new.
+    if (action === 'check' && req.method === 'GET') {
+      const { problems, detailed } = await collectProblems(context())
+      const broken: Problem[] = detailed.flatMap((error) =>
+        error.issues.map((issue) => ({
+          level: 'error' as const,
+          rule: 'page',
+          file: path.relative(config.root, error.file),
+          line: issue.line,
+          message: issue.message,
+        })),
+      )
+      sendJson(res, { problems: [...broken, ...problems] })
+      return
+    }
+
+    // The one thing the Studio writes outside the content folder: a line under `redirects:` in the config.
+    if (action === 'redirect' && (req.method === 'GET' || req.method === 'POST')) {
+      const asked = req.method === 'GET' ? Object.fromEntries(url.searchParams) : await jsonBody(req)
+      const plan = planRedirect(config, await readFile(config.configFile, 'utf8'), asked.from, asked.to, (route) => store.byPath(route) !== undefined)
+      if (req.method === 'GET') {
+        // Asked first, so that the Studio only offers what it can do.
+        sendJson(res, plan.ok ? { possible: true, line: plan.line } : { possible: false, line: plan.line, reason: plan.problem })
+        return
+      }
+      if (!plan.ok) throw new StudioRefusal(plan.problem, 409)
+      await writeFile(config.configFile, plan.source)
+      // Readers are sent on from the old address as soon as this answers. The watcher brings the file in
+      // as well a moment later, and finds the same config.
+      const running = context()
+      running.config = plan.config
+      running.store.setConfig(plan.config)
+      sendJson(res, { line: plan.line })
+      return
+    }
+
     sendJson(res, { error: 'Unknown Studio request.' }, 404)
+  }
+
+  /** The body of a request as a JSON object. */
+  const jsonBody = async (req: IncomingMessage): Promise<Record<string, unknown>> => {
+    const text = await readBody(req)
+    try {
+      const body: unknown = JSON.parse(text)
+      if (typeof body === 'object' && body !== null && !Array.isArray(body)) return body as Record<string, unknown>
+    } catch {
+      // Not JSON: refused below.
+    }
+    throw new StudioRefusal('Expected a JSON object as the body.', 400)
   }
 
   return (req, res, next) => {

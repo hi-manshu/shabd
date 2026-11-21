@@ -189,7 +189,12 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
           return `export default ${JSON.stringify(store.siteData({ dev }))}\n`
 
         case VIRTUAL.routes: {
-          const routes = store.pages().map((page) => `  ${JSON.stringify(page.path)}: () => import(${importPath(page.file)}),`)
+          // A file that has just been deleted is still a page here for a tenth of a second, until the watcher
+          // says it is gone. If another page is added in that time (a rename is both at once), this list is
+          // made again with the deleted file in it. Vite cannot resolve an import of a file that is not
+          // there, fails the whole module, and the browser gives up on the update and loads the page again.
+          const pages = dev ? store.pages().filter((page) => existsSync(page.file)) : store.pages()
+          const routes = pages.map((page) => `  ${JSON.stringify(page.path)}: () => import(${importPath(page.file)}),`)
           return `export const routes = {\n${routes.join('\n')}\n}\n`
         }
 
@@ -324,7 +329,13 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       const client = server.environments.client
       const reload = (id: string) => {
         const module = client.moduleGraph.getModuleById(resolved(id))
-        if (module) void client.reloadModule(module)
+        if (!module) return
+        // `reloadModule` tells the browser to fetch the module again. It does not tell Vite that an answer it
+        // is already working out, for a fetch that came a moment earlier, is out of date: that answer is kept
+        // and given to the next fetch too. Two changes to the list of pages in quick succession (a rename
+        // is a file added and a file removed) then leave the browser with the list from between the two.
+        client.moduleGraph.invalidateModule(module)
+        void client.reloadModule(module)
       }
       const same = (a: string, b: string) => normalizePath(a) === normalizePath(b)
       /** What the file holds as this change is handled, for the look that follows. */

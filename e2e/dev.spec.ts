@@ -1,5 +1,7 @@
 /** The dev server: files change on disk and the page on screen follows, without loading again. */
-import type { Locator, Page } from '@playwright/test'
+import type { APIRequestContext, APIResponse, Locator, Page } from '@playwright/test'
+import { existsSync } from 'node:fs'
+import { mkdir, readdir, rm, symlink } from 'node:fs/promises'
 import { contrastOn, parseColor, type Rgba } from '../packages/shabd/src/shared/color.js'
 import { PRESET_NAMES } from '../packages/shabd/src/shared/presets.js'
 import { DEV, expect, markPage, open, regions, test, type SiteFiles } from './support/fixtures.js'
@@ -98,6 +100,33 @@ test.describe('hot updates', () => {
     await site.remove('content/extras/gamma.md')
     await expect(extras.locator('.sb-nav-link')).toHaveText(['Alpha notes', 'Beta notes'])
     await expect(page.locator('h1.sb-page-title')).toHaveText('Page not found')
+  })
+
+  test('a page renamed on disk moves in the routes and the navigation, and the page on screen is not loaded again', async ({ page, site }) => {
+    await open(page, `${DEV}/guide/intro`)
+    const stillThere = await markPage(page)
+    const extras = page.locator('.sb-nav-category', { hasText: 'Extras' })
+    const beta = await site.read('content/extras/beta.md')
+    const renamed = beta.replace('Beta notes', 'Gamma notes')
+
+    // A rename is two changes at once: a file that is new and a file that is gone. Some tools make the new
+    // one first, some remove the old one first. Each order went wrong in its own way, roughly one time in ten
+    // on the machine this was written on. So each is done a few times here, which catches a return of either
+    // most of the time and not every time.
+    for (let round = 1; round <= 3; round++) {
+      await site.write('content/extras/gamma.md', renamed)
+      await site.remove('content/extras/beta.md')
+      await expect(extras.locator('.sb-nav-link')).toHaveText(['Alpha notes', 'Gamma notes'])
+      await extras.getByRole('link', { name: 'Gamma notes' }).click()
+      await expect(page).toHaveURL(`${DEV}/extras/gamma`)
+
+      await site.remove('content/extras/gamma.md')
+      await site.write('content/extras/beta.md', beta)
+      await expect(extras.locator('.sb-nav-link')).toHaveText(['Alpha notes', 'Beta notes'])
+      await extras.getByRole('link', { name: 'Beta notes' }).click()
+      await expect(page).toHaveURL(`${DEV}/extras/beta`)
+      expect(await stillThere(), `after rename ${round} and back`).toBe(true)
+    }
   })
 
   test('a mistake in the config is shown over the page, and clears when it is fixed', async ({ page, site }) => {
@@ -300,7 +329,8 @@ test.describe('studio', () => {
     await expect(editor).toHaveAccessibleDescription(hint)
     await expect(page.getByText(hint)).toBeHidden()
 
-    await page.getByRole('button', { name: 'Close the editor' }).focus()
+    // From the control before it, which is the last of the buttons above it.
+    await page.getByRole('button', { name: 'Delete', exact: true }).focus()
     await page.keyboard.press('Tab')
     await expect(editor).toBeFocused()
     await expect(page.getByText(hint)).toBeVisible()
@@ -454,13 +484,181 @@ test.describe('studio', () => {
     expect(await ink()).toBe(await page.evaluate(() => getComputedStyle(document.body).color))
   })
 
-  test('saves through a connected folder with the File System Access API', async ({ page, browserName }) => {
-    test.skip(browserName !== 'chromium', 'the File System Access API only exists in Chromium browsers')
+  test('makes a page from the Studio and goes to it', async ({ page, site }) => {
+    await site.track('content/extras/epsilon.md')
+    const editor = await openStudio(page, '/extras/alpha')
+    const stillThere = await markPage(page)
 
-    // The real folder picker is a system dialog that a test cannot click.
-    // Stand in for it with a directory from the origin-private file system,
-    // which hands out the same kind of handles the picker would.
-    await page.addInitScript(() => {
+    await page.getByRole('button', { name: 'New page' }).click()
+    const name = page.getByLabel('File for the new page, in content/')
+    // It starts in the folder of the page on screen, with the cursor in it.
+    await expect(name).toHaveValue('extras/')
+    await expect(name).toBeFocused()
+    const hint = page.locator('.sb-studio-hint')
+    const create = page.getByRole('button', { name: 'Create page' })
+
+    // What cannot be a page is said while it is typed, and cannot be sent.
+    for (const [typed, problem] of [
+      ['extras/_hidden', '"_hidden.md" starts with "_", and a file or folder that does is not a page.'],
+      ['../outside', 'A path cannot contain "." or "..". Name the folder the page is in.'],
+      ['extras/alpha', 'extras/alpha.md already has the address /extras/alpha.'],
+      ['extras/Alpha.mdx', 'extras/alpha.md already has the address /extras/alpha.'],
+    ] as const) {
+      await name.fill(typed)
+      await expect(hint).toHaveText(problem)
+      await expect(create).toBeDisabled()
+    }
+
+    await name.fill('extras/epsilon')
+    await expect(hint).toHaveText('Its address will be /extras/epsilon.')
+    await create.click()
+    await expect(page).toHaveURL(`${DEV}/extras/epsilon`)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Epsilon')
+    await expect(page.locator('.sb-nav-category', { hasText: 'Extras' }).locator('.sb-nav-link')).toHaveText(['Alpha notes', 'Beta notes', 'Epsilon'])
+    await expect(page.locator('.sb-studio-file strong')).toHaveText('content/extras/epsilon.md')
+    const outcome = page.locator('.sb-studio-outcome')
+    await expect(outcome).toContainText('Made content/extras/epsilon.md. Its address is /extras/epsilon.')
+    await expect(outcome).toContainText('shabd check reports nothing it did not report before.')
+    expect(await site.read('content/extras/epsilon.md')).toBe('---\ntitle: Epsilon\n---\n\n')
+    expect(await stillThere()).toBe(true)
+
+    // The new page is in the editor, to be written.
+    await expect.poll(() => textOf(editor)).toBe('---\ntitle: Epsilon\n---\n\n')
+    await expect(editor).toBeEditable()
+    await editor.locator('.cm-line').last().click()
+    await page.keyboard.type('The fifth letter.')
+    await expect(page.locator('.sb-content')).toContainText('The fifth letter.')
+    await written(editor, site, 'content/extras/epsilon.md')
+  })
+
+  test('renames a page, follows it to its new address and says what shabd check makes of the move', async ({ page, request, site }) => {
+    for (const file of ['content/guide/setup.md', 'content/guide/install.md', 'shabd.config.yaml']) await site.track(file)
+    const config = await site.read('shabd.config.yaml')
+    const editor = await openStudio(page, '/guide/setup')
+    const stillThere = await markPage(page)
+
+    // Something typed and not saved yet goes with the page.
+    await cursorAfter(editor, 'Install the thing.')
+    await page.keyboard.type(' Typed just before the move.')
+    await page.getByRole('button', { name: 'Rename', exact: true }).click()
+    const name = page.getByLabel('New name for guide/setup.md, in content/')
+    await expect(name).toHaveValue('guide/setup.md')
+    await name.fill('guide/install')
+    await expect(page.locator('.sb-studio-hint')).toHaveText(
+      'Its address changes from /guide/setup to /guide/install. Links to /guide/setup in other pages are not changed.',
+    )
+    await name.press('Enter')
+
+    await expect(page).toHaveURL(`${DEV}/guide/install`)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Setting up')
+    await expect(page.locator('.sb-studio-file strong')).toHaveText('content/guide/install.md')
+    expect(existsSync(site.path('content/guide/setup.md'))).toBe(false)
+    expect(await site.read('content/guide/install.md')).toContain('Install the thing. Typed just before the move.')
+    expect((await request.get(`${DEV}/guide/setup`)).status()).toBe(404)
+    expect(await stillThere()).toBe(true)
+
+    // Other pages are not rewritten. What the move broke is listed, in the words `shabd check` uses.
+    const outcome = page.locator('.sb-studio-outcome')
+    await expect(outcome).toContainText(
+      'content/guide/setup.md is now content/guide/install.md. Its address changed from /guide/setup to /guide/install.',
+    )
+    const found = outcome.locator('.sb-studio-found li')
+    const stillWrong = [
+      'warning sidebar.yaml:4 "guide/setup" does not match any page in the content directory',
+      'note sidebar.yaml /guide/install is published but not in the sidebar. Add it, or set `sidebar: { exclude: true }` in its frontmatter.',
+    ]
+    // Each is on the line it is written on, wherever that line is in the fixture's files today.
+    const lineOf = async (file: string, text: string) => (await site.read(file)).split('\n').findIndex((line) => line.includes(text)) + 1
+    const link = await lineOf('content/guide/intro.md', '(./setup.md)')
+    const redirect = await lineOf('shabd.config.yaml', '/old-setup:')
+    expect(link).toBeGreaterThan(0)
+    expect(redirect).toBeGreaterThan(0)
+    await expect(found).toHaveText([
+      stillWrong[0]!,
+      // Two links on one line of the page: to the page, and to a heading of it.
+      `error content/guide/intro.md:${link} Broken link: no page at /guide/setup`,
+      `error content/guide/intro.md:${link} Broken link: no page at /guide/setup`,
+      `error shabd.config.yaml:${redirect} Redirect from /old-setup leads to /guide/setup, where there is no page`,
+      stillWrong[1]!,
+    ])
+    expect(await site.read('content/guide/intro.md')).toContain('[the setup page](./setup.md)')
+
+    // A redirect is one line more in the config, and nothing else in it changes.
+    await page.getByRole('button', { name: 'Add a redirect from /guide/setup' }).click()
+    await expect(outcome).toContainText('Readers of /guide/setup are now sent on to /guide/install: the redirect is in shabd.config.yaml.')
+    expect(await site.read('shabd.config.yaml')).toBe(config.replace('#second-step\n', '#second-step\n  /guide/setup: /guide/install\n'))
+    const sent = await request.get(`${DEV}/guide/setup`, { maxRedirects: 0 })
+    expect([sent.status(), sent.headers().location]).toEqual([302, '/guide/install'])
+    // The links work again, by way of the redirect, which `shabd check` still finds worth a word.
+    await expect(found).toHaveText([
+      stillWrong[0]!,
+      `warning content/guide/intro.md:${link} Link to /guide/setup, which has moved to /guide/install. Link there instead.`,
+      `warning content/guide/intro.md:${link} Link to /guide/setup, which has moved to /guide/install. Link there instead.`,
+      stillWrong[1]!,
+    ])
+    await expect(page.getByRole('button', { name: /^Add a redirect/ })).toHaveCount(0)
+  })
+
+  test('does not offer a redirect that it could not add without rewriting the config', async ({ page, site }) => {
+    for (const file of ['content/extras/alpha.md', 'content/extras/first.md']) await site.track(file)
+    // The same redirects as before, written between braces on one line.
+    await site.edit('shabd.config.yaml', (text) =>
+      text.replace(
+        'redirects:\n  /guide/start: /guide/intro\n  /old-setup: /guide/setup#second-step\n',
+        'redirects: { /guide/start: /guide/intro, /old-setup: "/guide/setup#second-step" }\n',
+      ),
+    )
+    const config = await site.read('shabd.config.yaml')
+    await openStudio(page, '/extras/alpha')
+
+    await page.getByRole('button', { name: 'Rename', exact: true }).click()
+    await page.getByLabel('New name for extras/alpha.md, in content/').fill('extras/first')
+    await page.getByRole('button', { name: 'Rename page' }).click()
+    await expect(page).toHaveURL(`${DEV}/extras/first`)
+
+    const outcome = page.locator('.sb-studio-outcome')
+    await expect(outcome).toContainText(
+      'A redirect from /extras/alpha was not offered. The redirects in shabd.config.yaml are written between braces, and a line cannot be added to those without rewriting them. ' +
+        'To add it yourself, put this under redirects: in shabd.config.yaml: /extras/alpha: /extras/first',
+    )
+    await expect(page.getByRole('button', { name: /^Add a redirect/ })).toHaveCount(0)
+    expect(await site.read('shabd.config.yaml')).toBe(config)
+  })
+
+  test('deletes a page after asking, and goes to the page beside it', async ({ page, request, site }) => {
+    await site.track('content/extras/beta.md')
+    await openStudio(page, '/extras/beta')
+    const stillThere = await markPage(page)
+
+    // It asks first, and Esc is an answer.
+    const remove = page.getByRole('button', { name: 'Delete', exact: true })
+    await remove.click()
+    const question = page.getByRole('form', { name: 'Delete this page' })
+    await expect(question).toContainText('Delete content/extras/beta.md? The file is removed from disk.')
+    await expect(question.getByRole('button', { name: 'Cancel' })).toBeFocused()
+    await page.keyboard.press('Escape')
+    await expect(question).toHaveCount(0)
+    await expect(remove).toBeFocused()
+    expect(existsSync(site.path('content/extras/beta.md'))).toBe(true)
+
+    await remove.click()
+    await question.getByRole('button', { name: 'Delete page' }).click()
+    await expect(page).toHaveURL(`${DEV}/extras/alpha`)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Alpha notes')
+    await expect(page.locator('.sb-studio-file strong')).toHaveText('content/extras/alpha.md')
+    await expect(page.locator('.sb-studio-outcome')).toContainText('Deleted content/extras/beta.md.')
+    expect(existsSync(site.path('content/extras/beta.md'))).toBe(false)
+    expect((await request.get(`${DEV}/extras/beta`)).status()).toBe(404)
+    await expect(page.locator('.sb-nav-category', { hasText: 'Extras' }).locator('.sb-nav-link')).toHaveText(['Alpha notes'])
+    expect(await stillThere()).toBe(true)
+  })
+
+  /**
+   * The real folder picker is a system dialog that a test cannot click. A folder in the browser's private file
+   * system stands in for the one it would return: it hands out the same kind of handles.
+   */
+  const pickPrivateFolder = (page: Page) =>
+    page.addInitScript(() => {
       const contentFolder = async () => {
         const root = await navigator.storage.getDirectory()
         return root.getDirectoryHandle('content', { create: true })
@@ -468,21 +666,39 @@ test.describe('studio', () => {
       Object.defineProperty(window, 'showDirectoryPicker', { value: contentFolder, configurable: true })
     })
 
-    const readStored = () =>
-      page.evaluate(async () => {
-        const root = await navigator.storage.getDirectory()
-        const guide = await (await root.getDirectoryHandle('content')).getDirectoryHandle('guide')
-        return (await (await guide.getFileHandle('setup.md')).getFile()).text()
-      })
-    const writeStored = (text: string) =>
-      page.evaluate(async (contents) => {
-        const root = await navigator.storage.getDirectory()
-        const content = await root.getDirectoryHandle('content', { create: true })
-        const guide = await content.getDirectoryHandle('guide', { create: true })
-        const writable = await (await guide.getFileHandle('setup.md', { create: true })).createWritable()
+  /** The text of a file in that folder, by its path from the folder. Null where there is no such file. */
+  const inFolder = (page: Page, file: string): Promise<string | null> =>
+    page.evaluate(async (path) => {
+      const parts = path.split('/')
+      const name = parts.pop()!
+      try {
+        let folder = await (await navigator.storage.getDirectory()).getDirectoryHandle('content')
+        for (const part of parts) folder = await folder.getDirectoryHandle(part)
+        return await (await (await folder.getFileHandle(name)).getFile()).text()
+      } catch {
+        return null
+      }
+    }, file)
+
+  const putInFolder = (page: Page, file: string, text: string): Promise<void> =>
+    page.evaluate(
+      async ([path, contents]) => {
+        const parts = path.split('/')
+        const name = parts.pop()!
+        let folder = await (await navigator.storage.getDirectory()).getDirectoryHandle('content', { create: true })
+        for (const part of parts) folder = await folder.getDirectoryHandle(part, { create: true })
+        const writable = await (await folder.getFileHandle(name, { create: true })).createWritable()
         await writable.write(contents)
         await writable.close()
-      }, text)
+      },
+      [file, text] as const,
+    )
+
+  test('saves through a connected folder with the File System Access API', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'the File System Access API only exists in Chromium browsers')
+    await pickPrivateFolder(page)
+    const readStored = () => inFolder(page, 'guide/setup.md')
+    const writeStored = (text: string) => putInFolder(page, 'guide/setup.md', text)
 
     const editor = await openStudio(page, '/guide/setup')
     const label = page.locator('.sb-studio-file span')
@@ -509,6 +725,61 @@ test.describe('studio', () => {
     await page.getByRole('button', { name: 'Edit page' }).click()
     await expect(label).toHaveText('Writing to the “content” folder on this device')
     await expect.poll(() => textOf(editorOf(page))).toBe('# Setting up\n\nChanged by something else.\n')
+  })
+
+  test('makes, renames and deletes pages in a connected folder', async ({ page, browserName, site }) => {
+    test.skip(browserName !== 'chromium', 'the File System Access API only exists in Chromium browsers')
+    for (const file of ['content/extras/eta.md', 'content/extras/theta.md']) await site.track(file)
+    await pickPrivateFolder(page)
+    const starter = '---\ntitle: Eta\n---\n\n'
+
+    const editor = await openStudio(page, '/extras/alpha')
+    await putInFolder(page, 'extras/alpha.md', await site.read('content/extras/alpha.md'))
+    await putInFolder(page, 'extras/taken.md', 'In the folder, and not a page the site knows of.\n')
+    await page.getByRole('button', { name: 'Connect a folder' }).click()
+    await expect(page.locator('.sb-studio-file span')).toHaveText('Writing to the “content” folder on this device')
+
+    // The browser writes the new file itself, and will not write over one that is there. Here only it can
+    // know that one is: the site has no page of that name to object to.
+    await page.getByRole('button', { name: 'New page' }).click()
+    const name = page.getByLabel('File for the new page, in content/')
+    await name.fill('extras/taken')
+    await name.press('Enter')
+    await expect(page.locator('.sb-studio-problem')).toHaveText('There is already a file at extras/taken.md.')
+    expect(await inFolder(page, 'extras/taken.md')).toBe('In the folder, and not a page the site knows of.\n')
+
+    await name.fill('extras/eta')
+    await name.press('Enter')
+    await expect.poll(() => inFolder(page, 'extras/eta.md')).toBe(starter)
+    // The stand-in folder is not the one the dev server reads. A real one is, so the test does what a real one
+    // does by being that folder: the same file turns up on disk, and the dev server notices it.
+    await site.write('content/extras/eta.md', starter)
+    await expect(page).toHaveURL(`${DEV}/extras/eta`)
+    await expect(page.locator('.sb-studio-file strong')).toHaveText('content/extras/eta.md')
+    await expect.poll(() => textOf(editor)).toBe(starter)
+    await expect(page.locator('.sb-studio-outcome')).toContainText('Made content/extras/eta.md. Its address is /extras/eta.')
+
+    // Renamed: the text is at the new name, and nothing is left at the old one.
+    await page.getByRole('button', { name: 'Rename', exact: true }).click()
+    await page.getByLabel('New name for extras/eta.md, in content/').fill('extras/theta')
+    await page.getByRole('button', { name: 'Rename page' }).click()
+    await expect.poll(() => inFolder(page, 'extras/theta.md')).toBe(starter)
+    await expect.poll(() => inFolder(page, 'extras/eta.md')).toBeNull()
+    await site.write('content/extras/theta.md', starter)
+    await site.remove('content/extras/eta.md')
+    await expect(page).toHaveURL(`${DEV}/extras/theta`)
+    await expect(page.locator('.sb-studio-file strong')).toHaveText('content/extras/theta.md')
+    await expect(page.locator('.sb-studio-outcome')).toContainText('Its address changed from /extras/eta to /extras/theta.')
+    await expect(editor).toBeEditable()
+
+    // Deleted.
+    await page.getByRole('button', { name: 'Delete', exact: true }).click()
+    await page.getByRole('button', { name: 'Delete page' }).click()
+    await expect.poll(() => inFolder(page, 'extras/theta.md')).toBeNull()
+    await site.remove('content/extras/theta.md')
+    await expect(page).toHaveURL(`${DEV}/extras/beta`)
+    await expect(page.locator('.sb-studio-outcome')).toContainText('Deleted content/extras/theta.md.')
+    expect(await inFolder(page, 'extras/alpha.md')).toBe(await site.read('content/extras/alpha.md'))
   })
 
   test('a draft typed in one tab shows in another, which keeps its cursor', async ({ page, context, site }) => {
@@ -628,6 +899,226 @@ test.describe('studio', () => {
     })
     expect(outside.status()).toBe(400)
     expect(await site.read('content/guide/setup.md')).toBe(before)
+  })
+
+  /** The token the site's own pages are given. A request that carries it is taken for one of theirs, as far as the token goes. */
+  const studioToken = async (request: APIRequestContext) =>
+    ((await (await request.get(`${DEV}/_shabd/studio/session`)).json()) as { token: string }).token
+
+  test('the endpoints that make, move and delete pages refuse other websites and requests without the token', async ({ request, site }) => {
+    const token = await studioToken(request)
+    const attempts: [what: string, send: (headers: Record<string, string>) => Promise<APIResponse>][] = [
+      ['make a page', (headers) => request.post(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/made.md', source: 'made' } })],
+      ['move a page', (headers) => request.patch(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/alpha.md', to: 'extras/moved.md' } })],
+      ['delete a page', (headers) => request.delete(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/alpha.md' } })],
+      ['read what check reports', (headers) => request.get(`${DEV}/_shabd/studio/check`, { headers })],
+      ['ask about a redirect', (headers) => request.get(`${DEV}/_shabd/studio/redirect?from=/gone&to=/guide/intro`, { headers })],
+      ['add a redirect', (headers) => request.post(`${DEV}/_shabd/studio/redirect`, { headers, data: { from: '/gone', to: '/guide/intro' } })],
+    ]
+    const config = await site.read('shabd.config.yaml')
+
+    for (const [what, send] of attempts) {
+      expect((await send({})).status(), `${what}, with no token`).toBe(403)
+      expect((await send({ 'x-shabd-studio': 'a-guess' })).status(), `${what}, with a guessed token`).toBe(403)
+      expect((await send({ 'x-shabd-studio': token, origin: 'https://elsewhere.example' })).status(), `${what}, from another origin`).toBe(403)
+      expect((await send({ 'x-shabd-studio': token, 'sec-fetch-site': 'cross-site' })).status(), `${what}, from another site`).toBe(403)
+      expect((await send({ 'x-shabd-studio': token, 'sec-fetch-site': 'same-site' })).status(), `${what}, from a sibling site`).toBe(403)
+    }
+
+    expect(existsSync(site.path('content/extras/made.md'))).toBe(false)
+    expect(existsSync(site.path('content/extras/moved.md'))).toBe(false)
+    expect(existsSync(site.path('content/extras/alpha.md'))).toBe(true)
+    expect(await site.read('shabd.config.yaml')).toBe(config)
+  })
+
+  test('a new page, or the new place of one that moves, cannot be anywhere but a page in the content folder', async ({ request, site }) => {
+    const headers = { 'x-shabd-studio': await studioToken(request) }
+    const make = (id: unknown) => request.post(`${DEV}/_shabd/studio/page`, { headers, data: { id, source: 'made' } })
+    const move = (to: unknown) => request.patch(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/alpha.md', to } })
+    const alpha = await site.read('content/extras/alpha.md')
+
+    // A folder beside the content folder, to see that nothing reaches it, and a link to it from inside.
+    const elsewhere = site.path('elsewhere')
+    await mkdir(elsewhere, { recursive: true })
+    await symlink(elsewhere, site.path('content/linked'), 'junction')
+    try {
+      const outside = [
+        '../made.md',
+        '../elsewhere/made.md',
+        '../../made.md',
+        'extras/../../made.md',
+        'extras/../../elsewhere/made.md',
+        '..\\made.md',
+        'extras\\..\\..\\made.md',
+        site.path('made.md'),
+        site.path('elsewhere/made.md'),
+        '/tmp/made.md',
+        'C:\\made.md',
+        // Through the link: the path stays inside the content folder as text, and leaves it on disk.
+        'linked/made.md',
+        'linked/deeper/made.md',
+      ]
+      const notPages = [
+        './made.md',
+        'extras/./made.md',
+        'extras//made.md',
+        'extras/',
+        'extras/made',
+        'extras/made.txt',
+        'extras/made.md.txt',
+        'extras/made.html',
+        '_made.md',
+        'extras/_made.md',
+        '_drafts/made.md',
+        '.made.md',
+        'extras/.hidden/made.md',
+        '.git/made.md',
+        'extras/ma\u0000de.md',
+        'extras/ma\nde.md',
+        ' made.md',
+        '',
+      ]
+      for (const id of [...outside, ...notPages, 42, null, ['extras/made.md'], { path: 'extras/made.md' }]) {
+        expect((await make(id)).status(), `make ${JSON.stringify(id)}`).toBe(400)
+        expect((await move(id)).status(), `move to ${JSON.stringify(id)}`).toBe(400)
+      }
+      for (const file of ['made.md', 'elsewhere/made.md', '../made.md', 'content/made.md', 'content/_made.md', 'content/extras/made']) {
+        expect(existsSync(site.path(file)), file).toBe(false)
+      }
+      expect(await readdir(elsewhere)).toEqual([])
+
+      // Nothing is written over: not a page, not a file that is no page, and not the address a page already has.
+      await site.write('content/extras/notes.txt', 'kept')
+      await site.write('content/extras/_partial.md', 'kept')
+      for (const taken of ['extras/alpha.md', 'extras/beta.md', 'index.mdx']) {
+        expect((await make(taken)).status(), `make ${taken}`).toBe(409)
+      }
+      for (const taken of ['extras/beta.md', 'index.mdx', 'guide/setup.md']) {
+        expect((await move(taken)).status(), `move to ${taken}`).toBe(409)
+      }
+      for (const sameAddress of ['extras/alpha.mdx', 'extras/alpha/index.md', 'Extras/Alpha.md', 'index.md', 'guide/intro/index.mdx']) {
+        expect((await make(sameAddress)).status(), `make ${sameAddress}`).toBe(409)
+      }
+      expect((await move('extras/beta.mdx')).status()).toBe(409)
+      expect((await move('extras/alpha.md')).status(), 'move to the name it has').toBe(400)
+      expect(await site.read('content/extras/alpha.md')).toBe(alpha)
+      expect(await site.read('content/extras/beta.md')).toContain('Beta notes')
+      expect(await site.read('content/extras/notes.txt')).toBe('kept')
+      expect(existsSync(site.path('content/extras/alpha.mdx'))).toBe(false)
+      expect(existsSync(site.path('content/extras/alpha/index.md'))).toBe(false)
+
+      // Only a page can be moved or deleted, and it is found by its name: a path gets nowhere.
+      const notPageNames = ['../shabd.config.yaml', '../sidebar.yaml', 'extras/notes.txt', 'extras/_partial.md', 'extras', 'extras/', 'no/such.md']
+      for (const id of [...notPageNames, site.path('content/extras/alpha.md'), 42, null]) {
+        const moved = await request.patch(`${DEV}/_shabd/studio/page`, { headers, data: { id, to: 'extras/moved.md' } })
+        expect(moved.status(), `move ${JSON.stringify(id)}`).toBe(404)
+        const deleted = await request.delete(`${DEV}/_shabd/studio/page`, { headers, data: { id } })
+        expect(deleted.status(), `delete ${JSON.stringify(id)}`).toBe(404)
+      }
+      for (const kept of ['shabd.config.yaml', 'sidebar.yaml', 'content/extras/notes.txt', 'content/extras/_partial.md', 'content/extras/alpha.md']) {
+        expect(existsSync(site.path(kept)), kept).toBe(true)
+      }
+      expect(existsSync(site.path('content/extras/moved.md'))).toBe(false)
+
+      // A page is not deleted if it is no longer what the Studio showed.
+      const stale = await request.delete(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/alpha.md', baseHash: 'not-its-hash' } })
+      expect(stale.status()).toBe(409)
+      expect(await site.read('content/extras/alpha.md')).toBe(alpha)
+    } finally {
+      await rm(site.path('content/linked'), { force: true })
+      await rm(elsewhere, { recursive: true, force: true })
+    }
+  })
+
+  test('the same endpoints do make, move and delete a page that is asked for properly', async ({ request, site }) => {
+    const headers = { 'x-shabd-studio': await studioToken(request) }
+    for (const file of ['content/extras/made.md', 'content/handbook/start/moved.mdx']) await site.track(file)
+
+    const made = await request.post(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/made.md', source: '# Made\n' } })
+    expect(made.status()).toBe(201)
+    expect(await made.json()).toEqual({ id: 'extras/made.md', path: '/extras/made' })
+    expect(await site.read('content/extras/made.md')).toBe('# Made\n')
+    await expect.poll(async () => (await request.get(`${DEV}/extras/made`)).status()).toBe(200)
+
+    // Into folders that are not there yet.
+    const moved = await request.patch(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/made.md', to: 'handbook/start/moved.mdx' } })
+    expect(await moved.json()).toEqual({ id: 'handbook/start/moved.mdx', path: '/handbook/start/moved', from: '/extras/made' })
+    expect(existsSync(site.path('content/extras/made.md'))).toBe(false)
+    expect(await site.read('content/handbook/start/moved.mdx')).toBe('# Made\n')
+    await expect.poll(async () => (await request.get(`${DEV}/extras/made`)).status()).toBe(404)
+    await expect.poll(async () => (await request.get(`${DEV}/handbook/start/moved`)).status()).toBe(200)
+
+    const deleted = await request.delete(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'handbook/start/moved.mdx' } })
+    expect(deleted.status()).toBe(200)
+    expect(existsSync(site.path('content/handbook/start/moved.mdx'))).toBe(false)
+    await expect.poll(async () => (await request.get(`${DEV}/handbook/start/moved`)).status()).toBe(404)
+    await rm(site.path('content/handbook'), { recursive: true, force: true })
+  })
+
+  test('a page made a moment after another was deleted still reaches the page on screen, which is not loaded again', async ({ page, request, site }) => {
+    for (const file of ['content/extras/beta.md', 'content/extras/kappa.md']) await site.track(file)
+    const headers = { 'x-shabd-studio': await studioToken(request) }
+    await open(page, `${DEV}/guide/intro`)
+    const stillThere = await markPage(page)
+    const extras = page.locator('.sb-nav-category', { hasText: 'Extras' })
+    await expect(extras.locator('.sb-nav-link')).toHaveText(['Alpha notes', 'Beta notes'])
+
+    // The file is gone from disk, and the watcher will say so in a tenth of a second. Before it has, a new
+    // page arrives by a way that does not wait for the watcher, and the list of pages is made again with the
+    // deleted one still on it. That list once failed to compile, and the browser loaded the page again.
+    await rm(site.path('content/extras/beta.md'))
+    const made = await request.post(`${DEV}/_shabd/studio/page`, {
+      headers,
+      data: { id: 'extras/kappa.md', source: '---\ntitle: Kappa notes\n---\n\nMade.\n' },
+    })
+    expect(made.status()).toBe(201)
+
+    await expect(extras.locator('.sb-nav-link')).toHaveText(['Alpha notes', 'Kappa notes'])
+    await extras.getByRole('link', { name: 'Kappa notes' }).click()
+    await expect(page).toHaveURL(`${DEV}/extras/kappa`)
+    await expect(page.locator('.sb-content')).toContainText('Made.')
+    expect(await stillThere()).toBe(true)
+  })
+
+  test('a redirect is added only from an address a page has left to a page, and the config is otherwise left as it was', async ({ request, site }) => {
+    const headers = { 'x-shabd-studio': await studioToken(request) }
+    const config = await site.read('shabd.config.yaml')
+    const ask = (from: string, to: string) => request.get(`${DEV}/_shabd/studio/redirect`, { headers, params: { from, to } })
+    const add = (from: unknown, to: unknown) => request.post(`${DEV}/_shabd/studio/redirect`, { headers, data: { from, to } })
+
+    for (const [from, to] of [
+      ['/gone', '/no/such/page'],
+      ['/gone', 'https://elsewhere.example/'],
+      ['/gone', '//elsewhere.example/'],
+      ['/gone', '/guide/intro#getting-started'],
+      // From where a page is, or where a redirect already starts.
+      ['/guide/setup', '/guide/intro'],
+      ['/guide/start', '/guide/setup'],
+      ['https://elsewhere.example/', '/guide/intro'],
+      ['gone', '/guide/intro'],
+      ['/gone/', '/guide/intro'],
+      ['/gone\n  /injected: /guide/setup', '/guide/intro'],
+      [42, '/guide/intro'],
+    ] as const) {
+      expect((await add(from, to)).status(), `${String(from)} → ${to}`).toBe(409)
+    }
+    expect(await (await ask('/gone', '/no/such/page')).json()).toMatchObject({
+      possible: false,
+      reason: 'There is no page at /no/such/page to send readers to.',
+    })
+    expect(await site.read('shabd.config.yaml')).toBe(config)
+
+    // One that is in order: one line more, after the last redirect, and nothing else different.
+    await site.track('shabd.config.yaml')
+    expect(await (await ask('/gone', '/guide/intro')).json()).toEqual({ possible: true, line: '/gone: /guide/intro' })
+    expect(await site.read('shabd.config.yaml')).toBe(config)
+    expect((await add('/gone', '/guide/intro')).status()).toBe(200)
+    expect(await site.read('shabd.config.yaml')).toBe(config.replace('#second-step\n', '#second-step\n  /gone: /guide/intro\n'))
+    // The server sends readers on at once.
+    const sent = await request.get(`${DEV}/gone`, { maxRedirects: 0 })
+    expect([sent.status(), sent.headers().location]).toEqual([302, '/guide/intro'])
+    // And not twice from one address.
+    expect((await add('/gone', '/guide/setup')).status()).toBe(409)
   })
 })
 

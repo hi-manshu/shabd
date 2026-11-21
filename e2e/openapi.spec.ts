@@ -99,4 +99,41 @@ test.describe('a description that changes while shabd dev runs', () => {
     await open(page, `${DEV}/guide/setup`)
     await expect(page.getByRole('button', { name: 'Edit page' })).toBeVisible()
   })
+
+  test('the Studio does not save, move or delete a page that is made from the description', async ({ page, request }) => {
+    const { token } = (await (await request.get(`${DEV}/_shabd/studio/session`)).json()) as { token: string }
+    const headers = { 'x-shabd-studio': token }
+    // A made page has a name like any other, and a file, in a folder of Shabd's own.
+    const id = 'store/items/list-items.md'
+    const refused = 'This page is made from store.yaml. Change the description, and the page follows.'
+    for (const [what, response] of [
+      ['save', await request.put(`${DEV}/_shabd/studio/source`, { headers, data: { id, source: '# Mine\n' } })],
+      ['move', await request.patch(`${DEV}/_shabd/studio/page`, { headers, data: { id, to: 'guide/mine.md' } })],
+      ['delete', await request.delete(`${DEV}/_shabd/studio/page`, { headers, data: { id } })],
+    ] as const) {
+      expect(response.status(), what).toBe(403)
+      expect(((await response.json()) as { error: string }).error, what).toBe(refused)
+    }
+
+    // Open the Studio on a page of the site's own, and go from there to a made page: the way to one
+    // that the missing button does not close.
+    await open(page, `${DEV}/guide/setup`)
+    await page.getByRole('button', { name: 'Edit page' }).click()
+    const studio = page.locator('.sb-studio')
+    await expect(studio.getByRole('button', { name: 'Rename' })).toBeVisible()
+    await page.evaluate(() => {
+      const link = document.createElement('a')
+      link.href = '/store/items/list-items'
+      document.body.append(link)
+      link.click()
+      link.remove()
+    })
+    await expect(page.locator('h1.sb-page-title')).toHaveText('List items')
+    await expect(studio).toContainText('This page is made from an OpenAPI description.')
+    await expect(studio.getByRole('button', { name: 'Rename' })).toHaveCount(0)
+    await expect(studio.getByRole('button', { name: 'Delete' })).toHaveCount(0)
+    await expect(studio.getByRole('textbox')).toHaveCount(0)
+    // A new page can still be made from here.
+    await expect(studio.getByRole('button', { name: 'New page' })).toBeVisible()
+  })
 })
