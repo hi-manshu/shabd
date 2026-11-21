@@ -164,6 +164,8 @@ test.describe('with the keyboard', () => {
     await expect(said).toHaveText('0 results')
     // The option the arrow keys are on is named to the field, which keeps the focus.
     await field.fill('step')
+    // Not before the results are there: an arrow key pressed over an empty list is on no option.
+    await expect(said).toHaveText(/^[2-9] results$/)
     await page.keyboard.press('ArrowDown')
     const active = await field.getAttribute('aria-activedescendant')
     await expect(dialog.locator(`[id="${active}"]`)).toHaveAttribute('aria-selected', 'true')
