@@ -3,12 +3,13 @@ import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react
 import { CODE_THEMES_ID, CODE_THEMES_META, COLOR_MODE_KEY, PALETTE_KEY } from '../../../shared/presets.js'
 import { isExternal } from '../../../shared/paths.js'
 import type { PaletteChoice } from '../../../shared/types.js'
-import { hasIcon, Icon } from '../../app/icons.js'
+import { hasIcon } from '../../app/icon-table.js'
+import { Icon } from '../../app/icons.js'
 import { usePage } from '../../app/router.js'
 import { useSite } from '../../app/store.js'
 import { setUi, useUi } from '../../app/ui.js'
 import { Badge } from '../../ui/Badge.js'
-import { useHref } from '../../ui/Link.js'
+import { useHref } from '../../ui/href.js'
 
 export function MenuToggle() {
   const { layout } = usePage()

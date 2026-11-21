@@ -5,7 +5,7 @@ import { Icon } from '../app/icons.js'
 import { useRouter } from '../app/router.js'
 import { useSite, useStore } from '../app/store.js'
 import { setUi } from '../app/ui.js'
-import { useHref } from '../ui/Link.js'
+import { useHref } from '../ui/href.js'
 import { openSearch, runSearch, searchStatus, type SearchResults, type SearchStatus } from './client.js'
 
 /**

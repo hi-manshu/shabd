@@ -1,4 +1,4 @@
-import { useHref } from '../ui/Link.js'
+import { useHref } from '../ui/href.js'
 
 /** Body of the page shown for a URL that matches no content file. */
 export function NotFound() {

@@ -19,7 +19,7 @@ import { flattenSidebar } from '../../shared/sidebar.js'
 import type { PageMeta, SiteData } from '../../shared/types.js'
 import { useRouter } from '../app/router.js'
 import { routeStore, siteStore, useSite } from '../app/store.js'
-import { useHref } from '../ui/Link.js'
+import { useHref } from '../ui/href.js'
 import { addRedirect, checkSite, leftBehind, redirectOffer, type CheckProblem, type RedirectOffer, type StudioBackend } from './backends.js'
 
 interface PageActionsProps {
@@ -55,7 +55,7 @@ const UNSAVED = 'This page has changes that are not saved yet. Deal with those f
 const NOTICE_MS = 10_000
 
 /** What was typed, as a path in the content folder: `/guide/new page` is `guide/new page.md`. */
-export function typedPath(typed: string): string {
+function typedPath(typed: string): string {
   const path = typed.trim().replace(/^\.?\/+/, '')
   return path === '' || path.endsWith('/') || isPageFile(path) ? path : `${path}.md`
 }
