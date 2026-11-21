@@ -194,10 +194,10 @@ What it found that is not fixed:
 ### What has been checked, and what has not
 
 - 775 unit and integration tests pass.
-- 472 browser tests pass in Playwright's Chromium, Firefox and WebKit. 41 more are skipped: where an engine lacks
-  what a test needs, and the tests that belong to a variation that was not switched on for that run. That run
-  was made just before two small changes: a mend to the Theme tab, and the one that makes search run once. The
-  tests of the Theme tab, of the Studio's editor and of search were run again after them, in all three engines.
+- 471 browser tests pass in Playwright's Chromium, Firefox and WebKit, on the last commit that changes code. 42
+  more are skipped: where an engine lacks what a test needs, the tests that belong to a variation that was not
+  switched on for that run, and one that skips itself when two pages of a browser cannot reach each other. That
+  one is peer editing by codes, in Chromium. It passed in the run before, and twice on its own after this one.
 - The four variations of the browser tests were run once the Theme tab was finished. The whole suite with the
   search index in SQLite: 480 pass, 32 are skipped and one failed, where a test pressed an arrow key before a
   search had answered. Search was running twice on a site with versions or languages. It runs once now, and
