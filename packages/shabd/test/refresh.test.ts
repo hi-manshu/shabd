@@ -8,7 +8,7 @@
  * a whole page started again. So a component lives in a file of its own, and
  * this test holds every file of the client to that.
  */
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -65,5 +65,68 @@ describe('a file of the client that exports a component', () => {
     expect(of('ui/Link.tsx')).toEqual({ components: ['Link'], others: [] })
     expect(of('app/icons.tsx')).toEqual({ components: ['Icon'], others: [] })
     expect(of('studio/PageActions.tsx')).toEqual({ components: ['PageActions'], others: [] })
+  })
+})
+
+/**
+ * A hot update gives each module that takes it a fresh copy of the modules
+ * between it and the one that changed. A component's file takes an update by
+ * itself, so a module that stands above one, and that keeps something for
+ * the life of the page, can come to exist twice: the router's contexts did,
+ * and the header was then "used outside the Shabd app". A module with
+ * nothing but plain modules below it cannot: a change below it reaches the
+ * app's entry, and the page starts again.
+ */
+describe('a module of the client that keeps something for the life of the page', () => {
+  const files = (readdirSync(CLIENT, { recursive: true }) as string[]).filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.d.ts')).sort()
+  const source = new Map(files.map((file) => [file, readFileSync(path.join(CLIENT, file), 'utf8')]))
+
+  /** The file of the client a module imports from, for an import that is not of types alone. */
+  const resolve = (from: string, specifier: string): string | undefined => {
+    if (!specifier.startsWith('.')) return undefined
+    const base = path.join(path.dirname(path.join(CLIENT, from)), specifier.replace(/\.js$/, ''))
+    for (const ending of ['.ts', '.tsx', '/index.ts', '/index.tsx']) if (existsSync(base + ending)) return path.relative(CLIENT, base + ending)
+    return undefined
+  }
+  const imports = (file: string): string[] =>
+    [...source.get(file)!.matchAll(/^import\s+(?!type\b)[^'"]*?from\s+['"]([^'"]+)['"]/gm)].flatMap(([, specifier]) => {
+      const found = resolve(file, specifier!)
+      return found && source.has(found) ? [found] : []
+    })
+  const below = (file: string, seen = new Set<string>()): Set<string> => {
+    for (const next of imports(file)) {
+      if (seen.has(next)) continue
+      seen.add(next)
+      below(next, seen)
+    }
+    return seen
+  }
+  /** A file that takes a hot update by itself: every export of it is a component. */
+  const takesUpdates = (file: string) => {
+    const { components, others } = exportsOf(source.get(file)!)
+    return file.endsWith('.tsx') && components.length > 0 && others.length === 0
+  }
+  /** What a file makes once and keeps: a context, a store, a table, or a variable it writes to. */
+  const keeps = (file: string): string[] => [
+    ...[...source.get(file)!.matchAll(/^(?:export\s+)?(?:const|let)\s+([A-Za-z0-9_$]+)[^=\n]*=\s*(?:createContext|createStore|new Map|new Set|new WeakMap)\b/gm)].map(([, name]) => name!),
+    ...[...source.get(file)!.matchAll(/^let\s+([A-Za-z0-9_$]+)/gm)].map(([, name]) => name!),
+  ]
+
+  it('does not stand above a component, or keeps it through a hot update', () => {
+    const exposed = files.flatMap((file) => {
+      if (takesUpdates(file) || keeps(file).length === 0) return []
+      const components = [...below(file)].filter(takesUpdates)
+      // `import.meta.hot.data` is the same for every copy of a module.
+      return components.length > 0 && !/import\.meta\.hot\??\.data/.test(source.get(file)!) ? [`${file} keeps ${keeps(file).join(', ')} above ${components[0]}`] : []
+    })
+    expect(exposed).toEqual([])
+  })
+
+  it('finds the stores and the tables there are, so that the check above is of something', () => {
+    const keeping = files.filter((file) => !takesUpdates(file) && keeps(file).length > 0)
+    expect(keeping).toEqual(expect.arrayContaining(['app/hmr.ts', 'app/store.ts', 'app/ui.ts', 'sandbox/shared-state.ts', 'search/client.ts']))
+    // The router stands above the page that says a page was not found, and keeps its contexts through an update.
+    expect([...below('app/router.tsx')].filter(takesUpdates)).toContain('app/NotFound.tsx')
+    expect(source.get('app/router.tsx')).toContain('import.meta.hot?.data')
   })
 })

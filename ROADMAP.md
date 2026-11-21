@@ -198,8 +198,9 @@ Not checked:
   connection, so the two tests that cut it are skipped there.
 - Firefox now and then warns that the layout of an isolated snippet's frame was forced before the frame had loaded,
   on a page that also has a code editor. Nothing was seen to be wrong, and what asks for the layout was not found.
-- Hot updates of the theme's own source in Firefox and WebKit, and what a hot update does to the app's stores.
-  The router's contexts are kept through one; the stores were not looked at.
+- Hot updates of the theme's own source in Firefox and WebKit. They were tried in Chromium. A hot update cannot
+  hand out a second copy of one of the app's stores: none of them stands above a component's file, and a test
+  reads what every file of the client imports to keep it so.
 - In the Studio: an image is not moved, renamed or deleted with its page; pasting and dropping are tested with
   events the test makes, not with the real clipboard or a real drag; and while a page is renamed its breadcrumbs
   and its mark in the sidebar are gone for as long as the next page takes to draw.
