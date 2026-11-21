@@ -5,6 +5,7 @@
  * "doc", "splash" and "api" are not special cases in any component: they are
  * three entries in a table that `shabd.config.yaml` can edit or add to.
  */
+import { placeOf } from './editions.js'
 import { BUILTIN_BLOCKS, REGIONS, type RegionName } from './blocks.js'
 import type { BlockRef, Frontmatter, LayoutDefinition, ShabdConfig, TocOptions } from './schema.js'
 import type { LayoutWidth, ResolvedLayout, SiteData, TocEntry } from './types.js'
@@ -22,6 +23,9 @@ export const BUILTIN_LAYOUT_DEFINITIONS: Record<string, LayoutDefinition> = {
         'nav',
         'spacer',
         'search',
+        // Each is there on a site that has more than one version, or more than one language, and nowhere else.
+        'version-menu',
+        'language-menu',
         'studio-toggle',
         'social',
         'theme-menu',
@@ -35,7 +39,7 @@ export const BUILTIN_LAYOUT_DEFINITIONS: Record<string, LayoutDefinition> = {
     width: 'content',
     regions: {
       sidebar: blocks('sidebar-nav'),
-      main: blocks('breadcrumbs', 'page-header', 'page-actions', 'content', 'page-footer', 'pagination'),
+      main: blocks('version-notice', 'breadcrumbs', 'page-header', 'page-actions', 'content', 'page-footer', 'pagination'),
       aside: blocks('toc'),
     },
   },
@@ -53,7 +57,7 @@ export const BUILTIN_LAYOUT_DEFINITIONS: Record<string, LayoutDefinition> = {
     split: true,
     regions: {
       sidebar: blocks('sidebar-nav'),
-      main: blocks('breadcrumbs', 'page-header', 'page-actions', 'api-endpoint', 'content', 'pagination'),
+      main: blocks('version-notice', 'breadcrumbs', 'page-header', 'page-actions', 'api-endpoint', 'content', 'pagination'),
     },
   },
 }
@@ -210,7 +214,7 @@ export function meetsCondition(when: BlockRef['when'], path: string, frontmatter
  * every client navigation, so server and client markup cannot disagree.
  */
 export function resolvePageLayout(
-  site: Pick<SiteData, 'layouts' | 'defaults'> & Partial<Pick<SiteData, 'site' | 'features' | 'palettes'>>,
+  site: Pick<SiteData, 'layouts' | 'defaults'> & Partial<Pick<SiteData, 'site' | 'features' | 'palettes' | 'editions' | 'siteIn'>>,
   frontmatter: Pick<Frontmatter, 'layout' | 'sidebar' | 'toc' | 'pagination'> & Partial<Pick<Frontmatter, 'api'>> & Record<string, unknown>,
   toc: TocEntry[],
   /** The page's route, for blocks that are shown on some paths only. */
@@ -235,14 +239,21 @@ export function resolvePageLayout(
   if ((frontmatter.pagination ?? site.defaults.pagination) === false) hidden.add('pagination')
   if (frontmatter.api === undefined) hidden.add('api-endpoint')
   if (site.site) {
-    if (!site.site.footer) hidden.add('footer')
-    if (site.site.nav.length === 0) hidden.add('nav')
+    // A language can have a footer and links of its own (`languages[].footer`, `.nav`).
+    const said = site.siteIn?.[placeOf(path, site.editions ?? {}).language?.lang ?? '']
+    if (!(said?.footer ?? site.site.footer)) hidden.add('footer')
+    if ((said?.nav ?? site.site.nav).length === 0) hidden.add('nav')
     if (site.site.social.length === 0) hidden.add('social')
   }
   if (site.features && !site.features.search.enabled) hidden.add('search')
   // The actions lead to the page's Markdown copy, which is written with llms.txt.
   if (site.features && !site.features.llms.enabled) hidden.add('page-actions')
   if (!site.palettes?.length) hidden.add('theme-menu')
+  // A menu of versions or of languages is for a site with more than one, and the notice for a page of an older version.
+  const versions = site.editions?.versions ?? []
+  if (versions.length < 2) hidden.add('version-menu')
+  if ((site.editions?.languages?.length ?? 0) < 2) hidden.add('language-menu')
+  if (versions.length < 2 || (placeOf(path, site.editions ?? {}).version?.prefix ?? '') === '') hidden.add('version-notice')
 
   const regions: ActiveLayout['regions'] = {}
   for (const region of REGIONS) {

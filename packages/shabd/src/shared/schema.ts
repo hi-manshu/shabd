@@ -149,6 +149,8 @@ const NavItemSchema = z.strictObject({
   badge: BadgeSchema.optional(),
 })
 
+export type NavItem = z.output<typeof NavItemSchema>
+
 export const HEAD_TAGS = ['meta', 'link', 'script', 'style', 'noscript'] as const
 
 /** Elements that have no closing tag, and so no content. */
@@ -819,6 +821,50 @@ const blockName = z
   .string()
   .regex(/^[a-z][a-z0-9-]*$/, { error: 'Block names must be kebab-case, e.g. announcement-bar' })
 
+/* ─────────────────────────── versions and languages ────────────────────────── */
+
+/** Where a version or a language starts: one folder of the content, by its name. */
+const editionPath = z.string().regex(/^\/[A-Za-z0-9][A-Za-z0-9._-]*$/, { error: 'A path such as /v1: a slash, then the name of one folder' })
+
+const VersionSchema = z.strictObject({
+  /** What a reader picks it by: `2.x`. */
+  label: z.string().min(1),
+  /**
+   * Where its pages are: `/v1` for the pages of `content/v1`. The first
+   * version is the current one, whose pages are the site's own, and has none.
+   */
+  path: editionPath.optional(),
+  /**
+   * Whether search engines are asked to list its pages. They are asked not
+   * to list an older version's, so that a search leads to the current docs.
+   */
+  index: z.boolean().optional(),
+})
+
+const LanguageSchema = z.strictObject({
+  /** The language's code, as a page's `lang` says it: `de`, `pt-BR`. */
+  code: z.string().regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/, { error: 'A language code such as de or pt-BR' }),
+  /** Its name, in the language itself: `Deutsch`. */
+  label: z.string().min(1),
+  /**
+   * Where its pages are. Left out, it is the code in lower case: `/de`. The
+   * first language is the one the site is written in, and has no path.
+   */
+  path: editionPath.optional(),
+  /** The direction it is written in. */
+  dir: z.enum(['ltr', 'rtl']).default('ltr'),
+  /** The words of the site's own furniture in this language: "Search", "On this page". Each is named by a key. */
+  ui: z.record(z.string(), z.string()).default({}),
+  /**
+   * The header's links in this language. Left out, they are `site.nav`,
+   * each leading to its page in this language where there is one. The first
+   * language is the site's own, and its links are `site.nav`.
+   */
+  nav: z.array(NavItemSchema).optional(),
+  /** The site's footer in this language. Left out, it is `site.footer`. */
+  footer: z.string().optional(),
+})
+
 export const ConfigSchema = z.strictObject({
   site: SiteSchema,
   content: ContentSchema.prefault({}),
@@ -835,6 +881,10 @@ export const ConfigSchema = z.strictObject({
   blocks: z.record(blockName, z.string().min(1)).default({}),
   /** Addresses that have moved. Old path → new path, or a full address. */
   redirects: z.record(redirectSource, redirectTarget).default({}),
+  /** The versions of the docs, the current one first. Each of the others is a folder of the content. */
+  versions: z.array(VersionSchema).default([]),
+  /** The languages the site is in, the one it is written in first. Each of the others is a folder of the content. */
+  languages: z.array(LanguageSchema).default([]),
   /** Values every page can use by name: `{{version}}`. */
   vars: VarsSchema.default({}),
   /** How Markdown is read: the site's own plugins, and maths. */

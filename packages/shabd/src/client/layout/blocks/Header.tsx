@@ -1,8 +1,10 @@
 /** Blocks that normally live in the `header` region. Each is independent, so YAML can reorder or drop them. */
 import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { CODE_THEMES_ID, CODE_THEMES_META, COLOR_MODE_KEY, PALETTE_KEY } from '../../../shared/presets.js'
-import { isExternal } from '../../../shared/paths.js'
+import { placeOf, samePlace } from '../../../shared/editions.js'
+import { isExternal, normalizePath } from '../../../shared/paths.js'
 import type { PaletteChoice } from '../../../shared/types.js'
+import { useLocalLink, usePlace, useSiteInLanguage, useText } from '../../app/edition.js'
 import { hasIcon } from '../../app/icon-table.js'
 import { Icon } from '../../app/icons.js'
 import { usePage } from '../../app/router.js'
@@ -14,12 +16,13 @@ import { useHref } from '../../ui/href.js'
 export function MenuToggle() {
   const { layout } = usePage()
   const { sidebarOpen } = useUi()
+  const text = useText()
   if (!layout.regions.sidebar) return null
   return (
     <button
       type="button"
       className="sb-icon-button sb-menu-toggle"
-      aria-label={sidebarOpen ? 'Close navigation' : 'Open navigation'}
+      aria-label={text(sidebarOpen ? 'nav.close' : 'nav.open')}
       aria-expanded={sidebarOpen}
       // The sidebar region. PageLayout gives it this id.
       aria-controls="sb-sidebar"
@@ -33,8 +36,10 @@ export function MenuToggle() {
 export function SiteTitle() {
   const { site } = useSite()
   const href = useHref()
+  const { home } = useSiteInLanguage()
   const { logo } = site
-  const target = logo?.href ?? '/'
+  // The title leads to where the site starts, which for a reader of another language is where that language starts.
+  const target = !logo || logo.href === '/' ? home : logo.href
   // A logo that stands in for the title has to carry the link's name.
   const alt = logo?.replacesTitle ? logo.alt || site.title : (logo?.alt ?? '')
   return (
@@ -58,19 +63,25 @@ export function SiteTitle() {
 const firstSegment = (path: string) => path.split('/')[1] ?? ''
 
 export function Nav() {
-  const { site } = useSite()
-  const { path } = usePage()
+  const place = usePlace()
+  const { nav } = useSiteInLanguage()
+  const local = useLocalLink()
   const href = useHref()
-  if (site.nav.length === 0) return null
+  const text = useText()
+  if (nav.length === 0) return null
   return (
-    <nav className="sb-nav" aria-label="Main">
+    <nav className="sb-nav" aria-label={text('nav.main')}>
       <ul>
-        {site.nav.map((item) => {
+        {nav.map((item) => {
           const internal = item.link.startsWith('/')
-          const current = internal && firstSegment(item.link) === firstSegment(path) && path !== '/'
+          // A link leads to the reader's own language and version where the page is there too.
+          const link = local(item.link)
+          const there = placeOf(normalizePath(link.split(/[?#]/)[0]!), place.editions)
+          // The part of the site a reader is in: the link's first folder, in their language and version.
+          const current = internal && samePlace(there, place) && firstSegment(there.rest) === firstSegment(place.rest) && place.rest !== '/'
           return (
             <li key={item.link}>
-              <a href={href(item.link)} aria-current={current ? 'true' : undefined}>
+              <a href={href(link)} aria-current={current ? 'true' : undefined}>
                 {item.label}
                 {item.badge && <Badge {...item.badge} />}
               </a>
@@ -87,8 +98,9 @@ export function Spacer() {
   return <span className="sb-spacer" />
 }
 
-export function SearchButton({ label = 'Search' }: { label?: string }) {
+export function SearchButton({ label }: { label?: string }) {
   const { features } = useSite()
+  const text = useText()
   const enabled = features.search.enabled
   // The modifier differs by platform and is only known in the browser.
   const [shortcut, setShortcut] = useState('Ctrl K')
@@ -112,7 +124,7 @@ export function SearchButton({ label = 'Search' }: { label?: string }) {
   return (
     <button type="button" className="sb-search-button" onClick={() => setUi({ searchOpen: true })}>
       <Icon name="search" size={16} />
-      <span className="sb-search-button-label">{label}</span>
+      <span className="sb-search-button-label">{label ?? text('search')}</span>
       <kbd>{shortcut}</kbd>
     </button>
   )
@@ -168,6 +180,7 @@ function loadCodeThemes(): void {
 
 export function ThemeToggle() {
   const { colorMode, palettes } = useSite()
+  const text = useText()
   if (!colorMode.toggle) return null
   const toggle = () => {
     const root = document.documentElement
@@ -182,7 +195,7 @@ export function ThemeToggle() {
   }
   // Both icons are rendered and CSS shows one, so server and client markup match in either mode.
   return (
-    <button type="button" className="sb-icon-button sb-theme-toggle" onClick={toggle} aria-label="Switch colour theme">
+    <button type="button" className="sb-icon-button sb-theme-toggle" onClick={toggle} aria-label={text('theme.mode')}>
       <span className="sb-only-light">
         <Icon name="moon" />
       </span>
@@ -199,6 +212,7 @@ export function ThemeToggle() {
  * applies it before the next page paints.
  */
 export function ThemeMenu() {
+  const text = useText()
   const { palettes } = useSite()
   const own = palettes[0]?.name
   const [open, setOpen] = useState(false)
@@ -237,8 +251,8 @@ export function ThemeMenu() {
   const titled = looks.length > 0 && colours.length > 0
   const groups = [
     { title: undefined, palettes: palettes.slice(0, 1) },
-    { title: titled ? 'Themes' : undefined, palettes: looks },
-    { title: titled ? 'Palettes' : undefined, palettes: colours },
+    { title: titled ? text('theme.themes') : undefined, palettes: looks },
+    { title: titled ? text('theme.palettes') : undefined, palettes: colours },
   ].filter((group) => group.palettes.length > 0)
 
   const choose = (name: string) => {
@@ -266,7 +280,7 @@ export function ThemeMenu() {
       <button
         type="button"
         className="sb-icon-button"
-        aria-label="Choose a theme"
+        aria-label={text('theme.choose')}
         aria-expanded={open}
         aria-controls="sb-theme-menu-list"
         onClick={() => {
@@ -276,7 +290,7 @@ export function ThemeMenu() {
       >
         <Icon name="palette" />
       </button>
-      <div className="sb-theme-menu-list" id="sb-theme-menu-list" role="group" aria-label="Theme" hidden={!open}>
+      <div className="sb-theme-menu-list" id="sb-theme-menu-list" role="group" aria-label={text('theme.list')} hidden={!open}>
         {groups.map((group) => (
           <Fragment key={group.title ?? 'own'}>
             {group.title && <p className="sb-theme-menu-heading">{group.title}</p>}

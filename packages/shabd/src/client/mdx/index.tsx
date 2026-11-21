@@ -9,6 +9,7 @@
  * Sites add or replace entries through `components:` in shabd.config.yaml.
  */
 import { lazy, Suspense, useSyncExternalStore, type ComponentProps, type ComponentType } from 'react'
+import { useText } from '../app/edition.js'
 import { useSite } from '../app/store.js'
 import { Badge } from '../ui/Badge.js'
 import { useHref } from '../ui/href.js'
@@ -30,8 +31,9 @@ import { Tab, Tabs } from './Tabs.js'
  * several landmarks called the same.
  */
 function Table(props: ComponentProps<'table'>) {
+  const text = useText()
   return (
-    <div className="sb-table-scroll" tabIndex={0} role="group" aria-label="Table">
+    <div className="sb-table-scroll" tabIndex={0} role="group" aria-label={text('table')}>
       <table {...props} />
     </div>
   )

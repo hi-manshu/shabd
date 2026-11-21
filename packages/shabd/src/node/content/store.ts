@@ -7,6 +7,7 @@
  * much changed, so the dev server can decide between "swap one page module"
  * and "also refresh navigation" without rescanning the content directory.
  */
+import { editionRoots, placeOf } from '../../shared/editions.js'
 import { createHash } from 'node:crypto'
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -230,7 +231,7 @@ export class ContentStore {
         isIndex: page.isIndex,
         sidebar: page.frontmatter.sidebar,
       })),
-      { lang: this.config.config.site.lang, apis: this.#apis },
+      { lang: this.config.config.site.lang, apis: this.#apis, roots: editionRoots(this.config.editions) },
     )
     return this.#sidebar
   }
@@ -247,6 +248,16 @@ export class ContentStore {
     const { config, layouts } = this.config
     const pages: Record<string, PageMeta> = {}
     if (options.dev) for (const page of this.pages()) pages[page.path] = pageMeta(page)
+    const hasEditions = (this.config.editions.languages?.length ?? 0) > 1 || (this.config.editions.versions?.length ?? 0) > 1
+    // The words a language gives for the site's own furniture. A language that gives none is left out.
+    const ui = Object.fromEntries(config.languages.filter((language) => Object.keys(language.ui).length > 0).map((language) => [language.code, language.ui]))
+    // The header's links and the footer, in each language that has its own.
+    const siteIn = Object.fromEntries(
+      config.languages.flatMap((language) => {
+        const said = { ...(language.nav ? { nav: language.nav } : {}), ...(language.footer !== undefined ? { footer: language.footer } : {}) }
+        return Object.keys(said).length > 0 ? [[language.code, said]] : []
+      }),
+    )
     // The tags for <head> are written into each document. Leaving them out here keeps them out of the script.
     const { head: _head, ...site } = config.site
     return {
@@ -258,6 +269,9 @@ export class ContentStore {
       layouts,
       sidebar: this.sidebar.sidebar,
       ...(this.sidebar.sections.length ? { sidebars: this.sidebar.sections } : {}),
+      ...(hasEditions ? { editions: this.config.editions } : {}),
+      ...(Object.keys(ui).length > 0 ? { ui } : {}),
+      ...(Object.keys(siteIn).length > 0 ? { siteIn } : {}),
       contentDir: config.content.dir,
       // The whole table of pages is for the dev server. A build sends each page what is known of it, with the page.
       ...(options.dev ? { pagesInDev: pages, themeCss: themeToCss(config.theme) } : {}),
@@ -405,7 +419,8 @@ export class ContentStore {
       title: frontmatter.title ?? heading ?? fallback,
       titleFromHeading: heading !== undefined,
       description: frontmatter.description ?? '',
-      ...(day ? { updated: { day, text: formatDay(day, this.config.config.site.lang) } } : {}),
+      // The day is written as the page's own language writes one: `21. November 2026` on a German page.
+      ...(day ? { updated: { day, text: formatDay(day, placeOf(slugToPath(slug), this.config.editions).language?.lang ?? this.config.config.site.lang) } } : {}),
       ...(error ? { error } : {}),
       ...(generated ? { generated } : {}),
     }

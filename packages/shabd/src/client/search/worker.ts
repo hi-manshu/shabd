@@ -9,6 +9,7 @@
  * Keyword search works from the first keystroke. Semantic search joins in
  * when the model has loaded, without the reader doing anything.
  */
+import { placeOf, samePlace } from '../../shared/editions.js'
 import { MemoryStore, type SearchIndexFile, type SearchStore } from '../../shared/search-core.js'
 import type { ModelStatus, WorkerRequest, WorkerResponse } from './protocol.js'
 
@@ -141,12 +142,26 @@ function loadModel(): Promise<void> {
   return modelLoading
 }
 
+/** The most sections one query is ever asked for, however many languages and versions the site has. */
+const MOST_ASKED_FOR = 240
+
 async function query(request: Extract<WorkerRequest, { type: 'query' }>): Promise<void> {
   if (!store) return
   const started = performance.now()
   const vector = embed && store.semantic ? await embed(request.query) : null
   if (request.id !== newestQuery) return
-  const hits = store.search(request.query, vector, request.limit, minSimilarity)
+  let hits = store.search(request.query, vector, request.limit, minSimilarity)
+  const { scope } = request
+  if (scope) {
+    // The index is of the whole site. Each language and each version says most of what the others say,
+    // so the best sections for a query come that many times over, one from each. That many times as
+    // many are asked for, and the ones from elsewhere are left out. It is not exact: a site whose
+    // versions differ a great deal can be left with fewer results than it was asked for.
+    const here = placeOf(scope.path, scope.editions)
+    const kinds = Math.max(1, scope.editions.languages?.length ?? 1) * Math.max(1, scope.editions.versions?.length ?? 1)
+    if (kinds > 1) hits = store.search(request.query, vector, Math.min(request.limit * kinds, MOST_ASKED_FOR), minSimilarity)
+    hits = hits.filter((hit) => samePlace(placeOf(hit.doc.path, scope.editions), here)).slice(0, request.limit)
+  }
   post({
     type: 'results',
     id: request.id,

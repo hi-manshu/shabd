@@ -8,6 +8,7 @@
  * Both are generated from the same sidebar the reader sees, so the order an
  * agent reads in is the order the author intended.
  */
+import { isCurrent } from '../../shared/editions.js'
 import { markdownPath, siteHref, withBase } from '../../shared/paths.js'
 import type { SidebarNode, SidebarPage } from '../../shared/types.js'
 import type { ShabdContext } from '../context.js'
@@ -50,9 +51,19 @@ function toSections(sidebar: SidebarNode[]): Section[] {
   return sections.filter((section) => section.pages.length > 0)
 }
 
+/**
+ * The pages an agent is given: the current version, in the language the site
+ * is written in. An older version says things that are no longer so, and a
+ * translation says the same things twice.
+ */
+function currentPages(context: ShabdContext): PageRecord[] {
+  return context.store.pages().filter((page) => isCurrent(page.path, context.config.editions))
+}
+
 export function renderLlmsTxt(context: ShabdContext): string {
   const { site, features } = context.config.config
-  const byPath = new Map(context.store.pages().map((page) => [page.path, page]))
+  const pages = currentPages(context)
+  const byPath = new Map(pages.map((page) => [page.path, page]))
   const listed = new Set<string>()
 
   const line = (page: PageRecord, label = page.title) => {
@@ -77,15 +88,22 @@ export function renderLlmsTxt(context: ShabdContext): string {
 
   // Pages outside the sidebar are still part of the site; the spec's "Optional"
   // section marks them as safe to skip when context is short.
-  const rest = context.store.pages().filter((page) => !listed.has(page.path) && page.path !== '/')
+  const rest = pages.filter((page) => !listed.has(page.path) && page.path !== '/')
   if (rest.length) out.push('## Optional', rest.map((page) => line(page)).join('\n'))
+
+  // Where the rest of the site is, for an agent that was asked about another version or in another language.
+  const { languages = [], versions = [] } = context.config.editions
+  const elsewhere = (kind: typeof languages) => kind.slice(1).map((edition) => `- [${edition.label}](${pageAddress(context, edition.prefix)})`)
+  if (versions.length > 1) out.push('## Other versions', elsewhere(versions).join('\n'))
+  if (languages.length > 1) out.push('## Other languages', elsewhere(languages).join('\n'))
 
   return `${out.join('\n\n')}\n`
 }
 
 export function renderLlmsFull(context: ShabdContext): string {
   const { site } = context.config.config
-  const byPath = new Map(context.store.pages().map((page) => [page.path, page]))
+  const pages = currentPages(context)
+  const byPath = new Map(pages.map((page) => [page.path, page]))
   // Sidebar order first, then anything the sidebar does not list.
   const ordered: PageRecord[] = []
   const seen = new Set<string>()
@@ -98,7 +116,7 @@ export function renderLlmsFull(context: ShabdContext): string {
       }
     }
   }
-  for (const page of context.store.pages()) if (!seen.has(page.path)) ordered.push(page)
+  for (const page of pages) if (!seen.has(page.path)) ordered.push(page)
 
   const out = [`# ${site.title}`, site.description ? `> ${site.description}` : '']
   for (const page of ordered) {

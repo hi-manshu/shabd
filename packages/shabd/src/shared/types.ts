@@ -2,8 +2,9 @@
  * Data structures that cross the Node → browser boundary.
  * Everything here is plain JSON so it can be serialized into a virtual module.
  */
+import type { Editions } from './editions.js'
 import type { RegionName } from './blocks.js'
-import type { Badge, BlockRef, Frontmatter, ShabdConfig } from './schema.js'
+import type { Badge, BlockRef, Frontmatter, NavItem, ShabdConfig } from './schema.js'
 
 /* ──────────────── sidebar (resolved from sidebar.yaml + content) ──────── */
 
@@ -118,10 +119,22 @@ export interface SiteData {
    * (`usePage()`), and the sidebar has the pages in their order.
    */
   pagesInDev?: Record<string, PageMeta>
+  /** The languages and the versions of the site, on a site that has more than one of either. */
+  editions?: Editions
+  /** The words of the site's own furniture in each language that gives some, by the language's code. */
+  ui?: Record<string, Record<string, string>>
+  /** What the site says of itself in each language that says it in its own way, by the language's code. */
+  siteIn?: Record<string, SiteInLanguage>
   /** Content directory relative to the site root, used to build edit links. */
   contentDir: string
   /** Present in dev only, so token edits hot-swap without a reload. */
   themeCss?: string
+}
+
+/** A language's own header links and footer. What it leaves out is the site's own (`site.nav`, `site.footer`). */
+export interface SiteInLanguage {
+  nav?: NavItem[]
+  footer?: string
 }
 
 /** The day a page was last changed. */

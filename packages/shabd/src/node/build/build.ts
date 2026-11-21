@@ -21,6 +21,7 @@ import { pageFile, siteHref, withBase } from '../../shared/paths.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
 import type { RenderedPage } from '../../shared/types.js'
 import { chooseAdapter, type MovedAddress } from '../adapters/index.js'
+import { documentEdition } from './editions.js'
 import { collectProblems, formatProblem } from '../check.js'
 import { themePaletteCss } from '../config/theme-css.js'
 import { compilePage, createContext, type ShabdContext } from '../context.js'
@@ -130,13 +131,18 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
 
   const renderRoute = async (routePath: string, sourceFile?: string) => {
     const rendered = await render(routePath)
+    const edition = documentEdition(context, routePath)
     return renderDocument({
       config: config.config,
       title: rendered.title,
       description: rendered.description,
       path: routePath,
-      // The page for an address that does not exist is not one to list either.
-      noindex: sourceFile === undefined || store.byPath(routePath)?.frontmatter.noindex,
+      // The page for an address that does not exist is not one to list either, and neither is a page of
+      // a version that the site keeps out of search engines.
+      noindex: sourceFile === undefined || store.byPath(routePath)?.frontmatter.noindex || edition.noindex,
+      lang: edition.lang,
+      dir: edition.dir,
+      alternates: edition.alternates,
       // A page's own picture, then the one drawn for it. With neither, the document falls back to the site's.
       image: store.byPath(routePath)?.frontmatter.image ?? pictures.get(routePath),
       body: rendered.html,
@@ -280,7 +286,7 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   /* ── for search engines ── */
 
   // The sitemap lists what a search engine should list. A site that asks not to be listed has none.
-  const listed = site.noindex ? [] : pages.filter((page) => !page.frontmatter.noindex)
+  const listed = site.noindex ? [] : pages.filter((page) => !page.frontmatter.noindex && !documentEdition(context, page.path).noindex)
   const hasSitemap = site.url !== undefined && listed.length > 0
   if (hasSitemap) {
     const entries = listed.map((page) => ({ loc: pageAddress(context, page.path), lastmod: page.updated?.day }))

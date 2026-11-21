@@ -21,6 +21,7 @@ import { pageModules } from './hmr.js'
 import { NotFound } from './NotFound.js'
 import { routeStore, siteStore } from './store.js'
 import type { LoadedPage } from './types.js'
+import { textFor } from './words.js'
 
 /* ───────────────────────────── loading ───────────────────────────── */
 
@@ -88,7 +89,7 @@ export function toPageView(site: SiteData, page: LoadedPage): PageView {
     return {
       path: page.path,
       id: null,
-      title: 'Page not found',
+      title: textFor(site, page.path)('notFound.title'),
       description: '',
       frontmatter,
       toc: [],

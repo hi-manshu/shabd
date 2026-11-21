@@ -13,13 +13,15 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import type { Edition, Editions } from '../../shared/editions.js'
 import { resolveLayouts } from '../../shared/layout.js'
 import { isExternal, normalizePath } from '../../shared/paths.js'
 import { ConfigSchema, SidebarsSchema, type ShabdConfig, type SidebarsInput } from '../../shared/schema.js'
 import { SNIPPET_MODULES } from '../../shared/snippet.js'
 import type { ResolvedLayout } from '../../shared/types.js'
 import { flattenVars } from '../content/vars.js'
-import { ShabdError, type SourceIssue } from './errors.js'
+import { UI_TEXT } from '../../shared/ui-text.js'
+import { closestMatch, ShabdError, type SourceIssue } from './errors.js'
 import { locateIssues, parseYamlWithSchema } from './yaml.js'
 
 /** Bump when compiled page output changes shape, to invalidate on-disk caches. */
@@ -70,6 +72,11 @@ export interface ResolvedConfig {
    * in the site folder and never under `node_modules`: see src/node/openapi/site.ts.
    */
   generatedDir: string
+  /**
+   * `versions:` and `languages:` as the parts of the site they are: each with the path its pages start
+   * at, and none for the first of its kind. Empty on a site with neither.
+   */
+  editions: Editions
   /**
    * What a live snippet may import (`features.sandbox.modules`): the name a
    * snippet writes, and what stands behind it, a package or the absolute path
@@ -172,6 +179,10 @@ export function resolveConfig(root: string, configFile: string, source: string):
     return absolute
   })
 
+  const editions = resolveEditions(config, (yaml.data as { site?: { lang?: unknown } } | null)?.site?.lang !== undefined, issues)
+  // The first language is the one the site is written in: everything that asks for the site's language is told it.
+  if (editions.languages?.[0]?.lang) config.site.lang = editions.languages[0].lang
+
   // What a live snippet may import. A name that leads nowhere is found here, and not by a reader of the page.
   const sandboxModules = config.features.sandbox.modules.map((module, index) => {
     const at = ['features', 'sandbox', 'modules', index]
@@ -255,11 +266,80 @@ export function resolveConfig(root: string, configFile: string, source: string):
     vars,
     openapi,
     generatedDir: path.join(root, '.shabd', 'openapi'),
+    editions,
     sandboxModules,
     locate: (path) => yaml.locate(path, 'key'),
     compileFingerprint,
     structureFingerprint,
   }
+}
+
+/**
+ * `versions:` and `languages:` as parts of the site. The first of each is at
+ * the root; each of the others is under a path of its own, and no two may
+ * have the same.
+ */
+function resolveEditions(config: ShabdConfig, langWritten: boolean, issues: { path: (string | number)[]; message: string }[]): Editions {
+  const taken = new Map<string, string>()
+  const claim = (prefix: string, at: (string | number)[], what: string) => {
+    const other = taken.get(prefix.toLowerCase())
+    if (other) issues.push({ path: at, message: `${prefix} is where ${other} has its pages. Give ${what} a path of its own.` })
+    else taken.set(prefix.toLowerCase(), what)
+  }
+
+  const versions = config.versions.map((version, index): Edition => {
+    const at = ['versions', index]
+    if (config.versions.findIndex((other) => other.label === version.label) < index) {
+      issues.push({ path: [...at, 'label'], message: `Two versions are called "${version.label}". A reader picks one by its name.` })
+    }
+    if (index === 0) {
+      if (version.path !== undefined) {
+        issues.push({ path: [...at, 'path'], message: 'The first version is the current one, and its pages are the site\'s own: it has no path. List the older versions after it, each with the folder its pages are in.' })
+      }
+      // Asked for or not, the current version is what a search should find.
+      return { label: version.label, prefix: '', ...(version.index === false ? { noindex: true } : {}) }
+    }
+    if (version.path === undefined) {
+      issues.push({ path: at, message: `Say where the pages of "${version.label}" are: \`path: /v1\` for the pages in ${config.content.dir}/v1.` })
+      return { label: version.label, prefix: '' }
+    }
+    claim(version.path, [...at, 'path'], `the version "${version.label}"`)
+    return { label: version.label, prefix: version.path, ...(version.index === true ? {} : { noindex: true }) }
+  })
+
+  const languages = config.languages.map((language, index): Edition => {
+    const at = ['languages', index]
+    if (config.languages.findIndex((other) => other.code.toLowerCase() === language.code.toLowerCase()) < index) {
+      issues.push({ path: [...at, 'code'], message: `The language ${language.code} is listed twice.` })
+    }
+    // A word of the site's furniture is given by its key. A key that is not one would never be shown.
+    for (const key of Object.keys(language.ui)) {
+      if (Object.hasOwn(UI_TEXT, key)) continue
+      const meant = closestMatch(key, Object.keys(UI_TEXT))
+      issues.push({ path: [...at, 'ui', key], message: `"${key}" is not one of the site's own words.${meant ? ` Did you mean "${meant}"?` : ''}` })
+    }
+    const base = { label: language.label, lang: language.code, ...(language.dir === 'rtl' ? { dir: 'rtl' as const } : {}) }
+    if (index === 0) {
+      if (language.path !== undefined) {
+        issues.push({ path: [...at, 'path'], message: 'The first language is the one the site is written in, and its pages are the site\'s own: it has no path.' })
+      }
+      // One place to say each thing: what the site says of itself is under `site`, and that is in its first language.
+      for (const key of ['nav', 'footer'] as const) {
+        if (language[key] !== undefined) {
+          issues.push({ path: [...at, key], message: `The first language is the site's own: write this under site.${key}.` })
+        }
+      }
+      if (langWritten && config.site.lang.toLowerCase() !== language.code.toLowerCase()) {
+        issues.push({ path: ['site', 'lang'], message: `site.lang is ${config.site.lang}, and the first of \`languages\` is ${language.code}. The first language is the site's own: leave site.lang out, or make the two agree.` })
+      }
+      return { ...base, prefix: '' }
+    }
+    const prefix = language.path ?? `/${language.code.toLowerCase()}`
+    claim(prefix, language.path === undefined ? at : [...at, 'path'], `the language ${language.code}`)
+    return { ...base, prefix }
+  })
+
+  return { ...(languages.length > 0 ? { languages } : {}), ...(versions.length > 0 ? { versions } : {}) }
 }
 
 /** The package a name belongs to: `date-fns/locale` is in `date-fns`, and `@acme/ui/button` in `@acme/ui`. */

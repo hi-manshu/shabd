@@ -1,10 +1,12 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { passageTarget } from '../../shared/passage.js'
 import { isUnspaced, spansToMark, wordSpans, type SearchHit } from '../../shared/search-core.js'
+import { usePlace, useText } from '../app/edition.js'
 import { Icon } from '../app/icons.js'
-import { useRouter } from '../app/router.js'
+import { usePage, useRouter } from '../app/router.js'
 import { useSite, useStore } from '../app/store.js'
 import { setUi } from '../app/ui.js'
+import type { Text } from '../app/words.js'
 import { useHref } from '../ui/href.js'
 import { openSearch, runSearch, searchStatus, type SearchResults, type SearchStatus } from './client.js'
 
@@ -39,17 +41,17 @@ function Highlighted({ text, words }: { text: string; words: string[] }) {
   )
 }
 
-function statusLine(status: SearchStatus, semanticEnabled: boolean): string {
-  if (status.index === 'error') return `Search is unavailable. ${status.error ?? ''}`.trim()
-  if (status.index === 'loading') return 'Loading the search index…'
-  if (!semanticEnabled) return 'Searching by keyword.'
+function statusLine(status: SearchStatus, semanticEnabled: boolean, text: Text): string {
+  if (status.index === 'error') return `${text('search.unavailable')} ${status.error ?? ''}`.trim()
+  if (status.index === 'loading') return text('search.loading')
+  if (!semanticEnabled) return text('search.keyword')
   switch (status.model.state) {
     case 'loading':
-      return `Searching by keyword. Loading the language model for search by meaning: ${status.model.progress}%`
+      return text('search.modelLoading', { progress: status.model.progress })
     case 'ready':
-      return 'Searching by keyword and by meaning. Your query stays on this device.'
+      return text('search.hybrid')
     default:
-      return 'Searching by keyword.'
+      return text('search.keyword')
   }
 }
 
@@ -82,6 +84,11 @@ export default function SearchDialog() {
   }, [])
 
   const modelReady = status.model.state === 'ready'
+  // On a site with several languages or versions, what is found is of the one being read.
+  const { editions } = usePlace()
+  const text = useText()
+  const { path } = usePage()
+  const scope = useMemo(() => ((editions.languages?.length ?? 0) > 1 || (editions.versions?.length ?? 0) > 1 ? { editions, path } : undefined), [editions, path])
   useEffect(() => {
     const text = query.trim()
     if (!text) {
@@ -93,7 +100,7 @@ export default function SearchDialog() {
     // Embedding a query takes a few milliseconds; a short pause avoids doing it for every keystroke.
     const timer = window.setTimeout(
       () =>
-        void runSearch(text, features.search.maxResults).then((next) => {
+        void runSearch(text, features.search.maxResults, scope).then((next) => {
           if (!current) return
           setResults(next)
           setActive(0)
@@ -105,7 +112,7 @@ export default function SearchDialog() {
       window.clearTimeout(timer)
     }
     // Re-run when the model becomes ready, so keyword results upgrade in place.
-  }, [query, status.index, modelReady, features.search.maxResults])
+  }, [query, status.index, modelReady, features.search.maxResults, scope])
 
   useEffect(() => {
     list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
@@ -153,7 +160,7 @@ export default function SearchDialog() {
       className="sb-search"
       data-store={status.store}
       data-persistent={status.persistent ? '' : undefined}
-      aria-label="Search the documentation"
+      aria-label={text('search.dialog')}
       onClose={close}
       // The dialog element itself is only hit by clicks on the backdrop around its content.
       onClick={(event) => event.target === dialog.current && close()}
@@ -172,8 +179,8 @@ export default function SearchDialog() {
             aria-autocomplete="list"
             // Named here. The label around the field also holds the button that closes search, and
             // without a name of its own the field was read out as that button.
-            aria-label="Search the docs"
-            placeholder="Search the docs"
+            aria-label={text('search.field')}
+            placeholder={text('search.field')}
             autoComplete="off"
             spellCheck={false}
             autoFocus
@@ -182,12 +189,12 @@ export default function SearchDialog() {
             onKeyDown={onKeyDown}
           />
           {/* The name starts with what the button shows, for a reader who says what they see to press it. */}
-          <button type="button" className="sb-kbd" onClick={close} aria-label="Esc: close search">
+          <button type="button" className="sb-kbd" onClick={close} aria-label={text('search.close')}>
             esc
           </button>
         </label>
 
-        <ul className="sb-search-results" id={listId} role="listbox" ref={list} aria-label="Results">
+        <ul className="sb-search-results" id={listId} role="listbox" ref={list} aria-label={text('search.results')}>
           {hits.map((hit, index) => (
             <li key={`${hit.doc.path}#${hit.doc.anchor}:${index}`} role="presentation">
               <a
@@ -208,7 +215,7 @@ export default function SearchDialog() {
                     </>
                   )}
                   {hit.matched.meaning && !hit.matched.keywords && (
-                    <span className="sb-search-hit-related" title="Found by meaning: it does not contain your words">
+                    <span className="sb-search-hit-related" title={text('search.byMeaning')}>
                       <Icon name="sparkle" size={13} />
                       Related
                     </span>
@@ -226,17 +233,17 @@ export default function SearchDialog() {
 
         {query.trim() && results && hits.length === 0 && (
           <p className="sb-search-empty">
-            Nothing matches “{results.query}”. Try other words, or fewer of them.
+            {text('search.none', { query: results.query })}
           </p>
         )}
 
         {/* How many results there are, said aloud as they change: the list itself is silent until it is entered. */}
         <p className="sb-visually-hidden" aria-live="polite">
-          {query.trim() && results ? (hits.length === 1 ? '1 result' : `${hits.length} results`) : ''}
+          {query.trim() && results ? (hits.length === 1 ? text('search.count.one') : text('search.count.many', { count: hits.length })) : ''}
         </p>
 
         <p className="sb-search-status" role="status">
-          {statusLine(status, features.search.semantic)}
+          {statusLine(status, features.search.semantic, text)}
         </p>
       </div>
     </dialog>

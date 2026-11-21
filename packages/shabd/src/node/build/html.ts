@@ -15,6 +15,11 @@ export interface DocumentOptions {
   path: string
   /** Ask search engines not to list this page. A site that is `noindex` asks for every page. */
   noindex?: boolean | undefined
+  /** The language the page is in, on a site in more than one. Left out, it is the site's. */
+  lang?: string | undefined
+  dir?: 'rtl' | undefined
+  /** The page in the site's other languages, for search engines: full addresses. */
+  alternates?: { lang: string; href: string }[] | undefined
   /** The picture to show when this page is shared, in place of the site's: a path inside the site, or a full address. */
   image?: string | undefined
   /** Prerendered app markup. */
@@ -105,6 +110,7 @@ export function renderDocument(options: DocumentOptions): string {
     `<meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}">`,
     canonical && `<link rel="canonical" href="${escapeHtml(canonical)}">`,
     canonical && `<meta property="og:url" content="${escapeHtml(canonical)}">`,
+    ...(options.alternates ?? []).map((alternate) => `<link rel="alternate" hreflang="${escapeHtml(alternate.lang)}" href="${escapeHtml(alternate.href)}">`),
     site.favicon && `<link rel="icon" href="${escapeHtml(withBase(site.base, site.favicon))}">`,
     config.features.llms.enabled &&
       `<link rel="alternate" type="text/plain" title="llms.txt" href="${escapeHtml(withBase(site.base, '/llms.txt'))}">`,
@@ -124,7 +130,7 @@ export function renderDocument(options: DocumentOptions): string {
     .join('\n    ')
 
   return `<!doctype html>
-<html lang="${escapeHtml(site.lang)}"${themeAttribute}>
+<html lang="${escapeHtml(options.lang ?? site.lang)}"${options.dir ? ` dir="${options.dir}"` : ''}${themeAttribute}>
   <head>
     ${head}
   </head>

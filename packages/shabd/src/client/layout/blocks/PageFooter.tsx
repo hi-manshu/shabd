@@ -1,3 +1,4 @@
+import { useText } from '../../app/edition.js'
 import { Icon } from '../../app/icons.js'
 import { usePage } from '../../app/router.js'
 import { useSite } from '../../app/store.js'
@@ -11,6 +12,7 @@ import { useSite } from '../../app/store.js'
 export function PageFooter() {
   const { site, defaults, contentDir } = useSite()
   const { id, frontmatter, updated } = usePage()
+  const text = useText()
   const repo = site.repo
   const editable = repo && id && (frontmatter.editLink ?? defaults.editLink)
   if (!editable && !updated) return null
@@ -20,12 +22,13 @@ export function PageFooter() {
       {editable && (
         <a href={`${repo.url.replace(/\/$/, '')}/edit/${repo.branch}/${file}`} target="_blank" rel="noreferrer">
           <Icon name="edit" size={15} />
-          Edit this page
+          {text('page.edit')}
         </a>
       )}
       {updated && (
         <p className="sb-page-updated">
-          Last updated <time dateTime={updated.day}>{updated.text}</time>
+          {`${text('page.updated')} `}
+          <time dateTime={updated.day}>{updated.text}</time>
         </p>
       )}
     </footer>

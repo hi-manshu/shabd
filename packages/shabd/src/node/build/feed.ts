@@ -8,6 +8,7 @@
  *
  * The same function writes the file in a build and answers for it in dev.
  */
+import { isCurrent } from '../../shared/editions.js'
 import { refToSlug } from '../../shared/paths.js'
 import type { ShabdContext } from '../context.js'
 import { pageAddress, publicUrl } from '../llms/llms-txt.js'
@@ -34,7 +35,8 @@ export function feedEntries(context: ShabdContext): FeedEntry[] {
     .pages()
     .flatMap((page) => {
       const day = page.frontmatter.date ?? page.updated?.day
-      if (!day || !inFolder(page.slug) || page.frontmatter.noindex) return []
+      // The feed is of the current docs, in the language the site is written in.
+      if (!day || !inFolder(page.slug) || page.frontmatter.noindex || !isCurrent(page.path, context.config.editions)) return []
       return [{ title: page.title, link: pageAddress(context, page.path), day, description: page.description }]
     })
     .sort((a, b) => (a.day === b.day ? a.title.localeCompare(b.title) : a.day < b.day ? 1 : -1))

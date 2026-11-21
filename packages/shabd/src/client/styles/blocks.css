@@ -287,6 +287,171 @@
     outline-color: var(--sb-accent);
   }
 
+  /* ───────────── versions and languages ───────────── */
+
+  /* A menu of the site's versions, or of its languages: a word that opens a short list of links. */
+  .sb-edition-menu {
+    position: relative;
+    font-size: var(--sb-step--1);
+  }
+
+  .sb-edition-menu > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.55rem;
+    border: var(--sb-line) solid var(--sb-border);
+    border-radius: var(--sb-radius);
+    color: var(--sb-muted);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  /* Safari draws its own marker beside a summary unless it is told not to. */
+  .sb-edition-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .sb-edition-menu > summary:hover,
+  .sb-edition-menu[open] > summary {
+    color: var(--sb-text);
+  }
+
+  /* The arrow points down, and up while the list is open. */
+  .sb-edition-menu > summary .sb-icon {
+    transform: rotate(90deg);
+  }
+
+  .sb-edition-menu[open] > summary .sb-icon {
+    transform: rotate(-90deg);
+  }
+
+  .sb-edition-menu > ul {
+    position: absolute;
+    inset-block-start: calc(100% + 0.6rem);
+    inset-inline-end: 0;
+    z-index: 40;
+    display: grid;
+    gap: 1px;
+    min-inline-size: 9rem;
+    max-block-size: min(70dvh, 24rem);
+    overflow-y: auto;
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
+    border: var(--sb-line) solid var(--sb-border);
+    border-block-start: var(--sb-rule) solid var(--sb-bar);
+    border-radius: var(--sb-hang);
+    background: var(--sb-background);
+    box-shadow: 0 0.75rem 2rem color-mix(in oklab, var(--sb-text) 14%, transparent);
+  }
+
+  .sb-edition-menu > ul a {
+    display: block;
+    padding: 0.4rem 0.6rem;
+    border-radius: min(4px, var(--sb-radius));
+    color: var(--sb-muted);
+    white-space: nowrap;
+  }
+
+  .sb-edition-menu > ul a:hover {
+    color: var(--sb-text);
+    background: var(--sb-surface);
+  }
+
+  .sb-edition-menu > ul a[aria-current] {
+    color: var(--sb-text);
+    font-weight: 600;
+  }
+
+  /* A language's code, for where its name is too long. */
+  .sb-edition-short {
+    display: none;
+  }
+
+  /*
+   * When the header is short of room, what is in it is made smaller before anything is squeezed: a
+   * language is shown by its code, the arrows go, and the search field is as wide as its words. What
+   * can be pressed keeps its size, and the site's name is what gives way.
+   */
+  .sb-region-header :is(.sb-icon-button, .sb-edition-menu, .sb-search-button, .sb-studio-toggle) {
+    flex-shrink: 0;
+  }
+
+  .sb-region-header .sb-site-title {
+    min-inline-size: 0;
+    flex-shrink: 1;
+  }
+
+  .sb-region-header .sb-site-title > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @container sb-header (max-width: 64rem) {
+    .sb-search-button {
+      min-inline-size: 0;
+    }
+
+    .sb-edition-menu > summary .sb-icon,
+    .sb-edition-menu:has(.sb-edition-short) .sb-edition-long {
+      display: none;
+    }
+
+    .sb-edition-short {
+      display: inline;
+    }
+  }
+
+  @container sb-header (max-width: 30rem) {
+    .sb-edition-menu > summary {
+      padding-inline: 0.3rem;
+      border-color: transparent;
+    }
+
+    .sb-region-header .sb-site-title {
+      margin-inline-end: 0.25rem;
+    }
+  }
+
+  /* In a header with an ink of its own the word is in that ink. The list is a panel of the page, as the theme menu's is. */
+  .sb-region-header .sb-edition-menu > summary {
+    color: var(--sb-header-muted);
+    border-color: color-mix(in srgb, var(--sb-header-muted) 45%, transparent);
+  }
+
+  .sb-region-header .sb-edition-menu > summary:hover,
+  .sb-region-header .sb-edition-menu[open] > summary {
+    color: var(--sb-header-text);
+  }
+
+  .sb-region-header .sb-edition-menu > ul :focus-visible {
+    outline-color: var(--sb-accent);
+  }
+
+  /* On a page of an older version: which version it is, and where the current one is. */
+  .sb-version-notice {
+    margin-block-end: 1.25rem;
+    padding: 0.7rem 1rem;
+    border: var(--sb-line) solid var(--sb-border);
+    border-inline-start: var(--sb-rule) solid var(--sb-highlight);
+    border-radius: var(--sb-radius);
+    background: var(--sb-surface);
+    font-size: var(--sb-step--1);
+  }
+
+  .sb-version-notice p {
+    margin: 0;
+  }
+
+  .sb-version-notice a {
+    color: var(--sb-link);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
   /* ───────────── sidebar ───────────── */
 
   .sb-sidebar-nav {

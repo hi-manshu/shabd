@@ -9,6 +9,7 @@ import type { BuiltinBlockName } from '../../shared/blocks.js'
 import { ApiEndpoint } from './blocks/ApiEndpoint.js'
 import { Breadcrumbs } from './blocks/Breadcrumbs.js'
 import { Content } from './blocks/Content.js'
+import { LanguageMenu, VersionMenu } from './blocks/EditionMenu.js'
 import { Footer } from './blocks/Footer.js'
 import {
   MenuToggle,
@@ -28,6 +29,7 @@ import { PageHeader } from './blocks/PageHeader.js'
 import { Pagination } from './blocks/Pagination.js'
 import { SidebarNav } from './blocks/SidebarNav.js'
 import { Toc } from './blocks/Toc.js'
+import { VersionNotice } from './blocks/VersionNotice.js'
 
 // Blocks take whatever `props:` the YAML gives them, so the registry is loosely typed on purpose.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,11 +41,14 @@ const builtinBlocks: Record<BuiltinBlockName, AnyBlock> = {
   nav: Nav,
   spacer: Spacer,
   search: SearchButton,
+  'version-menu': VersionMenu,
+  'language-menu': LanguageMenu,
   social: Social,
   'theme-toggle': ThemeToggle,
   'theme-menu': ThemeMenu,
   'studio-toggle': StudioToggle,
   'sidebar-nav': SidebarNav,
+  'version-notice': VersionNotice,
   breadcrumbs: Breadcrumbs,
   'page-header': PageHeader,
   'page-actions': PageActions,

@@ -12,7 +12,7 @@ doc:
   width: content
   regions:
     sidebar: [sidebar-nav]
-    main: [breadcrumbs, page-header, page-actions, content, page-footer, pagination]
+    main: [version-notice, breadcrumbs, page-header, page-actions, content, page-footer, pagination]
     aside: [toc]
 ```
 
@@ -41,11 +41,14 @@ A page has up to six regions. A region with no blocks is not rendered, and the p
 | `nav` | header | The links from `site.nav` |
 | `spacer` | header | Empty space that pushes later blocks to the far edge |
 | `search` | header | The search field |
+| `version-menu` | header | The [versions](../features/versions.md) of the docs, on a site with more than one |
+| `language-menu` | header | The [languages](../features/versions.md#languages) of the site, on a site in more than one |
 | `studio-toggle` | header | Opens the [Studio](../features/studio.md). Dev server only |
 | `social` | header | The links from `site.social` |
 | `theme-menu` | header | The palette menu, when [`theme.picker`](./theme.md#a-theme-menu-for-readers) is on |
 | `theme-toggle` | header | Light and dark switch |
 | `sidebar-nav` | sidebar | The [sidebar](./sidebar.md) |
+| `version-notice` | main | On a page of an older version: which version it is, and where the current one is |
 | `breadcrumbs` | main | The sidebar groups above this page |
 | `page-header` | main | Title, badges and description |
 | `page-actions` | main | [The page as Markdown](../features/mcp.md#on-the-page): copy it, open it, hand it to an assistant |

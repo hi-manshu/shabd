@@ -30,6 +30,9 @@
     gap: 0.25rem;
     block-size: var(--sb-header-height);
     padding-inline: clamp(1rem, 3vw, 1.75rem);
+    /* What is in the header is laid out by the room the header has, which is not always the window's:
+       the Studio opens beside the page and takes half of it. */
+    container: sb-header / inline-size;
     background: var(--sb-header);
     /* The page's own text colour, unless the header has an ink of its own (`colors.headerText`). */
     color: var(--sb-header-text);

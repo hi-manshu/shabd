@@ -25,6 +25,9 @@ const PAGES = {
   'an API page': '/api/ping',
   'a page of components': '/play/writing',
   'a page made from a description': '/store/items/add-item',
+  'a page of an older version': '/v1/guide/intro',
+  'a page in another language': '/de/guide/intro',
+  'a page written from right to left': '/ar/guide/intro',
 }
 
 test.describe('what a checker finds', () => {

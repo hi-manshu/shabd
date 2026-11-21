@@ -132,6 +132,7 @@ GitHub's machines have not run any of it.
 | Sandboxes: modules named in the config, a frame of its own for a snippet, colours in the editor | Built, tested in three browser engines |
 | `shabd check`: a live snippet that cannot run, or that imports what the site has not named | Built, tested |
 | Fast Refresh while the theme's own source is edited | Built. A component is in a file of its own, and a test holds the client to that. Tried by hand in Chromium: a change to a link, an icon, a hook or the router's provider is taken in place and the page keeps its state. A change to the router's own file still starts the page again, because the app's entry imports it |
+| Versions of the docs (`versions:`) and languages of the site (`languages:`) | Built, tested in three browser engines, one of the languages written from right to left. Each is a folder of the content, with a sidebar and a search of its own, and a menu leads to the same page in the others. A language can say the site's own words, the header's links and the footer in its own way. What stays as it is written is under "Not checked" below |
 | A benchmark for large sites (`npm run bench`) | Built. Its numbers are below |
 
 ### What the accessibility pass found
@@ -208,6 +209,11 @@ Not checked:
 - Hot updates of the theme's own source in Firefox and WebKit. They were tried in Chromium. A hot update cannot
   hand out a second copy of one of the app's stores: none of them stands above a component's file, and a test
   reads what every file of the client imports to keep it so.
+- Versions and languages. Search within one asks for more results than it shows and leaves out those from
+  elsewhere, so a query can come back short where versions differ a great deal. The MCP endpoint searches every
+  version and every language. The site's title, the words of an API reference and those of a live example are
+  the same in every language. And a page written from right to left has been held to two things by a test, the
+  sidebar on the other side and nothing wider than the window: nobody who reads such a language has looked at one.
 - In the Studio: an image is not moved, renamed or deleted with its page; pasting and dropping are tested with
   events the test makes, not with the real clipboard or a real drag; and while a page is renamed its breadcrumbs
   and its mark in the sidebar are gone for as long as the next page takes to draw.
@@ -236,10 +242,9 @@ Search, MCP and the sandboxes have what was listed for them. What is left is in 
 
 ### Later
 
-- Translations and versioned docs.
 - A place to try a theme's tokens and see their contrast, before they are written to the config.
 
-The rest of what stood here is built: more than one sidebar chosen by section, addresses with a trailing slash or
+The rest of what stood here is built: versioned docs and translations, more than one sidebar chosen by section, addresses with a trailing slash or
 `.html`, conditions on layout blocks and a two-column `api` layout, pages made from an OpenAPI file, remark and
 rehype plugins named in YAML, and "last updated" from Git history, an RSS feed and social pictures.
 

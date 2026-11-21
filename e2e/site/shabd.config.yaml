@@ -54,6 +54,28 @@ features:
 markdown:
   mermaid: true
 
+# An older version of the docs, which is the pages of content/v1, and two more languages: German, the
+# pages of content/de, and Arabic, the pages of content/ar, which is written from right to left. German
+# says some of the site's own words in its own way, and has a link in the header and a footer of its own.
+versions:
+  - label: "2.x"
+  - { label: "1.x", path: /v1 }
+
+languages:
+  - { code: en, label: English }
+  - code: de
+    label: Deutsch
+    ui:
+      version.menu: "Fassung: {version}"
+      language.menu: "Sprache: {language}"
+      search: Suche
+      toc: Auf dieser Seite
+      notFound.title: Seite nicht gefunden
+    nav:
+      - { label: Anleitung, link: /de/guide/intro }
+    footer: Eine Seite für die Browsertests von Shabd.
+  - { code: ar, label: العربية, dir: rtl }
+
 # An API reference made from a description: an overview at /store and a page for each operation.
 openapi:
   spec: ./store.yaml

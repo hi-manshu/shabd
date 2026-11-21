@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { markdownPath, withBase } from '../../../shared/paths.js'
+import { useText } from '../../app/edition.js'
 import { Icon } from '../../app/icons.js'
 import { usePage } from '../../app/router.js'
 import { useSite } from '../../app/store.js'
@@ -50,6 +51,7 @@ export function PageActions({ copy = true, view = true, assistants = ASSISTANTS,
   const { site, features } = useSite()
   const { path, notFound } = usePage()
   const [copied, setCopied] = useState<'no' | 'yes' | 'failed'>('no')
+  const text = useText()
   if (!features.llms.enabled || notFound) return null
 
   const markdown = withBase(site.base, markdownPath(path))
@@ -80,17 +82,17 @@ export function PageActions({ copy = true, view = true, assistants = ASSISTANTS,
 
   if (!copy && !view && offered.length === 0) return null
   return (
-    <div className="sb-page-actions" role="group" aria-label="This page for AI assistants">
+    <div className="sb-page-actions" role="group" aria-label={text('page.actions')}>
       {copy && (
         <button type="button" className="sb-page-action" onClick={copyPage} aria-live="polite">
           <Icon name={copied === 'yes' ? 'check' : 'copy'} size={15} />
-          <span>{copied === 'yes' ? 'Copied' : copied === 'failed' ? 'Could not copy' : 'Copy page'}</span>
+          <span>{text(copied === 'yes' ? 'page.copied' : copied === 'failed' ? 'page.copyFailed' : 'page.copy')}</span>
         </button>
       )}
       {view && (
         <a className="sb-page-action" href={markdown} target="_blank" rel="noreferrer">
           <Icon name="page" size={15} />
-          View as Markdown
+          {text('page.markdown')}
         </a>
       )}
       {offered.map((assistant) => (
@@ -102,7 +104,7 @@ export function PageActions({ copy = true, view = true, assistants = ASSISTANTS,
           rel="noreferrer"
         >
           <Icon name="sparkle" size={15} />
-          Open in {assistant.label}
+          {text('page.openIn', { assistant: assistant.label })}
         </a>
       ))}
     </div>

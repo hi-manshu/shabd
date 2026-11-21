@@ -71,7 +71,7 @@ export function formatDay(day: string, lang: string): string {
   try {
     return new Intl.DateTimeFormat(lang, { dateStyle: 'long', timeZone: 'UTC' }).format(date)
   } catch {
-    // `site.lang` is free text, and may be a language tag Intl does not know.
+    // A language's code is free text, and may be a tag Intl does not know.
     return new Intl.DateTimeFormat('en', { dateStyle: 'long', timeZone: 'UTC' }).format(date)
   }
 }

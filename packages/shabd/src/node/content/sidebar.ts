@@ -211,6 +211,8 @@ function resolveIn({ pages, bySlug, directories }: ContentTree, input: SidebarIn
       if (page.sidebar.exclude) continue
       if (page.slug === '') continue // the home page is reached from the site title
       if (api?.slugs.has(page.slug)) continue
+      // A page of another part of the site, in a folder inside this one: a version inside a language's folder.
+      if (!owns(page)) continue
       listed.add(page.slug)
       const node = pageNode(page)
       entries.push({
@@ -410,20 +412,30 @@ export function inSection(path: string, prefix: string): boolean {
  * is under, and `/` stands for every page that is under no other key. With
  * no `/`, those pages get a sidebar made from their folders, as a site with
  * no sidebar.yaml does.
+ *
+ * `roots` are the paths that a version or a language of the site starts at
+ * (shared/editions.ts). Each is a part with a sidebar of its own whether the
+ * file says so or not: one it does not name gets a sidebar made from its own
+ * folders, as if that folder were the site.
  */
 export function resolveSidebars(
-  input: SidebarInput | Record<string, SidebarInput>,
+  given: SidebarInput | Record<string, SidebarInput>,
   pages: readonly SidebarPageInfo[],
-  options: { lang?: string; apis?: readonly ApiGroups[] } = {},
+  options: { lang?: string; apis?: readonly ApiGroups[]; roots?: readonly string[] } = {},
 ): ResolvedSidebars {
-  if (Array.isArray(input)) {
-    const one = resolveSidebar(input, pages, options)
+  const roots = options.roots ?? []
+  if (Array.isArray(given) && roots.length === 0) {
+    const one = resolveSidebar(given, pages, options)
     return { sidebar: one.sidebar, sections: [], all: one.sidebar, warnings: one.warnings, unlisted: one.unlisted }
   }
+  // One list, on a site with versions or languages: it is the sidebar of the pages that are in none of those.
+  // An empty one is no list at all, and those pages get a sidebar made from their folders, further down.
+  const input: Record<string, SidebarInput> = Array.isArray(given) ? (given.length > 0 ? { '/': given } : {}) : given
+  const listed = !Array.isArray(given)
 
   const keys = Object.keys(input)
   const prefixOf = (key: string) => (key.length > 1 ? key.replace(/\/+$/, '') : key)
-  const prefixes = new Set(keys.map(prefixOf).filter((prefix) => prefix !== '/'))
+  const prefixes = new Set([...keys.map(prefixOf).filter((prefix) => prefix !== '/'), ...roots])
 
   // Which part each page is in, and which parts have a page at all. Each page is asked once, by walking
   // up its own path, so a site with many parts costs no more to sort out than a site with few.
@@ -451,8 +463,8 @@ export function resolveSidebars(
   for (const key of keys) {
     const prefix = prefixOf(key)
     const resolved = resolveIn(tree, input[key]!, { ...options, owns: (page) => sectionOf(page) === prefix })
-    // A warning says where in the file it is about, and the file now has the key above the list.
-    warnings.push(...resolved.warnings.map((warning) => ({ ...warning, path: [key, ...(warning.path ?? [])] })))
+    // A warning says where in the file it is about, and a file with several sidebars has the key above the list.
+    warnings.push(...resolved.warnings.map((warning) => (listed ? { ...warning, path: [key, ...(warning.path ?? [])] } : warning)))
     unlisted.push(...resolved.unlisted)
     all.push(...resolved.sidebar)
     if (prefix === '/') fallback = resolved.sidebar
@@ -462,6 +474,26 @@ export function resolveSidebars(
         warnings.push({ message: `No page is under ${prefix}, so this sidebar is never shown`, path: [key] })
       }
     }
+  }
+
+  // A version or a language that the file does not name. Its sidebar is made from its own folders, with
+  // the folder it starts at as the top: its pages are placed as if that folder were the content folder.
+  for (const root of roots) {
+    if (keys.some((key) => prefixOf(key) === root)) continue
+    const folder = root.slice(1)
+    const own = pages
+      .filter((page) => sectionOf(page) === root)
+      .map((page) =>
+        page.slug === folder
+          ? // Its first page. The site's own is reached from the site's title, which is why a sidebar leaves
+            // it out; this one is reached from nowhere else, so it is the first entry.
+            { ...page, slug: 'index', isIndex: false, sidebar: { ...page.sidebar, order: page.sidebar.order ?? Number.NEGATIVE_INFINITY } }
+          : { ...page, slug: page.slug.slice(folder.length + 1) },
+      )
+    if (own.length === 0) continue
+    const made = resolveSidebar([], own, options)
+    sections.push({ prefix: root, sidebar: made.sidebar })
+    all.push(...made.sidebar)
   }
 
   if (!fallback) {

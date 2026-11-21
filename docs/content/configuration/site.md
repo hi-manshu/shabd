@@ -265,6 +265,31 @@ cores to spare, up to eight. Each thread holds a compiler of its own, so each ta
 is short, give `threads` a smaller number, or `1` to compile on one thread. A smaller site is compiled on one
 whatever this says, and so is a site that was built before, whose pages are in the cache.
 
+## versions and languages
+
+The versions of the docs, and the languages of the site. Each is a list, the site's own first, and each of the
+others is a folder of the content. [Versions and languages](../features/versions.md) says what a site gets for them.
+
+| Key | Of | Meaning |
+| --- | --- | --- |
+| `label` | a version, a language | What a reader picks it by. A language's is its name in the language itself |
+| `path` | a version, a language | The folder its pages are in: `/v1`. A language's is its code unless this says otherwise |
+| `index` | a version | Whether search engines are asked to list its pages. They are not, for an older version |
+| `code` | a language | The language's code: `de`, `pt-BR` |
+| `dir` | a language | `rtl` for a language written right to left |
+| `ui` | a language | [The site's own words](../features/versions.md#the-sites-own-words) in the language, by their keys |
+| `nav` | a language | The header's links in the language. Left out, they are `site.nav` |
+| `footer` | a language | The footer in the language. Left out, it is `site.footer` |
+
+```yaml title="shabd.config.yaml"
+versions:
+  - label: "2.x"
+  - { label: "1.x", path: /v1 }
+languages:
+  - { code: en, label: English }
+  - { code: de, label: Deutsch }
+```
+
 ## openapi
 
 An API reference made from an OpenAPI description: an overview, and a page for each operation.

@@ -38,6 +38,7 @@ import {
 } from 'vite'
 import { normalizePath as normalizeRoute, siteHref, stripBase } from '../../shared/paths.js'
 import { codeBackgrounds } from '../../shared/presets.js'
+import { documentEdition, textAt } from '../build/editions.js'
 import { renderDocument } from '../build/html.js'
 import { isShabdError } from '../config/errors.js'
 import { loadConfig, loadSidebar, type ResolvedConfig } from '../config/load.js'
@@ -572,12 +573,16 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
               res.end()
               return
             }
+            const edition = documentEdition(ctx(), route)
             const html = renderDocument({
               config: config.config,
-              title: page?.title ?? 'Page not found',
+              title: page?.title ?? textAt(config, route)('notFound.title'),
               description: page?.description ?? '',
               path: route,
-              noindex: !page || page.frontmatter.noindex,
+              noindex: !page || page.frontmatter.noindex || edition.noindex,
+              lang: edition.lang,
+              dir: edition.dir,
+              alternates: edition.alternates,
               image: page?.frontmatter.image,
               ...(await devTags(server, url)),
             })

@@ -22,7 +22,10 @@
 import { Component, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type ReactNode, type RefObject } from 'react'
 import { REGIONS, type RegionName } from '../../shared/blocks.js'
 import type { BlockRef } from '../../shared/schema.js'
+import type { UiKey } from '../../shared/ui-text.js'
+import { usePlace, useText } from '../app/edition.js'
 import { usePage } from '../app/router.js'
+import { useSite } from '../app/store.js'
 import { setUi, useUi } from '../app/ui.js'
 import { blockRegistry } from './registry.js'
 
@@ -36,9 +39,10 @@ const REGION_ELEMENT: Record<RegionName, 'div' | 'header' | 'nav' | 'main' | 'as
   footer: 'footer',
 }
 
-const REGION_LABEL: Partial<Record<RegionName, string>> = {
-  sidebar: 'Documentation',
-  aside: 'On this page',
+/** What a region is called, for the regions that are called something: by the key of its words. */
+const REGION_LABEL: Partial<Record<RegionName, UiKey>> = {
+  sidebar: 'region.sidebar',
+  aside: 'toc',
 }
 
 /**
@@ -125,6 +129,18 @@ const ABOVE_THE_PANEL: readonly RegionName[] = ['banner', 'header', 'sidebar']
 export function PageLayout() {
   const { layout, path } = usePage()
   const { sidebarOpen } = useUi()
+  const { site } = useSite()
+  const { language } = usePlace()
+  // A reader who picks another language is taken there without a new document, so the one there is
+  // says of itself what a new one would: the language it is in, and the direction that is written in.
+  const lang = language?.lang ?? site.lang
+  const dir = language?.dir
+  const text = useText()
+  useEffect(() => {
+    document.documentElement.lang = lang
+    if (dir === 'rtl') document.documentElement.dir = 'rtl'
+    else document.documentElement.removeAttribute('dir')
+  }, [lang, dir])
   const shell = useRef<HTMLDivElement>(null)
   usePanelTop(shell, sidebarOpen)
   const covering = usePanel(shell, sidebarOpen)
@@ -140,7 +156,7 @@ export function PageLayout() {
       data-sidebar-open={sidebarOpen ? '' : undefined}
     >
       <a className="sb-skip-link" href="#sb-main">
-        Skip to content
+        {text('skip')}
       </a>
       {REGIONS.map((region) => {
         const blocks = layout.regions[region]
@@ -163,10 +179,11 @@ const SIDEBAR_ID = 'sb-sidebar'
 
 function Region({ name, blocks, covered }: { name: RegionName; blocks: BlockRef[]; covered: boolean }) {
   const Element = REGION_ELEMENT[name]
+  const text = useText()
   return (
     <Element
       className={`sb-region sb-region-${name}`}
-      aria-label={REGION_LABEL[name]}
+      aria-label={REGION_LABEL[name] && text(REGION_LABEL[name])}
       // Under the open panel: not to be reached by a key or read out, since it cannot be seen.
       inert={covered ? true : undefined}
       {...(name === 'main' ? { id: 'sb-main', tabIndex: -1 } : {})}
