@@ -710,6 +710,13 @@ const BuildSchema = z.strictObject({
    * takes the same names, and wins over this.
    */
   adapter: z.enum(ADAPTERS).optional(),
+  /**
+   * How many threads compile pages, in a build and in `shabd check`. `auto`
+   * is as many as are of use on the machine, up to eight. `1` compiles on
+   * the thread that does the rest, as a small site is compiled whatever
+   * this says.
+   */
+  threads: z.union([z.literal('auto'), z.number().int().min(1).max(64)]).default('auto'),
 })
 
 /* ─────────────────────────────── redirects ────────────────────────────── */

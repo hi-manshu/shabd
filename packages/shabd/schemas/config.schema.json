@@ -1713,6 +1713,20 @@
             "vercel",
             "netlify"
           ]
+        },
+        "threads": {
+          "default": "auto",
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "auto"
+            },
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            }
+          ]
         }
       },
       "additionalProperties": false

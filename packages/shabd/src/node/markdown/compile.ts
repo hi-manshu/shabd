@@ -129,17 +129,23 @@ export class MarkdownCompiler {
     this.highlighter.forget()
   }
 
+  /** Where a page is kept in the cache, and what it was compiled from and with. */
+  #place(input: CompileInput): { slot: string; key: string } {
+    return {
+      slot: input.id ?? input.file,
+      key: cacheKey(this.options.fingerprint, input.format, input.routePath, input.liftTitle, input.split === true, input.hash ?? input.source),
+    }
+  }
+
+  /** Is the page compiled already, as it is now and as the site is set up now? */
+  async has(input: CompileInput): Promise<boolean> {
+    const { slot, key } = this.#place(input)
+    return (await this.cache.get(slot, key)) !== undefined
+  }
+
   async compile(input: CompileInput): Promise<CompileResult> {
     const started = performance.now()
-    const slot = input.id ?? input.file
-    const key = cacheKey(
-      this.options.fingerprint,
-      input.format,
-      input.routePath,
-      input.liftTitle,
-      input.split === true,
-      input.hash ?? input.source,
-    )
+    const { slot, key } = this.#place(input)
 
     const cached = await this.cache.get(slot, key)
     if (cached) return { ...cached, cached: true, ms: performance.now() - started }

@@ -16,6 +16,7 @@ import { checkExternalLinks, type ExternalOptions } from './check-external.js'
 import { isShabdError, type ShabdError } from './config/errors.js'
 import { redirectRoute } from './config/load.js'
 import { compilePage, createContext, type ShabdContext } from './context.js'
+import { warmCompileCache, type Warmed } from './markdown/compile-pool.js'
 
 export type ProblemLevel = Exclude<CheckLevel, 'off'>
 
@@ -33,6 +34,8 @@ export interface CheckResult {
   problems: Problem[]
   /** Errors that carry their own code frame (invalid frontmatter, MDX syntax). */
   detailed: ShabdError[]
+  /** How the pages were compiled, when it was on more than one core. */
+  warmed?: Warmed | undefined
 }
 
 export interface CheckOptions {
@@ -69,6 +72,11 @@ export async function collectProblems(context: ShabdContext, options: CheckOptio
       problems.push({ level: 'note', rule: 'openapi', file, message: `${more} more ${more === 1 ? 'part' : 'parts'} of this description could not be shown either.` })
     }
   }
+
+  // A large site's pages are compiled first, side by side (markdown/compile-pool.ts). What follows
+  // compiles each page as it always did, and finds it done. The dev server compiles a page when it is
+  // asked for, and is left to.
+  const warmed = context.dev ? undefined : await warmCompileCache(context, store.pages())
 
   /** What a live snippet may import: what every snippet has, and what the config names. */
   const importable = new Set([...SNIPPET_MODULES, ...config.sandboxModules.map((module) => module.name)])
@@ -204,7 +212,7 @@ export async function collectProblems(context: ShabdContext, options: CheckOptio
     }
   }
 
-  return { problems, detailed }
+  return { problems, detailed, warmed }
 }
 
 const LABEL = { error: pc.red('error'), warning: pc.yellow('warning'), note: pc.dim('note') }

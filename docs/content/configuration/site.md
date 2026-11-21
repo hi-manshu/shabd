@@ -249,6 +249,7 @@ has a key of its own, [`openapi`](#openapi).
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `adapter` | none | The host the site is deployed to: `cloudflare`, `vercel` or `netlify` |
+| `threads` | `auto` | How many threads compile pages, in a build and in `shabd check`: a number, or `auto` |
 
 ```yaml title="shabd.config.yaml"
 build:
@@ -258,6 +259,11 @@ build:
 With an adapter, a build also writes what that host needs to answer the MCP endpoint, and the site's
 [redirects](#redirects) in the host's own format. `shabd build --adapter <name>` does the same for one build, and
 wins over this key. [Deploying](../guide/deploying.md) says what each adapter writes.
+
+A site of a few hundred pages or more has its pages compiled side by side, on as many threads as the machine has
+cores to spare, up to eight. Each thread holds a compiler of its own, so each takes memory of its own: where that
+is short, give `threads` a smaller number, or `1` to compile on one thread. A smaller site is compiled on one
+whatever this says, and so is a site that was built before, whose pages are in the cache.
 
 ## openapi
 

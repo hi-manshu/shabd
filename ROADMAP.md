@@ -171,9 +171,12 @@ page became a group of one in the sidebar: on MDN's layout, where every page is 
 of 1,001 pages 224 MB, and it is 71 MB now. At 5,000 pages `shabd check` went from 6.7 s to 2.2 s, and the dev
 server listens after 0.52 s where it took 5.2 s.
 
+It also found that pages were compiled on one core: about 59 s of the 128 at 5,000 pages. A site of a few hundred
+pages or more now has them compiled on up to eight threads (`build.threads`). `shabd check` on 2,000 made-up pages,
+from an empty cache, took 21.8 s on one thread and 6.8 s on eight. The table above is from before that.
+
 What it found that is not fixed:
 
-- Pages are compiled on one core. At 5,000 pages that is about 59 s of the 128.
 - Every reader is sent the data of the whole site. At 5,000 pages it is 2.5 MB (436 KB compressed) in the first
   script.
 - The bundler's time grows faster than the number of pages, and most of the memory is the bundler's.
@@ -215,8 +218,7 @@ Not checked:
 - Peer editing between two machines on different networks.
 - The adapters for Cloudflare, Vercel and Netlify, each on its host.
 - Listen to the site with a screen reader.
-- From the benchmark: compile pages on more than one core, and send a reader the part of the site's data that a
-  page needs.
+- From the benchmark: send a reader the part of the site's data that a page needs.
 
 ### 0.3: Finish the four headline features
 

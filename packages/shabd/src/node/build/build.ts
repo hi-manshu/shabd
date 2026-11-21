@@ -73,9 +73,9 @@ export async function build(root: string, options: BuildOptions = {}): Promise<v
   console.log(`\n${pc.bold('shabd build')} ${pc.dim(path.relative(process.cwd(), config.root) || '.')}\n`)
 
   // Problems in content stop the build before any time is spent bundling.
-  const { problems, detailed } = await collectProblems(context)
+  const { problems, detailed, warmed } = await collectProblems(context)
   if (detailed.length) throw detailed[0]
-  step(`${pages.length} pages compiled`)
+  step(`${pages.length} pages compiled${warmed ? `, ${warmed.pages} of them on ${warmed.workers} cores` : ''}`)
   if (store.lastUpdatedNote) {
     console.log(pc.yellow(`    defaults.lastUpdated is on, but ${store.lastUpdatedNote}. No page shows when it was last changed.`))
   }
