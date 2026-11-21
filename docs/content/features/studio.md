@@ -32,6 +32,25 @@ dark, or picking another palette from the theme menu, changes the editor with ev
 
 CodeMirror is downloaded the first time the Studio is opened, not with the page.
 
+### Images
+
+Paste an image into the editor, or drop one on it. The Studio saves the file beside the page and puts a Markdown
+image where the cursor was, or where the image was dropped:
+
+```md
+![](./screenshot.png)
+```
+
+The cursor is left between the square brackets, for the words that describe the picture to someone who cannot
+see it. Shabd bundles an image that a page refers to by a relative path, so the picture shows in the page beside
+the editor as soon as the page is saved, and is part of a build.
+
+- PNG, JPEG, GIF, WebP and AVIF are taken, up to 10 MB each. What a file is, is read from its first bytes, not
+  from its name.
+- The file is named after what it was called, in lower case, with hyphens where there was anything but a letter
+  or a digit, and with the extension of what it is: `Screen Shot 1.PNG` becomes `screen-shot-1.png`.
+- A name that is taken is not written over. The next one is used: `screen-shot-1-2.png`.
+
 ## Where the file is written
 
 The Studio has two ways to write, and uses the first one available.
@@ -130,11 +149,15 @@ The Studio's endpoints exist only in the dev server, and they are narrow on purp
   names is then followed through any symbolic link, and has to be inside the content folder still.
 - A new file is made in a way that fails if anything has that name already, a symbolic link included. Nothing is
   written over, and a page is not deleted if the file has changed since the Studio last read it.
+- An image is saved in the folder of a page that exists, and nowhere else. Nothing that is sent with it chooses
+  its folder, its name or its kind: the name is made by the dev server from letters, digits and hyphens, the
+  extension follows from what the first bytes say the file is, and a file that is not one of the five kinds of
+  image, or is larger than 10 MB, is refused.
 - One file outside the content folder can change: `shabd.config.yaml` gains a line when you accept the offer of a
   redirect. The redirect must lead from an address that has no page to one that has.
 
-In a connected folder the browser does this work, and holds a name to the same rules before it touches a file.
-It cannot make a file in one step that fails if the name is taken: it looks first and then writes.
+In a connected folder the browser does this work, and holds a name and an image to the same rules before it
+touches a file. It cannot make a file in one step that fails if the name is taken: it looks first and then writes.
 
 Set `features.studio: false` to remove the Studio and its endpoints.
 
@@ -153,6 +176,15 @@ Set `features.studio: false` to remove the Studio and its endpoints.
   content folder, so the browser could not write to it.
 - Making, renaming and deleting through a connected folder is tested with a folder in the browser's private file
   system standing in for a real one, because a test cannot click the folder picker.
+- An SVG is not taken as an image. It is text, it can hold a script, and nothing in its first bytes tells one
+  from any other text. Put it in the folder yourself. HEIC pictures are not taken either: browsers do not show
+  them.
+- A picture is pasted only when it was copied as a picture: a screenshot, or "Copy image" in a browser. What is
+  copied in a file manager or a spreadsheet arrives with text, and the text is what is pasted, as before. Drop
+  the file instead.
+- An image is saved as it is, at the size it has. When its link is deleted from the page, the file stays.
+- Pasting and dropping are tested with events that the test makes and attaches files to, because a test cannot
+  use the real clipboard of every browser or drag a file in from outside the page.
 - The editor has no autocomplete and no search of its own. The browser's find only sees the lines near the ones
   on screen, because the editor draws no more of a long page than that.
 - Code in a fence is coloured for the six languages named above and no others. An `.mdx` page is coloured as

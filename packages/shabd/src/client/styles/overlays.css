@@ -352,6 +352,11 @@
     color: var(--sb-danger);
   }
 
+  /* Why an image that was pasted or dropped was not taken. */
+  .sb-studio-footer .sb-studio-problem {
+    padding: 0 0 0.3rem;
+  }
+
   .sb-studio-choices {
     display: flex;
     gap: 0.5rem;

@@ -40,8 +40,8 @@ export function sendJson(res: ServerResponse, value: unknown, status = 200): voi
   sendText(res, JSON.stringify(value), 'application/json; charset=utf-8', status)
 }
 
-/** Read a request body as text, refusing bodies over `limit` bytes. */
-export async function readBody(req: IncomingMessage, limit = 2 * 1024 * 1024): Promise<string> {
+/** Read a request body as bytes, refusing bodies over `limit` bytes. */
+export async function readBytes(req: IncomingMessage, limit: number): Promise<Buffer> {
   const chunks: Buffer[] = []
   let size = 0
   for await (const chunk of req) {
@@ -49,5 +49,10 @@ export async function readBody(req: IncomingMessage, limit = 2 * 1024 * 1024): P
     if (size > limit) throw Object.assign(new Error('Request body too large'), { status: 413 })
     chunks.push(chunk as Buffer)
   }
-  return Buffer.concat(chunks).toString('utf8')
+  return Buffer.concat(chunks)
+}
+
+/** Read a request body as text, refusing bodies over `limit` bytes. */
+export async function readBody(req: IncomingMessage, limit = 2 * 1024 * 1024): Promise<string> {
+  return (await readBytes(req, limit)).toString('utf8')
 }

@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
 import { resolveConfig } from '../src/node/config/load.js'
 import { addRedirect, planRedirect } from '../src/node/config/redirect-edit.js'
-import { createPage, deletePage, movePage } from '../src/node/vite/studio-files.js'
+import { createPage, deletePage, movePage, saveImage } from '../src/node/vite/studio-files.js'
+import { IMAGE_BYTES_LIMIT, imageFileName, sniffImage } from '../src/shared/image-file.js'
 import { pagePathProblem, pageRoute } from '../src/shared/page-path.js'
 import { temporarySites } from './helpers/site.js'
 
@@ -319,5 +320,172 @@ describe('a redirect added to the config', () => {
     const plan = planRedirect(config, source, '/b', '/a', (route) => route === '/a')
     expect(plan).toMatchObject({ ok: false, line: '/b: /a' })
     if (!plan.ok) expect(plan.problem).toContain('Redirects lead in a circle')
+  })
+})
+
+const bytes = (...parts: (string | number[])[]) =>
+  Uint8Array.from(parts.flatMap((part) => (typeof part === 'string' ? [...part].map((letter) => letter.charCodeAt(0)) : part)))
+
+/** How a file of each kind begins. Only the first bytes are real: that is all that is read. */
+const IMAGES = {
+  png: bytes([0x89], 'PNG\r\n', [0x1a], '\n', [0, 0, 0, 13], 'IHDR'),
+  jpg: bytes([0xff, 0xd8, 0xff, 0xe0, 0, 16], 'JFIF', [0]),
+  gif: bytes('GIF89a', [1, 0, 1, 0]),
+  webp: bytes('RIFF', [36, 0, 0, 0], 'WEBPVP8 '),
+  avif: bytes([0, 0, 0, 28], 'ftypavif', [0, 0, 0, 0], 'avifmif1miaf'),
+}
+
+/** Files that are not images, and files that are close to one. */
+const NOT_IMAGES: [what: string, bytes: Uint8Array][] = [
+  ['nothing at all', bytes()],
+  ['two bytes', bytes([0xff, 0xd8])],
+  ['text', bytes('Just some words.\n')],
+  ['a page', bytes('---\ntitle: A page\n---\n')],
+  ['a web page', bytes('<!doctype html><script>alert(1)</script>')],
+  ['an SVG, which is text and can hold a script', bytes('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')],
+  ['a script', bytes('export default 1\n')],
+  ['a PDF', bytes('%PDF-1.7\n')],
+  ['an archive', bytes('PK', [3, 4, 20, 0])],
+  ['a program', bytes([0x7f], 'ELF', [2, 1, 1])],
+  ['sound in the wrapper WebP uses', bytes('RIFF', [36, 0, 0, 0], 'WAVEfmt ')],
+  ['video in the wrapper WebP uses', bytes('RIFF', [36, 0, 0, 0], 'AVI LIST')],
+  ['video in the wrapper AVIF uses', bytes([0, 0, 0, 24], 'ftypisom', [0, 0, 2, 0], 'isomiso2')],
+  ['a HEIC picture, which browsers do not show', bytes([0, 0, 0, 24], 'ftypheic', [0, 0, 0, 0], 'mif1heic')],
+  ['a PNG with one byte of its signature wrong', bytes([0x89], 'PNG\r\n', [0x1b], '\n')],
+  ['a GIF of a version there is not', bytes('GIF90a', [1, 0, 1, 0])],
+  ['a bitmap', bytes('BM', [70, 0, 0, 0])],
+  ['an icon', bytes([0, 0, 1, 0, 1, 0])],
+]
+
+describe('what the Studio takes for an image', () => {
+  it('knows a PNG, a JPEG, a GIF, a WebP and an AVIF by how they begin', () => {
+    expect(Object.entries(IMAGES).map(([name, start]) => [name, sniffImage(start)?.extension])).toEqual([
+      ['png', 'png'],
+      ['jpg', 'jpg'],
+      ['gif', 'gif'],
+      ['webp', 'webp'],
+      ['avif', 'avif'],
+    ])
+    expect(sniffImage(bytes('GIF87a'))?.extension).toBe('gif')
+    // An AVIF may say first that it is of the family, and only then that it is an AVIF.
+    expect(sniffImage(bytes([0, 0, 0, 28], 'ftypmif1', [0, 0, 0, 0], 'mif1avifmiaf'))?.extension).toBe('avif')
+    expect(sniffImage(bytes([0, 0, 0, 28], 'ftypavis', [0, 0, 0, 0], 'avismsf1miaf'))?.extension).toBe('avif')
+  })
+
+  it.each(NOT_IMAGES)('does not take %s', (_what, start) => {
+    expect(sniffImage(start)).toBeUndefined()
+  })
+
+  it('names the file itself, from what it was called and what it is', () => {
+    const png = sniffImage(IMAGES.png)!
+    const jpg = sniffImage(IMAGES.jpg)!
+    expect(imageFileName('Screenshot 2026-11-19 at 10.00.00.png', png)).toBe('screenshot-2026-11-19-at-10-00-00.png')
+    expect(imageFileName('Çà et là.webp', png)).toBe('ca-et-la.png')
+    expect(imageFileName('photo.JPEG', jpg)).toBe('photo.jpg')
+    // The extension is that of the content, whatever the name said.
+    expect(imageFileName('page.md', png)).toBe('page.png')
+    expect(imageFileName('evil.svg', png)).toBe('evil.png')
+    expect(imageFileName('run.php.png', png)).toBe('run-php.png')
+    // A name that is taken gets a number.
+    expect(imageFileName('shot.png', png, 2)).toBe('shot-2.png')
+    expect(imageFileName('shot.png', png, 31)).toBe('shot-31.png')
+    // Nothing to make a name from.
+    for (const nameless of ['', '.png', '.htaccess', '...', '///', 'снимок.png', undefined, null, 42, ['shot.png']]) {
+      expect(imageFileName(nameless, png), String(nameless)).toBe('image.png')
+    }
+    expect(imageFileName(`${'long-'.repeat(40)}name.png`, png)).toBe(`${'long-'.repeat(12).slice(0, -1)}.png`)
+  })
+
+  it('makes no name that could be anywhere but in the folder it is saved to', () => {
+    const png = sniffImage(IMAGES.png)!
+    const attempts = [
+      '../outside.png',
+      '../../outside.png',
+      '/tmp/outside.png',
+      'C:\\outside.png',
+      '..\\..\\outside.png',
+      'folder/inside.png',
+      './here.png',
+      '..',
+      '.',
+      '%2e%2e%2foutside.png',
+      'a\u0000b.png',
+      'a\nb.png',
+      ' leading and trailing .png ',
+      'CON.png',
+    ]
+    for (const attempt of attempts) {
+      for (const turn of [1, 2]) expect(imageFileName(attempt, png, turn), attempt).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*\.png$/)
+    }
+    expect(imageFileName('../../outside.png', png)).toBe('outside.png')
+    expect(imageFileName('C:\\Users\\me\\Desktop\\shot.png', png)).toBe('shot.png')
+    // A name Windows keeps for a device is not used as it is.
+    expect(imageFileName('CON.png', png)).toBe('image-con.png')
+    expect(imageFileName('lpt1.png', png, 2)).toBe('image-lpt1-2.png')
+  })
+})
+
+describe('an image saved beside a page', () => {
+  const site = temporarySites()
+  const names = async (folder: string) => (await readdir(folder)).sort()
+
+  it('is written into the page\'s folder under a name of its own', async () => {
+    const root = await site({ 'content/guide/page.md': '# Page\n' })
+    const content = path.join(root, 'content')
+    const page = path.join(content, 'guide', 'page.md')
+
+    expect(await saveImage(content, page, 'My Shot.PNG', IMAGES.png)).toBe('my-shot.png')
+    expect(new Uint8Array(await readFile(path.join(content, 'guide', 'my-shot.png')))).toEqual(IMAGES.png)
+    // The same name again, and a third time: each is another file, and none is written over.
+    expect(await saveImage(content, page, 'My Shot.PNG', IMAGES.jpg)).toBe('my-shot.jpg')
+    expect(await saveImage(content, page, 'my shot.png', IMAGES.gif)).toBe('my-shot.gif')
+    expect(await saveImage(content, page, 'my-shot.png', IMAGES.png.slice(0, 12))).toBe('my-shot-2.png')
+    expect(await saveImage(content, page, 'my-shot.png', IMAGES.png.slice(0, 10))).toBe('my-shot-3.png')
+    expect(await names(path.join(content, 'guide'))).toEqual(['my-shot-2.png', 'my-shot-3.png', 'my-shot.gif', 'my-shot.jpg', 'my-shot.png', 'page.md'])
+    expect(new Uint8Array(await readFile(path.join(content, 'guide', 'my-shot.png')))).toEqual(IMAGES.png)
+  })
+
+  it('stays in that folder whatever it was called', async () => {
+    const root = await site({ 'content/guide/page.md': '# Page\n', 'content/index.md': '# Home\n', 'outside.md': 'kept\n' })
+    const content = path.join(root, 'content')
+    const page = path.join(content, 'guide', 'page.md')
+
+    for (const name of ['../up.png', '../../outside.png', path.join(root, 'absolute.png'), '..\\..\\back.png', 'deeper/down.png', '../index.md', 'page.md']) {
+      await saveImage(content, page, name, IMAGES.png)
+    }
+    expect(await names(root)).toEqual(['content', 'outside.md'])
+    expect(await names(content)).toEqual(['guide', 'index.md'])
+    expect(await names(path.join(content, 'guide'))).toEqual(['absolute.png', 'back.png', 'down.png', 'index.png', 'outside.png', 'page.md', 'page.png', 'up.png'])
+    // The page itself, and the one that was named, are as they were.
+    expect(await readFile(page, 'utf8')).toBe('# Page\n')
+    expect(await readFile(path.join(content, 'index.md'), 'utf8')).toBe('# Home\n')
+  })
+
+  it.each(NOT_IMAGES)('is not written when it is %s', async (_what, start) => {
+    const root = await site({ 'content/guide/page.md': '# Page\n' })
+    const content = path.join(root, 'content')
+    await expect(saveImage(content, path.join(content, 'guide', 'page.md'), 'shot.png', start)).rejects.toMatchObject({ status: 415 })
+    expect(await names(path.join(content, 'guide'))).toEqual(['page.md'])
+  })
+
+  it('is not written when it is larger than the limit, and is at the limit', async () => {
+    const root = await site({ 'content/guide/page.md': '# Page\n' })
+    const content = path.join(root, 'content')
+    const page = path.join(content, 'guide', 'page.md')
+    const large = new Uint8Array(IMAGE_BYTES_LIMIT + 1)
+    large.set(IMAGES.png)
+
+    await expect(saveImage(content, page, 'large.png', large)).rejects.toMatchObject({ status: 413, message: 'That image is larger than 10 MB.' })
+    expect(await names(path.join(content, 'guide'))).toEqual(['page.md'])
+    expect(await saveImage(content, page, 'large.png', large.subarray(0, IMAGE_BYTES_LIMIT))).toBe('large.png')
+  })
+
+  it.runIf(canLink)('is not written beside a page that a link has put outside the content folder', async () => {
+    const root = await site({ 'content/index.md': '# Home\n', 'elsewhere/page.md': '# Elsewhere\n' })
+    const content = path.join(root, 'content')
+    await symlink(path.join(root, 'elsewhere'), path.join(content, 'linked'), 'junction')
+
+    await expect(saveImage(content, path.join(content, 'linked', 'page.md'), 'shot.png', IMAGES.png)).rejects.toMatchObject({ status: 400 })
+    expect(await names(path.join(root, 'elsewhere'))).toEqual(['page.md'])
   })
 })

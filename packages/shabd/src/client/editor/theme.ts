@@ -62,6 +62,10 @@ const frame = EditorView.theme({
   '.cm-line': {
     padding: '0',
   },
+  // Where something dragged over the text would land.
+  '.cm-dropCursor': {
+    borderLeftColor: text,
+  },
   '&.cm-focused .cm-matchingBracket': {
     backgroundColor: 'transparent',
     outline: `1px solid ${muted}`,

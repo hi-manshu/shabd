@@ -14,7 +14,8 @@ import { Icon } from '../app/icons.js'
 import { usePage } from '../app/router.js'
 import { useSite } from '../app/store.js'
 import { setUi } from '../app/ui.js'
-import { CodeEditor } from '../editor/CodeEditor.js'
+import { IMAGE_BYTES_LIMIT, IMAGE_TOO_LARGE, imageMarkdown } from '../../shared/image-file.js'
+import { CodeEditor, type EditorInsertion } from '../editor/CodeEditor.js'
 import {
   ConflictError,
   connectFolder,
@@ -179,6 +180,33 @@ export default function Studio() {
 
   const version = useCallback(() => live.current.version, [])
 
+  /* ── an image pasted or dropped into the editor ── */
+
+  const [imageProblem, setImageProblem] = useState('')
+
+  const addImages = useCallback(
+    async (files: File[]): Promise<EditorInsertion | undefined> => {
+      if (!backend || !id) return undefined
+      const links: string[] = []
+      let problem = ''
+      for (const file of files) {
+        try {
+          // Said here as well as where the image is saved, so that one that is too large is not read first.
+          if (file.size > IMAGE_BYTES_LIMIT) throw new Error(IMAGE_TOO_LARGE)
+          links.push(imageMarkdown(await backend.addImage(id, file.name, new Uint8Array(await file.arrayBuffer()))))
+        } catch (error) {
+          problem = error instanceof Error ? error.message : String(error)
+        }
+      }
+      setImageProblem(problem)
+      // The cursor is left between the brackets of the first: the words for someone who cannot see it are still to be written.
+      return links.length > 0 ? { text: links.join('\n'), cursor: 2 } : undefined
+    },
+    [backend, id],
+  )
+
+  useEffect(() => setImageProblem(''), [id])
+
   /* ── the page hot-updated ── */
 
   useEffect(() => {
@@ -323,6 +351,7 @@ export default function Studio() {
           readOnly={status.kind === 'loading'}
           onChange={edit}
           onSave={() => void save()}
+          onFiles={addImages}
         />
       ) : (
         <p className="sb-studio-empty">There is no page at this address to edit.</p>
@@ -338,6 +367,11 @@ export default function Studio() {
       )}
 
       <footer className="sb-studio-footer" data-state={status.kind}>
+        {imageProblem && (
+          <p className="sb-studio-problem" role="alert">
+            {imageProblem}
+          </p>
+        )}
         <p role="status">{describe(status)}</p>
         {status.kind === 'conflict' && (
           <p className="sb-studio-choices">

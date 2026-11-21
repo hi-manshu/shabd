@@ -322,7 +322,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       }
     },
 
-    async hotUpdate({ type, file, read, server }) {
+    async hotUpdate({ type, file, modules, read, server }) {
       if (this.environment.name !== 'client') return undefined
       const context = ctx()
       const { config, store } = context
@@ -396,7 +396,15 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
         return []
       }
 
-      if (!store.owns(file)) return undefined
+      if (!store.owns(file)) {
+        // A file beside the pages: an image, most often. Vite remembers every file it has served. When one
+        // that no page uses any more is made again, or written to, it finds nothing that can take the change
+        // and loads the whole page again. That happened to a picture pasted under a name that had been used
+        // before, and took the Studio and the link it had not saved yet with it. What nothing uses is left out.
+        const fromContent = path.relative(config.contentDir, file)
+        const beside = !fromContent.startsWith('..') && !path.isAbsolute(fromContent)
+        return beside ? modules.filter((module) => module.file !== normalizePath(file) || module.importers.size > 0) : undefined
+      }
 
       if (type === 'delete') {
         if (store.remove(file)) {

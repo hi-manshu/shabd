@@ -9,7 +9,7 @@
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { bracketMatching, indentOnInput, indentUnit } from '@codemirror/language'
 import { Annotation, Compartment, EditorState, Transaction, type Extension } from '@codemirror/state'
-import { EditorView, keymap } from '@codemirror/view'
+import { dropCursor, EditorView, keymap } from '@codemirror/view'
 import { useLayoutEffect, useRef } from 'react'
 import type { EditorViewProps } from './CodeEditor.js'
 import { endsLinesWithCrLf, replacement, toCrLf, toLineFeeds } from './text.js'
@@ -38,22 +38,51 @@ function access(label: string, readOnly: boolean, hintId: string): Extension {
   ]
 }
 
-export function CodeMirrorView({ value, label, onChange, onSave, readOnly = false, hintId, grammar }: Props) {
+export function CodeMirrorView({ value, label, onChange, onSave, onFiles, readOnly = false, hintId, grammar }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const mounted = useRef<{ view: EditorView; accessOf: Compartment } | null>(null)
   /** The text as the caller has it: what it passed in last, or what it was told last. */
   const known = useRef(value)
   /** CodeMirror keeps lines apart with a line feed alone. This remembers that the file's lines end in CR LF. */
   const crlf = useRef(false)
-  const handlers = useRef({ onChange, onSave })
+  const handlers = useRef({ onChange, onSave, onFiles })
 
   useLayoutEffect(() => {
-    handlers.current = { onChange, onSave }
+    handlers.current = { onChange, onSave, onFiles }
   })
 
   useLayoutEffect(() => {
     const accessOf = new Compartment()
     crlf.current = endsLinesWithCrLf(known.current)
+    /** Where files landed that the caller is still dealing with. Kept in step with the text as it changes meanwhile. */
+    const landings = new Set<{ from: number; to: number }>()
+
+    /**
+     * Hand files to the caller, and put what it answers where they landed.
+     * False when this editor does nothing with files, so that CodeMirror does what it would.
+     */
+    const take = (files: File[], landing: { from: number; to: number }): boolean => {
+      const { onFiles } = handlers.current
+      if (!onFiles || view.state.readOnly) return false
+      landings.add(landing)
+      onFiles(files)
+        .then((insertion) => {
+          // The editor may be gone by now: the Studio has gone to another page.
+          if (!insertion || mounted.current?.view !== view) return
+          const text = toLineFeeds(insertion.text)
+          view.dispatch({
+            changes: { from: landing.from, to: landing.to, insert: text },
+            selection: { anchor: landing.from + Math.min(insertion.cursor ?? text.length, text.length) },
+            scrollIntoView: true,
+            userEvent: 'input.paste',
+          })
+          view.focus()
+        })
+        // What went wrong is the caller's to say. Nothing is put in.
+        .catch(() => {})
+        .finally(() => landings.delete(landing))
+      return true
+    }
 
     const view = new EditorView({
       parent: host.current!,
@@ -86,8 +115,35 @@ export function CodeMirrorView({ value, label, onChange, onSave, readOnly = fals
           grammar,
           // Filled in by the effect below, which also follows the props it is made from.
           accessOf.of([]),
+          // Shows where something dragged over the text would land.
+          dropCursor(),
+          EditorView.domEventHandlers({
+            paste(event) {
+              const files = [...(event.clipboardData?.files ?? [])]
+              // What is copied from a spreadsheet or a file manager comes as text with a picture or a file
+              // beside it. The text is what is pasted then, as it always was.
+              if (files.length === 0 || event.clipboardData?.getData('text/plain')) return false
+              const { from, to } = view.state.selection.main
+              if (!take(files, { from, to })) return false
+              event.preventDefault()
+              return true
+            },
+            drop(event) {
+              const files = [...(event.dataTransfer?.files ?? [])]
+              if (files.length === 0) return false
+              const at = view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.head
+              if (!take(files, { from: at, to: at })) return false
+              event.preventDefault()
+              return true
+            },
+          }),
           EditorView.updateListener.of((update) => {
-            if (!update.docChanged || update.transactions.every((transaction) => transaction.annotation(fromOutside))) return
+            if (!update.docChanged) return
+            for (const landing of landings) {
+              landing.from = update.changes.mapPos(landing.from, 1)
+              landing.to = update.changes.mapPos(landing.to, 1)
+            }
+            if (update.transactions.every((transaction) => transaction.annotation(fromOutside))) return
             const text = update.state.doc.toString()
             // A file with Windows line endings gets them back, so that one keystroke does not rewrite every line of it.
             known.current = crlf.current ? toCrLf(text) : text

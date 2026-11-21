@@ -1,6 +1,6 @@
 /**
  * What the Studio may do to files besides writing to a page that exists:
- * make a page, move one, delete one.
+ * make a page, move one, delete one, and save an image beside one.
  *
  * A page that exists is found by its name in the content store, and no path
  * is taken from the request. A page that is to be made, or the new place of
@@ -19,6 +19,15 @@
 import { constants } from 'node:fs'
 import { copyFile, lstat, mkdir, realpath, stat, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import {
+  IMAGE_BYTES_LIMIT,
+  IMAGE_NAME_ATTEMPTS,
+  IMAGE_TOO_LARGE,
+  imageFileName,
+  NOT_AN_IMAGE,
+  sniffImage,
+  TOO_MANY_IMAGES,
+} from '../../shared/image-file.js'
 import { pagePathProblem } from '../../shared/page-path.js'
 
 /** A request the Studio's endpoints turn down, with the HTTP status that says how. */
@@ -122,4 +131,39 @@ export async function movePage(contentDir: string, from: string, id: unknown): P
 /** Delete a page's file. `file` is the file of a page the store knows; `unlink` removes a file and refuses a folder. */
 export async function deletePage(file: string): Promise<void> {
   await unlink(file)
+}
+
+/**
+ * Save an image beside a page, and return the name it was given.
+ * `pageFile` is the file of a page the store knows.
+ *
+ * Nothing that was sent decides where the file goes or what it is. The
+ * folder is the page's own. The kind is read from the first bytes, and
+ * what is not one of a few kinds of image is refused. The name is made
+ * here from what the image was called (shared/image-file.ts): letters,
+ * digits and hyphens, and the extension of what the file is. A name that
+ * is taken is not written over: the next free one is used.
+ */
+export async function saveImage(contentDir: string, pageFile: string, suggested: unknown, bytes: Uint8Array): Promise<string> {
+  if (bytes.length > IMAGE_BYTES_LIMIT) throw new StudioRefusal(IMAGE_TOO_LARGE, 413)
+  const kind = sniffImage(bytes)
+  if (!kind) throw new StudioRefusal(NOT_AN_IMAGE, 415)
+
+  const folder = path.dirname(pageFile)
+  // The store finds pages by walking the content folder, which does not go through links. The watcher that
+  // tells it of new files does, so a page can be known that is somewhere else on disk. Not for this.
+  if (!isInside(await realpath(contentDir), await realpath(folder))) {
+    throw new StudioRefusal('That page is in a folder that leads out of the content folder.', 400)
+  }
+
+  for (let attempt = 1; attempt <= IMAGE_NAME_ATTEMPTS; attempt++) {
+    const name = imageFileName(suggested, kind, attempt)
+    try {
+      await writeFile(path.join(folder, name), bytes, { flag: 'wx' })
+      return name
+    } catch (error) {
+      if (codeOf(error) !== 'EEXIST') throw error
+    }
+  }
+  throw new StudioRefusal(TOO_MANY_IMAGES, 409)
 }

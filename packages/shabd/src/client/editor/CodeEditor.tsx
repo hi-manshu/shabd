@@ -23,6 +23,13 @@ import { lazy, Suspense, useId } from 'react'
 
 export type EditorLanguage = 'markdown' | 'tsx'
 
+/** Text for the editor to put in, for files that were pasted or dropped. */
+export interface EditorInsertion {
+  text: string
+  /** Where in the text the cursor is left. At its end, if this is left out. */
+  cursor?: number
+}
+
 export interface CodeEditorProps {
   value: string
   /**
@@ -36,6 +43,12 @@ export interface CodeEditorProps {
   onChange: (value: string) => void
   /** Ctrl or ⌘ + S. Left out, the key stays the browser's. */
   onSave?: (() => void) | undefined
+  /**
+   * Files that were pasted or dropped into the editor. Resolve with the text to put where they landed, or
+   * with nothing to put nothing there. Left out, a file is treated as CodeMirror treats one: a pasted file
+   * is ignored and a dropped one is typed in as text.
+   */
+  onFiles?: ((files: File[]) => Promise<EditorInsertion | undefined>) | undefined
   /** The text can be read, selected and copied, and not changed. */
   readOnly?: boolean | undefined
   /** Added to the frame's own class, for the caller to size it and give it a background. */
@@ -64,13 +77,13 @@ const VIEWS = {
   tsx: fetched(() => import('./tsx.js')),
 } satisfies Record<EditorLanguage, unknown>
 
-export function CodeEditor({ value, language, label, onChange, onSave, readOnly = false, className }: CodeEditorProps) {
+export function CodeEditor({ value, language, label, onChange, onSave, onFiles, readOnly = false, className }: CodeEditorProps) {
   const hint = useId()
   const View = VIEWS[language]
   return (
     <div className={className ? `sb-editor ${className}` : 'sb-editor'} data-readonly={readOnly ? '' : undefined}>
       <Suspense fallback={<pre className="sb-editor-plain">{value}</pre>}>
-        <View value={value} label={label} onChange={onChange} onSave={onSave} readOnly={readOnly} hintId={hint} />
+        <View value={value} label={label} onChange={onChange} onSave={onSave} onFiles={onFiles} readOnly={readOnly} hintId={hint} />
       </Suspense>
       {/*
        * Tab indents, so it cannot also move focus on, and someone using a keyboard alone would be held

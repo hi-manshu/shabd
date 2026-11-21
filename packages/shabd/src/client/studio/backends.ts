@@ -15,6 +15,15 @@
  * there is nobody else to check, so the folder backend holds every path to
  * the same rule before it touches a file.
  */
+import {
+  IMAGE_BYTES_LIMIT,
+  IMAGE_NAME_ATTEMPTS,
+  IMAGE_TOO_LARGE,
+  imageFileName,
+  NOT_AN_IMAGE,
+  sniffImage,
+  TOO_MANY_IMAGES,
+} from '../../shared/image-file.js'
 import { pagePathProblem } from '../../shared/page-path.js'
 import { withBase } from '../../shared/paths.js'
 import { siteStore } from '../app/store.js'
@@ -47,6 +56,11 @@ export interface StudioBackend {
   rename(id: string, to: string): Promise<void>
   /** Delete a page's file. Throws if the file no longer matches `baseVersion`: it is not what the Studio showed. */
   remove(id: string, baseVersion: string): Promise<void>
+  /**
+   * Save an image beside a page. `name` is what the image was called and is only a suggestion. Resolves with
+   * the name it was saved under. Throws if the bytes are not an image of a kind that is taken, or are too many.
+   */
+  addImage(id: string, name: string, bytes: Uint8Array<ArrayBuffer>): Promise<string>
 }
 
 /* ───────────────────────── dev-server backend ────────────────────────── */
@@ -154,6 +168,17 @@ export async function connectServer(): Promise<StudioBackend> {
     async remove(id, baseVersion) {
       await ask('page', 'DELETE', { id, baseHash: baseVersion })
     },
+    async addImage(id, name, bytes) {
+      // The bytes as they are, and not as text inside JSON, which would be a third larger.
+      const response = await fetch(`${endpoint('image')}?id=${encodeURIComponent(id)}&name=${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { ...headers, 'content-type': 'application/octet-stream' },
+        body: bytes,
+      })
+      const answer = (await response.json()) as { name?: string; error?: string }
+      if (!response.ok || !answer.name) throw new Error(answer.error ?? 'The image could not be saved.')
+      return answer.name
+    },
   }
 }
 
@@ -257,6 +282,23 @@ function folderBackend(root: DirectoryHandle): StudioBackend {
       const current = await (await directory.getFileHandle(name)).getFile()
       if (String(current.lastModified) !== baseVersion) throw new Error('The file changed on disk since it was opened.')
       await directory.removeEntry(name)
+    },
+    async addImage(id, name, bytes) {
+      assertPage(id)
+      // What the dev server would check, checked here: there is nobody else to.
+      if (bytes.length > IMAGE_BYTES_LIMIT) throw new Error(IMAGE_TOO_LARGE)
+      const kind = sniffImage(bytes)
+      if (!kind) throw new Error(NOT_AN_IMAGE)
+      const { directory } = await folderOf(root, id)
+      for (let attempt = 1; attempt <= IMAGE_NAME_ATTEMPTS; attempt++) {
+        const fileName = imageFileName(name, kind, attempt)
+        if (await isTaken(directory, fileName)) continue
+        const writable = await (await directory.getFileHandle(fileName, { create: true })).createWritable()
+        await writable.write(bytes)
+        await writable.close()
+        return fileName
+      }
+      throw new Error(TOO_MANY_IMAGES)
     },
   }
 }

@@ -1,7 +1,8 @@
 /** The dev server: files change on disk and the page on screen follows, without loading again. */
 import type { APIRequestContext, APIResponse, Locator, Page } from '@playwright/test'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, readdir, rm, symlink } from 'node:fs/promises'
+import path from 'node:path'
 import { contrastOn, parseColor, type Rgba } from '../packages/shabd/src/shared/color.js'
 import { PRESET_NAMES } from '../packages/shabd/src/shared/presets.js'
 import { DEV, expect, markPage, open, regions, test, type SiteFiles } from './support/fixtures.js'
@@ -653,6 +654,94 @@ test.describe('studio', () => {
     expect(await stillThere()).toBe(true)
   })
 
+  /** A real picture, one pixel of it, as base64. */
+  const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+
+  /**
+   * Hand files to the editor as a paste or a drop does. A test cannot put a picture on the clipboard of every
+   * engine, or drag one in from outside the page, so the event is made here and the files are attached to it:
+   * Firefox empties the files of a clipboard event that a script constructs with them. A drop lands at the end
+   * of the line that holds `onLine`.
+   */
+  const giveFiles = (editor: Locator, how: 'paste' | 'drop', files: { name: string; type: string; base64: string }[], onLine = '') =>
+    editor.evaluate(
+      (content, [how, files, onLine]) => {
+        const carried = new DataTransfer()
+        for (const file of files) {
+          const bytes = Uint8Array.from(atob(file.base64), (letter) => letter.charCodeAt(0))
+          carried.items.add(new File([bytes], file.name, { type: file.type }))
+        }
+        if (how === 'paste') {
+          const event = new Event('paste', { bubbles: true, cancelable: true })
+          Object.defineProperty(event, 'clipboardData', { value: carried })
+          content.dispatchEvent(event)
+          return
+        }
+        const line = [...content.querySelectorAll('.cm-line')].find((candidate) => candidate.textContent?.includes(onLine))!
+        const box = line.getBoundingClientRect()
+        const event = new MouseEvent('drop', { bubbles: true, cancelable: true, clientX: box.right - 4, clientY: box.top + box.height / 2 })
+        Object.defineProperty(event, 'dataTransfer', { value: carried })
+        content.dispatchEvent(event)
+      },
+      [how, files, onLine] as const,
+    )
+
+  test('an image pasted or dropped into the editor is saved beside the page and linked where it landed', async ({ page, site }) => {
+    for (const file of ['setup.md', 'shot.png', 'shot-2.png', 'diagram.png', 'notes.png']) await site.track(`content/guide/${file}`)
+    const editor = await openStudio(page, '/guide/setup')
+    const stillThere = await markPage(page)
+    const shot = { name: 'Shot.PNG', type: 'image/png', base64: PIXEL }
+
+    // Pasted: the link goes where the cursor is, and the cursor is left where the words for the picture go.
+    await cursorAfter(editor, 'Install the thing.')
+    await page.keyboard.type(' ')
+    await giveFiles(editor, 'paste', [shot])
+    await expect(editor).toContainText('Install the thing. ![](./shot.png)')
+    expect(readFileSync(site.path('content/guide/shot.png')).toString('base64')).toBe(PIXEL)
+    await page.keyboard.type('One pixel')
+    await expect(editor).toContainText('Install the thing. ![One pixel](./shot.png)')
+
+    // The page beside the editor shows it: the file is where the link says.
+    const picture = page.locator('.sb-content img[alt="One pixel"]')
+    await expect(picture).toBeVisible()
+    await expect.poll(() => picture.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(1)
+
+    // The same picture again is a second file. The first is not written over.
+    await cursorAfter(editor, '## Second step')
+    await giveFiles(editor, 'paste', [shot])
+    await expect(editor).toContainText('## Second step![](./shot-2.png)')
+    expect(readFileSync(site.path('content/guide/shot-2.png')).toString('base64')).toBe(PIXEL)
+
+    // Dropped: the link goes where the picture was dropped, which is not where the cursor is.
+    await giveFiles(editor, 'drop', [{ name: 'diagram.png', type: 'image/png', base64: PIXEL }], 'Pelicans')
+    await expect(editor).toContainText('nowhere else.![](./diagram.png)')
+    expect(existsSync(site.path('content/guide/diagram.png'))).toBe(true)
+
+    // A file that only says it is a picture is not saved, nothing is typed for it, and the Studio says why.
+    const before = await textOf(editor)
+    await giveFiles(editor, 'paste', [{ name: 'notes.png', type: 'image/png', base64: Buffer.from('Just words.').toString('base64') }])
+    await expect(page.locator('.sb-studio-footer [role="alert"]')).toHaveText('That file is not a PNG, JPEG, GIF, WebP or AVIF image.')
+    expect(await textOf(editor)).toBe(before)
+    expect(existsSync(site.path('content/guide/notes.png'))).toBe(false)
+
+    await written(editor, site, 'content/guide/setup.md')
+    expect(await site.read('content/guide/setup.md')).toContain('Install the thing. ![One pixel](./shot.png)\n')
+
+    // The pictures are taken out of the page and deleted, and one is pasted again under the name it had. The dev
+    // server has served a file of that name, and no page uses it now. That once made it load the whole page
+    // again, which closed the Studio before the new link was saved.
+    await editor.fill(before.replace(/ ?!\[[^\]]*\]\([^)]*\)/g, ''))
+    await written(editor, site, 'content/guide/setup.md')
+    await expect(page.locator('.sb-content img')).toHaveCount(0)
+    for (const file of ['shot.png', 'shot-2.png', 'diagram.png']) await rm(site.path(`content/guide/${file}`))
+    await cursorAfter(editor, 'Install the thing.')
+    await giveFiles(editor, 'paste', [shot])
+    await expect(editor).toContainText('Install the thing.![](./shot.png)')
+    await written(editor, site, 'content/guide/setup.md')
+    await expect(page.locator('.sb-content img')).toHaveCount(1)
+    expect(await stillThere()).toBe(true)
+  })
+
   /**
    * The real folder picker is a system dialog that a test cannot click. A folder in the browser's private file
    * system stands in for the one it would return: it hands out the same kind of handles.
@@ -780,6 +869,46 @@ test.describe('studio', () => {
     await expect(page).toHaveURL(`${DEV}/extras/beta`)
     await expect(page.locator('.sb-studio-outcome')).toContainText('Deleted content/extras/theta.md.')
     expect(await inFolder(page, 'extras/alpha.md')).toBe(await site.read('content/extras/alpha.md'))
+  })
+
+  test('saves a pasted image into a connected folder', async ({ page, browserName, site }) => {
+    test.skip(browserName !== 'chromium', 'the File System Access API only exists in Chromium browsers')
+    await pickPrivateFolder(page)
+    /** The bytes of a file in the folder, as base64. Null where there is no such file. */
+    const imageInFolder = (file: string) =>
+      page.evaluate(async (name) => {
+        try {
+          const content = await (await navigator.storage.getDirectory()).getDirectoryHandle('content')
+          const bytes = new Uint8Array(await (await (await (await content.getDirectoryHandle('guide')).getFileHandle(name)).getFile()).arrayBuffer())
+          return btoa(String.fromCharCode(...bytes))
+        } catch {
+          return null
+        }
+      }, file)
+
+    const editor = await openStudio(page, '/guide/setup')
+    await putInFolder(page, 'guide/setup.md', await site.read('content/guide/setup.md'))
+    await page.getByRole('button', { name: 'Connect a folder' }).click()
+    await expect(page.locator('.sb-studio-file span')).toHaveText('Writing to the “content” folder on this device')
+    const shot = { name: 'Shot.PNG', type: 'image/png', base64: PIXEL }
+
+    await cursorAfter(editor, 'Install the thing.')
+    await giveFiles(editor, 'paste', [shot])
+    await expect(editor).toContainText('Install the thing.![](./shot.png)')
+    expect(await imageInFolder('shot.png')).toBe(PIXEL)
+
+    // The name is taken now: the browser looks, and writes beside it.
+    await cursorAfter(editor, '## Second step')
+    await giveFiles(editor, 'paste', [shot])
+    await expect(editor).toContainText('## Second step![](./shot-2.png)')
+    expect(await imageInFolder('shot-2.png')).toBe(PIXEL)
+    expect(await imageInFolder('shot.png')).toBe(PIXEL)
+
+    // What the dev server would refuse, the browser refuses: there is nobody else to.
+    await giveFiles(editor, 'paste', [{ name: 'notes.png', type: 'image/png', base64: Buffer.from('Just words.').toString('base64') }])
+    await expect(page.locator('.sb-studio-footer [role="alert"]')).toHaveText('That file is not a PNG, JPEG, GIF, WebP or AVIF image.')
+    expect(await imageInFolder('notes.png')).toBeNull()
+    await expect.poll(() => inFolder(page, 'guide/setup.md')).toContain('## Second step![](./shot-2.png)')
   })
 
   test('a draft typed in one tab shows in another, which keeps its cursor', async ({ page, context, site }) => {
@@ -1078,6 +1207,72 @@ test.describe('studio', () => {
     await expect(page).toHaveURL(`${DEV}/extras/kappa`)
     await expect(page.locator('.sb-content')).toContainText('Made.')
     expect(await stillThere()).toBe(true)
+  })
+
+  test('the image endpoint takes a real image for a real page, and gives it a name and a place of its own choosing', async ({ request, site }) => {
+    const token = await studioToken(request)
+    const headers = { 'x-shabd-studio': token, 'content-type': 'application/octet-stream' }
+    const pixel = Buffer.from(PIXEL, 'base64')
+    const send = (query: Record<string, string>, data: Buffer, extra: Record<string, string> = headers) =>
+      request.post(`${DEV}/_shabd/studio/image`, { params: query, headers: extra, data })
+    const extras = site.path('content/extras')
+    const before = (await readdir(extras)).sort()
+    const alpha = await site.read('content/extras/alpha.md')
+
+    try {
+      // Not from the site itself.
+      const asked = { id: 'extras/alpha.md', name: 'shot.png' }
+      expect((await send(asked, pixel, {})).status()).toBe(403)
+      expect((await send(asked, pixel, { 'x-shabd-studio': 'a-guess' })).status()).toBe(403)
+      expect((await send(asked, pixel, { ...headers, origin: 'https://elsewhere.example' })).status()).toBe(403)
+      expect((await send(asked, pixel, { ...headers, 'sec-fetch-site': 'cross-site' })).status()).toBe(403)
+
+      // Not beside a page: the page is found by its name, and a path gets nowhere.
+      for (const id of ['../shabd.config.yaml', '..', 'extras', 'extras/', 'extras/nope.md', site.path('content/extras/alpha.md'), '']) {
+        expect((await send({ id, name: 'shot.png' }, pixel)).status(), `beside ${id}`).toBe(404)
+      }
+
+      // Not an image, whatever it is called and whatever it says it is.
+      const disguised = { ...headers, 'content-type': 'image/png' }
+      for (const [name, body] of [
+        ['page.png', '<!doctype html><script>alert(1)</script>'],
+        ['drawing.png', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'],
+        ['words.png', 'Just words.'],
+        ['empty.png', ''],
+        ['sound.webp', 'RIFF$\u0000\u0000\u0000WAVEfmt '],
+      ] as const) {
+        expect((await send({ id: 'extras/alpha.md', name }, Buffer.from(body, 'latin1'), disguised)).status(), name).toBe(415)
+      }
+
+      // Too large: a megabyte over, with the right first bytes.
+      const large = Buffer.alloc(11 * 1024 * 1024)
+      pixel.copy(large)
+      const refused = await send({ id: 'extras/alpha.md', name: 'large.png' }, large)
+      expect([refused.status(), ((await refused.json()) as { error: string }).error]).toEqual([413, 'That image is larger than 10 MB.'])
+      expect((await readdir(extras)).sort()).toEqual(before)
+
+      // A real one is saved. Its name is made here, and its extension is that of what it is.
+      const names: string[] = []
+      for (const name of ['Shot.PNG', '../../escape.png', '/tmp/escape.png', '..\\..\\escape.png', 'sub/folder/escape.png', 'escape.html', '.htaccess', 'alpha.md', '']) {
+        const saved = await send({ id: 'extras/alpha.md', name }, pixel)
+        expect(saved.status(), name).toBe(201)
+        names.push(((await saved.json()) as { name: string }).name)
+      }
+      expect(names).toEqual(['shot.png', 'escape.png', 'escape-2.png', 'escape-3.png', 'escape-4.png', 'escape-5.png', 'image.png', 'alpha.png', 'image-2.png'])
+      expect((await readdir(extras)).sort()).toEqual([...before, ...names].sort())
+      for (const elsewhere of ['escape.png', 'content/escape.png', 'content/extras/sub', 'content/extras/escape.html', 'content/extras/.htaccess']) {
+        expect(existsSync(site.path(elsewhere)), elsewhere).toBe(false)
+      }
+      expect(await site.read('content/extras/alpha.md')).toBe(alpha)
+
+      // The same name again is another file. The first one is as it was.
+      const other = Buffer.concat([pixel, Buffer.from('more')])
+      expect(((await (await send({ id: 'extras/alpha.md', name: 'shot.png' }, other)).json()) as { name: string }).name).toBe('shot-2.png')
+      expect(readFileSync(site.path('content/extras/shot.png')).equals(pixel)).toBe(true)
+      expect(readFileSync(site.path('content/extras/shot-2.png')).equals(other)).toBe(true)
+    } finally {
+      for (const name of await readdir(extras)) if (!before.includes(name)) await rm(path.join(extras, name), { recursive: true, force: true })
+    }
   })
 
   test('a redirect is added only from an address a page has left to a page, and the config is otherwise left as it was', async ({ request, site }) => {

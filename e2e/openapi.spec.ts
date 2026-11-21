@@ -100,7 +100,7 @@ test.describe('a description that changes while shabd dev runs', () => {
     await expect(page.getByRole('button', { name: 'Edit page' })).toBeVisible()
   })
 
-  test('the Studio does not save, move or delete a page that is made from the description', async ({ page, request }) => {
+  test('the Studio does not save, move, delete or add to a page that is made from the description', async ({ page, request }) => {
     const { token } = (await (await request.get(`${DEV}/_shabd/studio/session`)).json()) as { token: string }
     const headers = { 'x-shabd-studio': token }
     // A made page has a name like any other, and a file, in a folder of Shabd's own.
@@ -110,6 +110,7 @@ test.describe('a description that changes while shabd dev runs', () => {
       ['save', await request.put(`${DEV}/_shabd/studio/source`, { headers, data: { id, source: '# Mine\n' } })],
       ['move', await request.patch(`${DEV}/_shabd/studio/page`, { headers, data: { id, to: 'guide/mine.md' } })],
       ['delete', await request.delete(`${DEV}/_shabd/studio/page`, { headers, data: { id } })],
+      ['put an image beside it', await request.post(`${DEV}/_shabd/studio/image?id=${encodeURIComponent(id)}&name=shot.png`, { headers, data: Buffer.from('89504e470d0a1a0a', 'hex') })],
     ] as const) {
       expect(response.status(), what).toBe(403)
       expect(((await response.json()) as { error: string }).error, what).toBe(refused)

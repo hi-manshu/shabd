@@ -16,6 +16,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import path, { extname } from 'node:path'
 import { normalizePath, type Connect, type ViteDevServer } from 'vite'
+import { IMAGE_BYTES_LIMIT, IMAGE_TOO_LARGE } from '../../shared/image-file.js'
 import { pagePathProblem, pageRoute } from '../../shared/page-path.js'
 import { stripBase } from '../../shared/paths.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
@@ -24,7 +25,7 @@ import { collectProblems, type Problem } from '../check.js'
 import { planRedirect } from '../config/redirect-edit.js'
 import type { PageRecord } from '../content/store.js'
 import type { ShabdContext } from '../context.js'
-import { readBody, sendJson, sendText, sendWebResponse, toWebRequest } from '../http.js'
+import { readBody, readBytes, sendJson, sendText, sendWebResponse, toWebRequest } from '../http.js'
 import { renderLlmsFull, renderLlmsTxt } from '../llms/llms-txt.js'
 import { pageMarkdown } from '../llms/markdown.js'
 import { createMcpHandler } from '../mcp/http.js'
@@ -32,7 +33,7 @@ import { liveDocs } from '../mcp/live.js'
 import { SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, toRoutePath } from '../mcp/source.js'
 import { modelFiles, runtimeFiles } from '../search/model-files.js'
 import { SearchService } from '../search/service.js'
-import { createPage, deletePage, movePage, StudioRefusal } from './studio-files.js'
+import { createPage, deletePage, movePage, saveImage, StudioRefusal } from './studio-files.js'
 
 const STUDIO_PREFIX = '/_shabd/studio/'
 
@@ -302,6 +303,20 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
       await deletePage(page.file)
       server.watcher.emit('unlink', normalizePath(page.file))
       sendJson(res, { id: page.id })
+      return
+    }
+
+    // An image pasted or dropped into the editor, as the bytes of the request. The page it goes beside is found
+    // by its name; what the image is called is only a suggestion, and what it is, is read from the bytes.
+    if (action === 'image' && req.method === 'POST') {
+      const page = existingPage(url.searchParams.get('id'))
+      // Refused by its stated size before any of it is read, and by its real size while it is.
+      if (Number(req.headers['content-length']) > IMAGE_BYTES_LIMIT) throw new StudioRefusal(IMAGE_TOO_LARGE, 413)
+      const bytes = await readBytes(req, IMAGE_BYTES_LIMIT).catch((error: unknown) => {
+        throw (error as { status?: number }).status === 413 ? new StudioRefusal(IMAGE_TOO_LARGE, 413) : error
+      })
+      const name = await saveImage(config.contentDir, page.file, url.searchParams.get('name'), bytes)
+      sendJson(res, { name }, 201)
       return
     }
 
