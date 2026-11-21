@@ -11,6 +11,7 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { threadId } from 'node:worker_threads'
 
 interface Entry<T> {
   key: string
@@ -87,7 +88,9 @@ export class SlotCache<T> {
       await this.#dirReady
       const file = this.#file(slot)
       // Write-then-rename, so a crash never leaves a half-written entry behind.
-      const temporary = `${file}.${process.pid}.tmp`
+      // Named after the thread as well as the process: the threads that compile pages side by side
+      // (compile-pool.ts) are one process.
+      const temporary = `${file}.${process.pid}.${threadId}.tmp`
       await writeFile(temporary, JSON.stringify(entry))
       await rename(temporary, file)
     } catch {

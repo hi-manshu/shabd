@@ -4,10 +4,17 @@ site:
   description: A site for Shabd's browser tests.
   url: https://fixture.test
   favicon: /favicon.svg
+  # Two pictures: one drawn for a light page and one for a dark page.
+  logo:
+    light: /logo-light.svg
+    dark: /logo-dark.svg
+    alt: ""
   repo: https://github.com/example/fixture
   nav:
     - { label: Guide, link: /guide/intro }
     - { label: API, link: /api/ping }
+  head:
+    - { tag: meta, attrs: { name: fixture-head, content: written by site.head } }
 
 theme:
   # Readers may switch to any preset; the site's own palette is the default one with one colour changed.
@@ -17,6 +24,12 @@ theme:
     highlight: { light: "#f6b40e", dark: "#ffc53d" }
 
 layouts:
+  # A block with a condition: every layout has the banner, and it is shown under /extras alone.
+  base:
+    regions:
+      banner:
+        - block: notice
+          when: { path: /extras/** }
   wide-doc:
     extends: doc
     width: wide
@@ -31,6 +44,47 @@ layouts:
 features:
   search: { semantic: false }
   studio: { sync: peers }
+  feed: true
+  # What a live snippet may import: a package, and a file of the site's own under a name.
+  sandbox:
+    modules:
+      - github-slugger
+      - { name: fixture/gauge, file: ./components/Gauge.tsx }
+
+markdown:
+  mermaid: true
+
+# An older version of the docs, which is the pages of content/v1, and two more languages: German, the
+# pages of content/de, and Arabic, the pages of content/ar, which is written from right to left. German
+# says some of the site's own words in its own way, and has a link in the header and a footer of its own.
+versions:
+  - label: "2.x"
+  - { label: "1.x", path: /v1 }
+
+languages:
+  - { code: en, label: English }
+  - code: de
+    label: Deutsch
+    ui:
+      version.menu: "Fassung: {version}"
+      language.menu: "Sprache: {language}"
+      search: Suche
+      toc: Auf dieser Seite
+      notFound.title: Seite nicht gefunden
+    nav:
+      - { label: Anleitung, link: /de/guide/intro }
+    footer: Eine Seite für die Browsertests von Shabd.
+  - { code: ar, label: العربية, dir: rtl }
+
+# An API reference made from a description: an overview at /store and a page for each operation.
+openapi:
+  spec: ./store.yaml
+  path: /store
+  try: true
+
+redirects:
+  /guide/start: /guide/intro
+  /old-setup: /guide/setup#second-step
 
 components:
   Counter: ./components/Counter.tsx

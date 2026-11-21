@@ -2,9 +2,12 @@ import { bundledThemes } from 'shiki'
 import { describe, expect, it } from 'vitest'
 import { resolveConfig } from '../src/node/config/load.js'
 import { MarkdownCompiler } from '../src/node/markdown/compile.js'
+import { themedCodeCss } from '../src/node/markdown/plugins/rehype-code.js'
 import { readFileSync } from 'node:fs'
 import { contrastOn, over, parseColor, toHex, type Rgba } from '../src/shared/color.js'
 import {
+  BADGE_LABEL,
+  BADGE_TINT,
   COLOR_TOKENS,
   LINE_HIGHLIGHT_STRENGTH,
   PRESET_NAMES,
@@ -14,21 +17,13 @@ import {
   contrast,
   type ColorToken,
 } from '../src/shared/presets.js'
+import { CONTRAST_FLOORS } from '../src/shared/theme-check.js'
 import { renderCompiled } from './helpers/render.js'
 
 const MODES = ['light', 'dark'] as const
 
-/** What a colour is read against, and how much contrast that takes. */
-const FLOORS: Partial<Record<ColorToken, number>> = {
-  text: 7,
-  muted: 4.5,
-  accent: 4.5,
-  note: 4.5,
-  tip: 4.5,
-  success: 4.5,
-  caution: 4.5,
-  danger: 4.5,
-}
+/** What a colour is read against, and how much contrast that takes: the same floors the Studio shows a theme against. */
+const FLOORS: Partial<Record<ColorToken, number>> = CONTRAST_FLOORS
 
 describe('theme presets', () => {
   it('measures contrast as WCAG does', () => {
@@ -62,6 +57,16 @@ describe('theme presets', () => {
     expect(misses).toEqual([])
   })
 
+  it('draws the editor in those colours and no others, so that it is readable wherever the page is', () => {
+    const theme = readFileSync(new URL('../src/client/editor/theme.ts', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+    // No colour of its own.
+    expect(theme).not.toMatch(/#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|color|color-mix)\(/i)
+    const used = new Set([...theme.matchAll(/var\(--sb-([a-z-]+)\)/g)].map((match) => match[1]!))
+    // The one that is a length.
+    expect(used.delete('editor-padding')).toBe(true)
+    expect([...used].sort()).toEqual(Object.keys(FLOORS).sort())
+  })
+
   it.each(PRESET_NAMES)('%s names code themes that Shiki ships', (name) => {
     const { code } = THEME_PRESETS[name]
     expect(Object.keys(bundledThemes)).toEqual(expect.arrayContaining([code.light, code.dark]))
@@ -81,6 +86,44 @@ const tinted = (highlight: string, background: string) => {
   const [red, green, blue] = parseColor(highlight) as Rgba
   return toHex(over([red, green, blue, LINE_HIGHLIGHT_STRENGTH], parseColor(background) as Rgba))
 }
+
+describe('a badge', () => {
+  /** The word of a badge and the tint under it, for a badge of this colour drawn on this background. */
+  const badge = (colour: Rgba, text: Rgba, behind: Rgba) => ({
+    label: over([colour[0], colour[1], colour[2], BADGE_LABEL], text),
+    tint: over([colour[0], colour[1], colour[2], BADGE_TINT], behind),
+  })
+
+  it('is drawn by the stylesheet with the numbers that are checked here', () => {
+    const css = readFileSync(new URL('../src/client/styles/base.css', import.meta.url), 'utf8')
+    expect(css).toContain(`--sb-badge-label: color-mix(in srgb, var(--sb-badge-color, var(--sb-muted)) ${BADGE_LABEL * 100}%, var(--sb-text));`)
+    expect(css).toContain(`background: color-mix(in srgb, var(--sb-badge-color, var(--sb-muted)) ${BADGE_TINT * 100}%, transparent);`)
+  })
+
+  it('can be read in every preset and every colour a badge has, on the page and on a surface', () => {
+    const misses: string[] = []
+    let plain = 0
+    for (const name of PRESET_NAMES) {
+      const { colors } = THEME_PRESETS[name]
+      for (const mode of MODES) {
+        const text = parseColor(colors.text[mode]) as Rgba
+        for (const ink of ['muted', 'note', 'tip', 'success', 'caution', 'danger'] as const) {
+          const colour = parseColor(colors[ink][mode]) as Rgba
+          for (const where of ['background', 'surface'] as const) {
+            const { label, tint } = badge(colour, text, parseColor(colors[where][mode]) as Rgba)
+            const ratio = contrastOn(label, tint)
+            if (ratio < 4.5) misses.push(`${name} ${mode}: ${ink} on ${where} is ${ratio.toFixed(2)}`)
+            // The same badge with the word in its own colour, as it was drawn before.
+            if (contrastOn(colour, tint) < 4.5) plain++
+          }
+        }
+      }
+    }
+    expect(misses).toEqual([])
+    // Why the word is not simply in the badge's colour: that is too faint in this many places.
+    expect(plain).toBe(74)
+  })
+})
 
 describe('what code is drawn on', () => {
   it('is the surface of the site\'s own palette when there is no menu', () => {
@@ -186,7 +229,7 @@ describe('code in every preset', () => {
   it('holds every token to 4.5:1 against what is behind it, in both modes', async () => {
     expect(theme.code.minContrast).toBe(4.5)
     const compiled = await compilerWith(theme.code.minContrast, 'floor').compile(SOURCE)
-    const colours = coloursByKey(compiled.codeCss, plan.keys)
+    const colours = coloursByKey(themedCodeCss(plan.keys, compiled.codeColours), plan.keys)
     const classes = classesByLine(await renderCompiled(compiled.code))
     expect(classes.plain.size).toBeGreaterThan(8)
     expect(classes.highlighted.size).toBeGreaterThan(4)
@@ -213,7 +256,7 @@ describe('code in every preset', () => {
 
   it('leaves the syntax themes as they are when the floor is 0', async () => {
     const untouched = await compilerWith(0, 'no-floor').compile(SOURCE)
-    const colours = coloursByKey(untouched.codeCss, plan.keys)
+    const colours = coloursByKey(themedCodeCss(plan.keys, untouched.codeColours), plan.keys)
     // Everforest Light, on the Forest preset, as it ships: its yellow is 2.05:1 on that surface.
     const key = plan.palettes.forest![0]!
     const { surface } = THEME_PRESETS.forest.colors
@@ -229,6 +272,8 @@ describe('code in every preset', () => {
       sandbox: false,
       fingerprint: 'no-backgrounds',
     })
-    expect(untouched.codeCss).toBe((await plainCompiler.compile(SOURCE)).codeCss)
+    const plain = await plainCompiler.compile(SOURCE)
+    expect(untouched.codeCss).toBe(plain.codeCss)
+    expect(untouched.codeColours).toEqual(plain.codeColours)
   }, 60_000)
 })

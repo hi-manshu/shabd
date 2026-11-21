@@ -5,12 +5,16 @@ layout: api
 api:
   method: GET
   path: /llms.txt
+  # This site's own address, so that "Try it" has a file to fetch.
+  baseUrl: https://hi-manshu.github.io/shabd
   auth: none
+  try: true
 sidebar:
   order: 1
 ---
 
-Returns a Markdown file that follows the [llms.txt convention](https://llmstxt.org).
+Returns a Markdown file that follows the [llms.txt convention](https://llmstxt.org). **Try it**, above, fetches the
+one this site serves.
 
 The file has the site title as its heading, the site description as a quote, and one section per top-level sidebar
 group. Each section lists its pages as links to their Markdown copies.
@@ -35,3 +39,6 @@ Pages that are not in the sidebar are listed last, under `Optional`.
 | `/<page>.md` | One page as Markdown |
 | `/_shabd/search-index.json` | The search index: every section's text |
 | `/_shabd/docs.json` | Every page's Markdown as JSON, for [hosting the MCP endpoint](../../features/mcp.md#in-production) |
+
+[Files for programs](/reference/files) has a page for each of these, with what is in the two JSON files field by
+field.

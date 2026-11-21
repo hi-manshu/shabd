@@ -1,4 +1,5 @@
 import { useRef, useState, type ComponentProps } from 'react'
+import { useText } from '../app/edition.js'
 import { Icon } from '../app/icons.js'
 
 type PreProps = ComponentProps<'pre'> & {
@@ -15,6 +16,7 @@ type PreProps = ComponentProps<'pre'> & {
 export function CodeBlock({ children, 'data-title': title, 'data-lang': lang, ...rest }: PreProps) {
   const pre = useRef<HTMLPreElement>(null)
   const [copied, setCopied] = useState(false)
+  const text = useText()
 
   const copy = async () => {
     const text = pre.current?.querySelector('code')?.textContent ?? ''
@@ -35,7 +37,7 @@ export function CodeBlock({ children, 'data-title': title, 'data-lang': lang, ..
         </span>
         <button type="button" className="sb-code-copy" onClick={copy} aria-live="polite">
           <Icon name={copied ? 'check' : 'copy'} size={14} />
-          <span>{copied ? 'Copied' : 'Copy'}</span>
+          <span>{text(copied ? 'code.copied' : 'code.copy')}</span>
         </button>
       </figcaption>
       <pre ref={pre} {...rest}>

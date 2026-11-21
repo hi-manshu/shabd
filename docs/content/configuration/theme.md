@@ -29,7 +29,7 @@ Ten presets are themes: they change fonts, corners and how code is framed as wel
 | Preset | Look |
 | --- | --- |
 | `macos` | After the look of a macOS app: code in windows with a title bar, a frosted sidebar and header, the system font and system blue |
-| `xp` | After the look of Windows XP: code in windows with a blue title bar and its three buttons, cream panels, a pale blue side pane, a green button and Tahoma |
+| `xp` | After the look of Windows XP: a blue bar across the top, code in windows with a blue title bar and its three buttons, cream panels, a pale blue side pane, a green button and Tahoma |
 | `blueprint` | An engineer's drawing: a measured grid behind the page, capital headings in a typewriter face, square corners |
 | `newsprint` | A broadsheet: serif text on off-white paper, a heavy rule over every headline, one red |
 | `brutal` | Black lines, hard shadows and flat colour. Nothing is rounded and nothing is subtle |
@@ -58,12 +58,15 @@ The other thirteen are palettes. They change colour and leave the rest of the lo
 | `contrast` | Pure black and white with the strongest borders and colours |
 
 A test holds every preset to the same floor: body text has a contrast of at least 7:1, and muted text, links and
-callout titles at least 4.5:1, against both the page and the surface colour.
+callout titles at least 4.5:1, against both the page and the surface colour. A badge is a word on a tint of its own
+colour, which is harder to read than the same word on the page, so a fifth of the text colour is mixed into the
+word: it is held to 4.5:1 on its tint, in every colour a badge has.
 
 Comparing one colour with another is not enough for a theme that puts a picture behind the page, because what is
 behind the text there is not one colour. A second test renders a page in each of the ten themes, light and dark,
 in Chromium, Firefox and WebKit. It holds body text, muted text and the accent colour to the same ratios against
-every pixel of the header, the sidebar and the content area.
+every pixel of the header, the sidebar and the content area. A header with [an ink of its own](#a-header-of-another-colour)
+is held to them in that ink.
 
 That test looks at one page in a window of 1280 by 800, and it does not look inside code blocks or callouts, which
 have backgrounds of their own. Neither test checks colours you set yourself. Code has a floor of its own, which
@@ -119,16 +122,20 @@ site's as they are. When the menu offers both kinds, it lists them under "Themes
 Code follows the choice. A preset from the menu shows code in its own pair of syntax themes, and the site's own
 entry shows the pair you set under [`code`](#code).
 
-The menu makes pages with code heavier. Each page carries the colours of its own code in every syntax theme the
-menu can reach, once in its HTML and once in its script. This site offers all twenty-three presets, which use 27
-syntax themes between them: its page with the most code carries about 39 KB of those colours in each, a little
-over 5 KB compressed. A page with no code carries none.
+The menu does not make a page heavier for a reader who never opens it. A page carries the colours of its own code
+in the site's two syntax themes, with a menu or without: on this site, about 4 KB on the page with the most code,
+in its HTML and again in its script. The colours under every other theme the menu can reach are in one stylesheet
+for the whole site. A page names it and does not load it. It is fetched when a reader opens the menu, and from then
+on before the first paint of each page for a reader who has picked a preset.
 
-Without a menu a page carries two syntax themes, and each preset on the menu adds at most two. If page weight
-matters to you, list the presets you want under `picker` and leave `picker: true` alone.
+This site offers all twenty-three presets, which use 27 syntax themes between them. That stylesheet is 103 KB
+here, about 15 KB compressed, and holds every colour of every page's code. Each preset on the menu adds at most
+two themes to it, so a site that lists a few presets under `picker` has a smaller one.
 
-The presets' own colours are not repeated in every page. A build puts them in one stylesheet that every page
-shares: about 40 KB here, about 5 KB compressed.
+The presets' own colours are not repeated in every page either. A build puts them in one stylesheet that every
+page shares: about 48 KB here, about 5 KB compressed.
+
+`shabd dev` has neither stylesheet. There every page carries all of it, so that an edit to the theme shows at once.
 
 The menu is the `theme-menu` block, so a [layout](./layouts.md) can move it or leave it out.
 
@@ -142,14 +149,27 @@ The menu is the `theme-menu` block, so a [layout](./layouts.md) can move it or l
 The reader's choice is remembered in their browser. The mode is applied before the first paint, so a page does not
 flash in the wrong colours.
 
+### On paper
+
+A page that is printed, or saved as a PDF, is the page alone: its title and content, without the header, the
+sidebar, the outline or any button. It takes the light colours whichever mode the reader has on, because paper is
+white. Long lines of code wrap, every tab of a set is printed under its label, and the address of a link to another
+site is printed after the link.
+
+To change what is printed, write rules for `@media print` in [your own CSS](#your-own-css).
+
 ## Colours
 
-Each colour is one value for both modes, or `{ light, dark }`. A preset defines these twelve:
+Each colour is one value for both modes, or `{ light, dark }`. To try colours on the page itself and see their
+contrast before writing them here, open the Studio's [Theme tab](../features/studio.md#trying-a-theme) while
+`shabd dev` runs.
+
+A preset defines these twelve:
 
 | Token | Used for |
 | --- | --- |
 | `accent` | Links and focus rings |
-| `highlight` | Marks: the bar on the current page, highlighted code lines, the bar on a primary button |
+| `highlight` | Marks: the bar on the current page, highlighted code lines, the words a search found, the bar on a primary button |
 | `background` | The page |
 | `surface` | Code blocks, inline code, hovered items |
 | `text` | Body text |
@@ -157,7 +177,7 @@ Each colour is one value for both modes, or `{ light, dark }`. A preset defines 
 | `border` | Lines between regions |
 | `note`, `tip`, `success`, `caution`, `danger` | Callouts and badges |
 
-Eleven more are optional. Most take their value from one of the twelve until you set them:
+Twelve more are optional. Most take their value from one of the twelve until you set them:
 
 | Token | Used for | Until set |
 | --- | --- | --- |
@@ -166,6 +186,7 @@ Eleven more are optional. Most take their value from one of the twelve until you
 | `bar` | The bars that titles, code blocks, cards and buttons hang from | `text` |
 | `button` | Background of a primary button. Its label is drawn in `background` | `text` |
 | `header` | Background of the header | `background` |
+| `headerText` | The title, the links and the buttons in the header: see [below](#a-header-of-another-colour) | `text` |
 | `sidebar` | Background of the sidebar | `background` |
 | `main` | Background of the content area, the outline beside it and the footer | See-through |
 | `code` | Background of code, inline and in blocks | `surface` |
@@ -173,13 +194,41 @@ Eleven more are optional. Most take their value from one of the twelve until you
 | `selection` | Background of selected text | A tint of `highlight` |
 | `backdrop` | A picture behind the whole page: any CSS background, such as a gradient | None |
 
-Text in the header and the sidebar keeps using `text` and `muted`. If you give either a background of its own,
-choose one that those stay readable on, in both modes. Both are drawn as backgrounds, so a gradient works as well
-as a colour: `xp` uses one for each.
+Text in the sidebar keeps using `text` and `muted`. If you give the sidebar a background of its own, choose one
+that those stay readable on, in both modes. `header` and `sidebar` are drawn as backgrounds, so a gradient works as
+well as a colour: `xp` uses one for each.
 
 A `header` or `sidebar` colour with some transparency, such as `rgb(255 255 255 / 0.7)`, blurs whatever is behind
 it. The header always has the page scrolling under it. The sidebar has only the page's background, so it needs a
 `backdrop` to look frosted, and then `main` to keep that backdrop out from under the text.
+
+### A header of another colour
+
+A header that is darker or lighter than the page cannot be written in the page's ink. `headerText` gives it one of
+its own:
+
+```yaml title="shabd.config.yaml"
+theme:
+  colors:
+    header: { light: "#102a43", dark: "#0b1b2b" }
+    headerText: "#ffffff"
+```
+
+The title, the links and the buttons of the header are then drawn in that colour. What the page writes more
+quietly, such as a link that is not the current one, is the same ink with the header showing through, so it is
+right on a header of any colour. The ring around whatever has the keyboard's focus takes the ink too, where the
+page's `accent` might not show. The search field stays a field of the page, in the page's colours, and so does the
+palette menu that opens from the header.
+
+A [logo](./site.md#site) with two pictures has one drawn for a light page and one for a dark page. The header
+shows the one that suits it: with a light ink it is a dark bar, and takes the picture drawn for the dark, whatever
+the page is. For that the ink has to be a hex colour or `rgb()`. An ink written any other way, such as a
+variable, says nothing about the bar, and the logo follows the page.
+
+`xp` is written this way: a blue bar in white. Choose it from the menu in the header to see one.
+
+Nothing checks the ink you choose against the header you choose. The presets are held to 7:1 for the ink and 4.5:1
+for the quieter text, on every pixel of the header.
 
 ## Typography
 

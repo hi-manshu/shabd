@@ -1,0 +1,82 @@
+# A small OpenAPI description. `openapi:` in shabd.config.yaml makes pages from it, under /store.
+openapi: 3.1.0
+info:
+  title: Fixture store
+  version: "1.0"
+  description: What the shop has on its shelves, and how much of it.
+servers:
+  - url: https://store.fixture.test/v2
+tags:
+  - name: Items
+    description: The things on the shelves.
+  - name: Stock
+paths:
+  /items:
+    get:
+      operationId: listItems
+      summary: List items
+      tags: [Items]
+      parameters:
+        - name: limit
+          in: query
+          description: How many to return.
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        "200":
+          description: The items, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Item" }
+    post:
+      operationId: addItem
+      summary: Add an item
+      tags: [Items]
+      security:
+        - token: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Item" }
+            example: { sku: lamp-7, name: Desk lamp, price: 39.5 }
+      responses:
+        "201":
+          description: The item as it was stored.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+  /stock/{sku}:
+    get:
+      operationId: getStock
+      summary: Count what is left
+      tags: [Stock]
+      parameters:
+        - name: sku
+          in: path
+          required: true
+          description: The item's number in the catalogue.
+          schema: { type: string }
+      responses:
+        "200":
+          description: How many are on the shelf.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  left: { type: integer }
+components:
+  securitySchemes:
+    token:
+      type: http
+      scheme: bearer
+  schemas:
+    Item:
+      type: object
+      required: [sku, name]
+      properties:
+        sku: { type: string, description: Its number in the catalogue. }
+        name: { type: string }
+        price: { type: number, description: In euros. }

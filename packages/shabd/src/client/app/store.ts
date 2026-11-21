@@ -9,6 +9,7 @@ import { useSyncExternalStore } from 'react'
 import initialData, { revision as dataRevision } from 'virtual:shabd/data'
 import { routes as initialRoutes, revision as routesRevision } from 'virtual:shabd/routes'
 import type { SiteData } from '../../shared/types.js'
+import { keepPages } from './hmr.js'
 import type { PageModule } from './types.js'
 
 export interface Store<T> {
@@ -46,7 +47,7 @@ export type RouteTable = Record<string, () => Promise<PageModule>>
 export const siteStore = createStore<SiteData>(initialData)
 export const routeStore = createStore<RouteTable>(initialRoutes)
 
-/** Site config, layouts, sidebar and the page index. Re-renders when YAML changes in dev. */
+/** Site config, layouts and sidebar. Re-renders when YAML changes in dev. */
 export function useSite(): SiteData {
   return useStore(siteStore)
 }
@@ -59,6 +60,9 @@ if (import.meta.hot) {
     const style = document.getElementById('sb-theme')
     if (css !== undefined && style && style.textContent !== css) style.textContent = css
   })
+
+  // A page that has gone takes its module with it (see hmr.ts).
+  siteStore.subscribe(() => keepPages(new Set(Object.values(siteStore.get().pagesInDev ?? {}).map((page) => page.id))))
 
   // Two updates sent one after the other are two requests, answered in whichever order they finish.
   // The dev server numbers what it sends, and an answer older than the one in use is dropped.

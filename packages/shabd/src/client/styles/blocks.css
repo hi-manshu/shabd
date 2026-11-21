@@ -184,9 +184,18 @@
       background: none;
     }
 
-    .sb-search-button-label,
     .sb-search-button kbd {
       display: none;
+    }
+
+    /* The icon is all that is seen. The word stays for a screen reader: without it the button has no name. */
+    .sb-search-button-label {
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 
@@ -220,6 +229,227 @@
     .sb-studio-toggle span {
       display: none;
     }
+  }
+
+  /*
+   * In the header these are written in the header's ink. A site that gives
+   * the header a colour of its own gives it an ink too (`colors.headerText`),
+   * and the quieter tones are made from that. Without one, the four tokens
+   * are the page's own and these rules change nothing. The same blocks in
+   * another region keep the page's colours.
+   */
+  .sb-region-header :is(.sb-nav a, .sb-icon-button, .sb-studio-toggle) {
+    color: var(--sb-header-muted);
+  }
+
+  .sb-region-header
+    :is(
+      .sb-nav a:hover,
+      .sb-nav a[aria-current],
+      .sb-icon-button:hover,
+      .sb-studio-toggle:hover,
+      .sb-studio-toggle[aria-pressed='true']
+    ) {
+    color: var(--sb-header-text);
+  }
+
+  .sb-region-header .sb-icon-button:hover {
+    background: var(--sb-header-hover);
+  }
+
+  .sb-region-header :focus-visible {
+    outline-color: var(--sb-header-focus);
+  }
+
+  /* A header with an ink of its own has its badges in that ink. Any other header has them as the page does. */
+  .sb-region-header .sb-badge {
+    color: var(--sb-header-badge, var(--sb-badge-label));
+    background: color-mix(in srgb, var(--sb-header-badge, var(--sb-badge-color, var(--sb-muted))) 13%, transparent);
+  }
+
+  /* On a small screen the search field is its icon alone, drawn straight on the header. */
+  @media (max-width: 39.99rem) {
+    .sb-region-header .sb-search-button {
+      color: var(--sb-header-muted);
+    }
+
+    .sb-region-header .sb-search-button:hover {
+      color: var(--sb-header-text);
+    }
+  }
+
+  /* The palette menu opens from the header and is a panel of the page: its text and its focus ring are the page's. */
+  .sb-region-header .sb-theme-menu-list {
+    color: var(--sb-text);
+  }
+
+  .sb-region-header .sb-theme-menu-list :focus-visible {
+    outline-color: var(--sb-accent);
+  }
+
+  /* ───────────── versions and languages ───────────── */
+
+  /* A menu of the site's versions, or of its languages: a word that opens a short list of links. */
+  .sb-edition-menu {
+    position: relative;
+    font-size: var(--sb-step--1);
+  }
+
+  .sb-edition-menu > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.55rem;
+    border: var(--sb-line) solid var(--sb-border);
+    border-radius: var(--sb-radius);
+    color: var(--sb-muted);
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  /* Safari draws its own marker beside a summary unless it is told not to. */
+  .sb-edition-menu > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .sb-edition-menu > summary:hover,
+  .sb-edition-menu[open] > summary {
+    color: var(--sb-text);
+  }
+
+  /* The arrow points down, and up while the list is open. */
+  .sb-edition-menu > summary .sb-icon {
+    transform: rotate(90deg);
+  }
+
+  .sb-edition-menu[open] > summary .sb-icon {
+    transform: rotate(-90deg);
+  }
+
+  .sb-edition-menu > ul {
+    position: absolute;
+    inset-block-start: calc(100% + 0.6rem);
+    inset-inline-end: 0;
+    z-index: 40;
+    display: grid;
+    gap: 1px;
+    min-inline-size: 9rem;
+    max-block-size: min(70dvh, 24rem);
+    overflow-y: auto;
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
+    border: var(--sb-line) solid var(--sb-border);
+    border-block-start: var(--sb-rule) solid var(--sb-bar);
+    border-radius: var(--sb-hang);
+    background: var(--sb-background);
+    box-shadow: 0 0.75rem 2rem color-mix(in oklab, var(--sb-text) 14%, transparent);
+  }
+
+  .sb-edition-menu > ul a {
+    display: block;
+    padding: 0.4rem 0.6rem;
+    border-radius: min(4px, var(--sb-radius));
+    color: var(--sb-muted);
+    white-space: nowrap;
+  }
+
+  .sb-edition-menu > ul a:hover {
+    color: var(--sb-text);
+    background: var(--sb-surface);
+  }
+
+  .sb-edition-menu > ul a[aria-current] {
+    color: var(--sb-text);
+    font-weight: 600;
+  }
+
+  /* A language's code, for where its name is too long. */
+  .sb-edition-short {
+    display: none;
+  }
+
+  /*
+   * When the header is short of room, what is in it is made smaller before anything is squeezed: a
+   * language is shown by its code, the arrows go, and the search field is as wide as its words. What
+   * can be pressed keeps its size, and the site's name is what gives way.
+   */
+  .sb-region-header :is(.sb-icon-button, .sb-edition-menu, .sb-search-button, .sb-studio-toggle) {
+    flex-shrink: 0;
+  }
+
+  .sb-region-header .sb-site-title {
+    min-inline-size: 0;
+    flex-shrink: 1;
+  }
+
+  .sb-region-header .sb-site-title > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @container sb-header (max-width: 64rem) {
+    .sb-search-button {
+      min-inline-size: 0;
+    }
+
+    .sb-edition-menu > summary .sb-icon,
+    .sb-edition-menu:has(.sb-edition-short) .sb-edition-long {
+      display: none;
+    }
+
+    .sb-edition-short {
+      display: inline;
+    }
+  }
+
+  @container sb-header (max-width: 30rem) {
+    .sb-edition-menu > summary {
+      padding-inline: 0.3rem;
+      border-color: transparent;
+    }
+
+    .sb-region-header .sb-site-title {
+      margin-inline-end: 0.25rem;
+    }
+  }
+
+  /* In a header with an ink of its own the word is in that ink. The list is a panel of the page, as the theme menu's is. */
+  .sb-region-header .sb-edition-menu > summary {
+    color: var(--sb-header-muted);
+    border-color: color-mix(in srgb, var(--sb-header-muted) 45%, transparent);
+  }
+
+  .sb-region-header .sb-edition-menu > summary:hover,
+  .sb-region-header .sb-edition-menu[open] > summary {
+    color: var(--sb-header-text);
+  }
+
+  .sb-region-header .sb-edition-menu > ul :focus-visible {
+    outline-color: var(--sb-accent);
+  }
+
+  /* On a page of an older version: which version it is, and where the current one is. */
+  .sb-version-notice {
+    margin-block-end: 1.25rem;
+    padding: 0.7rem 1rem;
+    border: var(--sb-line) solid var(--sb-border);
+    border-inline-start: var(--sb-rule) solid var(--sb-highlight);
+    border-radius: var(--sb-radius);
+    background: var(--sb-surface);
+    font-size: var(--sb-step--1);
+  }
+
+  .sb-version-notice p {
+    margin: 0;
+  }
+
+  .sb-version-notice a {
+    color: var(--sb-link);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
   }
 
   /* ───────────── sidebar ───────────── */
@@ -382,9 +612,41 @@
     text-wrap: pretty;
   }
 
+  /* A quiet row under the title: it is there for the reader who wants it and out of the way of the one who does not. */
+  .sb-page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.25rem;
+    /* The header above keeps its space for pages without this row; here some of it is taken back. */
+    margin-block: -1.1rem 2rem;
+    font-size: var(--sb-step--1);
+  }
+
+  .sb-page-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--sb-muted);
+  }
+
+  .sb-page-action:hover {
+    color: var(--sb-text);
+  }
+
+  /* "Edit this page" at one end and the day the page last changed at the other. */
   .sb-page-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
     margin-block-start: 3rem;
     font-size: var(--sb-step--1);
+  }
+
+  .sb-page-updated {
+    /* Alone in the footer it still sits at the far end, where it is when the link is there. */
+    margin-inline-start: auto;
+    color: var(--sb-muted);
   }
 
   .sb-page-footer a {
@@ -593,5 +855,130 @@
   .sb-api-auth strong {
     color: var(--sb-text);
     font-weight: 600;
+  }
+
+  /* "Try it" sits at the far end of the request line, and drops under it when the line is full. */
+  .sb-api-try-toggle {
+    margin-inline-start: auto;
+    padding: 0.2rem 0.7rem 0.25rem;
+    border: var(--sb-line) solid var(--sb-border);
+    border-radius: var(--sb-hang);
+    background: var(--sb-background);
+    font-size: var(--sb-step--1);
+    font-weight: 600;
+  }
+
+  .sb-api-try-toggle:hover {
+    border-color: var(--sb-text);
+  }
+
+  .sb-api-try {
+    margin-block-start: 0.85rem;
+    padding-block-start: 0.85rem;
+    border-block-start: var(--sb-line) solid var(--sb-border);
+    font-size: var(--sb-step--1);
+  }
+
+  /* A label beside its field, and above it where there is no room beside. */
+  .sb-api-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem 0.85rem;
+    align-items: baseline;
+  }
+
+  .sb-api-fields label {
+    color: var(--sb-muted);
+  }
+
+  .sb-api-fields :is(input, textarea) {
+    inline-size: 100%;
+    margin-block-end: 0.5rem;
+    padding: 0.35rem 0.55rem;
+    border: var(--sb-line) solid var(--sb-border);
+    border-radius: min(4px, var(--sb-radius));
+    background: var(--sb-background);
+    color: var(--sb-text);
+    font-family: var(--sb-font-mono);
+    font-size: 0.82rem;
+    line-height: 1.5;
+  }
+
+  .sb-api-fields textarea {
+    display: block;
+    resize: vertical;
+  }
+
+  .sb-api-fields ::placeholder {
+    color: var(--sb-muted);
+    opacity: 1;
+  }
+
+  @media (min-width: 36rem) {
+    .sb-api-fields {
+      grid-template-columns: max-content minmax(0, 1fr);
+      row-gap: 0.5rem;
+    }
+
+    .sb-api-fields :is(input, textarea) {
+      margin-block-end: 0;
+    }
+  }
+
+  .sb-api-send {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-block-start: 0.85rem;
+  }
+
+  .sb-api-send button {
+    padding-block: 0.4rem 0.45rem;
+  }
+
+  .sb-api-send button:disabled {
+    cursor: progress;
+  }
+
+  .sb-api-note {
+    color: var(--sb-muted);
+  }
+
+  /* The line that says how it went. It is in the page before there is anything to say, so that it is announced when there is. */
+  .sb-api-status {
+    margin-block-start: 0.85rem;
+  }
+
+  .sb-api-status:empty {
+    display: none;
+  }
+
+  /* The status is a number, and the failure a sentence: the colour only repeats what they say. */
+  .sb-api-status strong,
+  .sb-api-status[data-state='failed'] {
+    color: var(--sb-danger);
+  }
+
+  .sb-api-status strong {
+    font-weight: 650;
+  }
+
+  .sb-api-status strong[data-ok] {
+    color: var(--sb-success);
+  }
+
+  .sb-api-answer {
+    max-block-size: 24rem;
+    margin-block: 0.5rem 0;
+    padding: 0.7rem 0.85rem;
+    overflow: auto;
+    border: var(--sb-line) solid var(--sb-border);
+    border-radius: min(4px, var(--sb-radius));
+    background: var(--sb-background);
+    color: var(--sb-text);
+    font-size: 0.82rem;
+    line-height: 1.55;
+    tab-size: 2;
   }
 }

@@ -27,7 +27,14 @@ export interface BuiltIndex {
 export interface SearchServiceOptions {
   /** Force keyword-only, regardless of the config (`shabd build --no-semantic`). */
   semantic?: boolean
+  /** Where the embedding model comes from: Transformers.js, unless something else is given. A test gives its own. */
+  loadEmbedder?: (model: string, root: string) => Promise<Embedder | null>
   log?: (message: string) => void
+}
+
+export interface SearchOptions {
+  /** False ranks this search by keyword alone, even when the index has vectors (`features.mcp.semantic`). */
+  semantic?: boolean
 }
 
 export class SearchService {
@@ -38,6 +45,8 @@ export class SearchService {
   #keywords: { index: KeywordIndex; for: BuiltIndex } | undefined
   #database: { result: Promise<BuiltDatabase | null>; for: BuiltIndex } | undefined
   #embedder: Embedder | null = null
+  /** A model that fails on queries is reported once, not for every search. */
+  #warned = false
 
   constructor(context: () => ShabdContext, options: SearchServiceOptions = {}) {
     this.#context = context
@@ -66,17 +75,34 @@ export class SearchService {
     return this.#database.result
   }
 
-  /** Search with the same ranking the browser uses. */
-  async search(query: string, limit: number): Promise<SearchHit[]> {
+  /**
+   * Search with the same ranking the browser uses: by keyword, and by
+   * meaning as well when the index has vectors. The model that embedded the
+   * sections embeds the query, so nothing is loaded here that the index did
+   * not already need.
+   */
+  async search(query: string, limit: number, options: SearchOptions = {}): Promise<SearchHit[]> {
     const built = await this.index()
     if (this.#keywords?.for !== built) {
       this.#keywords = { index: new KeywordIndex(built.file.docs), for: built }
     }
+    const semantic =
+      options.semantic !== false && built.vectors && built.file.semantic
+        ? { vectors: built.vectors, dims: built.file.semantic.dims }
+        : null
     let queryVector: Float32Array | null = null
-    if (built.vectors && built.file.semantic && this.#embedder) {
-      ;[queryVector = null] = await this.#embedder.embed([query])
+    if (semantic && this.#embedder) {
+      try {
+        ;[queryVector = null] = await this.#embedder.embed([query])
+      } catch (error) {
+        // A query the model fails on is still a query the keywords can answer.
+        if (!this.#warned) {
+          const reason = error instanceof Error ? error.message : String(error)
+          this.#options.log?.(`The embedding model could not embed a query (${reason}). Searching by keyword.`)
+        }
+        this.#warned = true
+      }
     }
-    const semantic = built.vectors && built.file.semantic ? { vectors: built.vectors, dims: built.file.semantic.dims } : null
     const { minSimilarity } = this.#context().config.config.features.search
     return search(this.#keywords.index, semantic, queryVector, query, limit, minSimilarity)
   }
@@ -108,7 +134,7 @@ export class SearchService {
       let embedder: Embedder | null = null
       let reason = '@huggingface/transformers is not installed'
       try {
-        embedder = await loadEmbedder(feature.model, context.config.root)
+        embedder = await (this.#options.loadEmbedder ?? loadEmbedder)(feature.model, context.config.root)
       } catch (error) {
         reason = `the model "${feature.model}" could not be loaded (${error instanceof Error ? error.message : String(error)})`
       }

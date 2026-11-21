@@ -1,0 +1,139 @@
+/*
+ * A page on paper, or saved as a PDF.
+ *
+ * What a reader prints is the page: its title and its content. Everything
+ * that is there to move around the site, or to click, stays behind.
+ *
+ * Colours need no rule here. The dark mode is switched on for screens only
+ * (src/node/config/theme-css.ts and the code colours in rehype-code.ts), so
+ * paper gets the light palette whatever the reader's device is set to.
+ */
+@page {
+  margin: 18mm 16mm;
+}
+
+@layer shabd.print {
+  @media print {
+    :root {
+      font-size: 11pt;
+    }
+
+    body::before,
+    .sb-skip-link,
+    .sb-region-banner,
+    .sb-region-header,
+    .sb-region-sidebar,
+    .sb-region-aside,
+    .sb-page-actions,
+    .sb-page-footer,
+    .sb-pagination,
+    .sb-hero-actions,
+    .sb-anchor,
+    .sb-code-copy,
+    .sb-tab-list,
+    .sb-api-try-toggle,
+    .sb-api-try,
+    .sb-search,
+    .sb-studio {
+      display: none;
+    }
+
+    /* One column, as wide as the paper. */
+    .sb-shell {
+      display: block;
+      min-block-size: 0;
+    }
+
+    .sb-region-main {
+      padding: 0;
+    }
+
+    .sb-region-main > * {
+      max-inline-size: none;
+    }
+
+    .sb-region-footer {
+      margin-block-start: 2rem;
+      padding-inline: 0;
+    }
+
+    /* Nothing scrolls on paper: long lines of code wrap, and a wide table takes the room it needs. */
+    .sb-code {
+      box-shadow: none;
+    }
+
+    .sb-code pre,
+    .sb-table-scroll {
+      overflow: visible;
+    }
+
+    .sb-code code {
+      min-inline-size: 0;
+    }
+
+    .sb-code .line {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    /* Every tab is printed, each under its label: there is no choosing one on paper. */
+    .sb-tab-panel[hidden] {
+      display: block;
+    }
+
+    .sb-tab-panel::before {
+      content: attr(data-label);
+      display: block;
+      margin-block-start: 1rem;
+      font-weight: 650;
+      font-stretch: var(--sb-wide);
+    }
+
+    /* A heading stays with what it heads, and a block is not cut in two where that can be helped. */
+    .sb-page-header,
+    .sb-content :is(h1, h2, h3, h4, h5, h6),
+    .sb-tab-panel::before {
+      break-after: avoid;
+    }
+
+    .sb-callout,
+    .sb-card,
+    .sb-api-endpoint,
+    .sb-content :is(tr, img, blockquote) {
+      break-inside: avoid;
+    }
+
+    /*
+     * Browsers leave backgrounds off paper unless told otherwise. These few
+     * carry meaning: which line of code is marked, what kind of callout this
+     * is, where inline code starts and ends.
+     */
+    .sb-line-highlight,
+    .sb-line-ins,
+    .sb-line-del,
+    .sb-callout,
+    .sb-badge,
+    .sb-api-param,
+    .sb-content :not(pre) > code {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* A link cannot be followed on paper, so where it leads is printed after it. */
+    .sb-content a[href^='http']:not([class])::after {
+      content: ' (' attr(href) ')';
+      font-size: 0.85em;
+      color: var(--sb-muted);
+      overflow-wrap: anywhere;
+    }
+
+    /* Pictures that swap with the colour mode: paper takes the light one. */
+    :root .sb-only-light {
+      display: revert;
+    }
+
+    :root .sb-only-dark {
+      display: none;
+    }
+  }
+}

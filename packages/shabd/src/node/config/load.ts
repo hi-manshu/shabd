@@ -13,16 +13,33 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import type { Edition, Editions } from '../../shared/editions.js'
 import { resolveLayouts } from '../../shared/layout.js'
-import { ConfigSchema, SidebarSchema, type ShabdConfig, type SidebarInput } from '../../shared/schema.js'
+import { isExternal, normalizePath } from '../../shared/paths.js'
+import { ConfigSchema, SidebarsSchema, type ShabdConfig, type SidebarsInput } from '../../shared/schema.js'
+import { SNIPPET_MODULES } from '../../shared/snippet.js'
 import type { ResolvedLayout } from '../../shared/types.js'
-import { ShabdError, type SourceIssue } from './errors.js'
+import { flattenVars } from '../content/vars.js'
+import { UI_TEXT } from '../../shared/ui-text.js'
+import { closestMatch, ShabdError, type SourceIssue } from './errors.js'
 import { locateIssues, parseYamlWithSchema } from './yaml.js'
 
 /** Bump when compiled page output changes shape, to invalidate on-disk caches. */
-export const PIPELINE_VERSION = 6
+export const PIPELINE_VERSION = 13
 
 export const CONFIG_FILE_NAMES = ['shabd.config.yaml', 'shabd.config.yml'] as const
+
+/** One entry of `redirects:`, ready to use. */
+export interface Redirect {
+  /** The key as it is written in the config, for pointing at it. */
+  key: string
+  /** The route that has moved, e.g. `/old-page`. */
+  from: string
+  /** Where it leads in the end: a route, with its `#heading` if it has one, or a full address. */
+  to: string
+  /** True when `to` is on another site. */
+  external: boolean
+}
 
 export interface ResolvedConfig {
   /** Absolute path of the site root (the folder holding shabd.config.yaml). */
@@ -42,6 +59,32 @@ export interface ResolvedConfig {
   blocks: Record<string, string>
   /** Absolute paths of the site's own stylesheets (`theme.css`). */
   stylesheets: string[]
+  /** Absolute paths of the font files social pictures are set in. Empty: a font of this machine is looked for. */
+  socialFonts: string[]
+  /** `redirects:` with chains followed to their end. */
+  redirects: Redirect[]
+  /** `vars:` as one flat table of text: a nested value is `group.name`. */
+  vars: Record<string, string>
+  /** `openapi:`: each description's file as an absolute path, and the address its pages start at. */
+  openapi: { spec: string; prefix: string; try: boolean }[]
+  /**
+   * The folder the pages made from those descriptions are written to. It is
+   * in the site folder and never under `node_modules`: see src/node/openapi/site.ts.
+   */
+  generatedDir: string
+  /**
+   * `versions:` and `languages:` as the parts of the site they are: each with the path its pages start
+   * at, and none for the first of its kind. Empty on a site with neither.
+   */
+  editions: Editions
+  /**
+   * What a live snippet may import (`features.sandbox.modules`): the name a
+   * snippet writes, and what stands behind it, a package or the absolute path
+   * of a file.
+   */
+  sandboxModules: { name: string; from: string }[]
+  /** Where a key of the config is written, for problems found after it has loaded. */
+  locate(path: (string | number)[]): { line: number; column: number } | undefined
   /** Changes whenever a setting that affects compiled pages changes. Part of every cache key. */
   compileFingerprint: string
   /**
@@ -110,20 +153,97 @@ export function resolveConfig(root: string, configFile: string, source: string):
     return absolute
   })
 
+  const redirects = resolveRedirects(config.redirects, issues)
+
+  if (config.features.feed.enabled && !config.site.url) {
+    issues.push({
+      path: ['features', 'feed'],
+      message: 'The feed needs `site.url`: a feed reader is given full addresses, such as https://docs.example.com/guide',
+    })
+  }
+
+  if (config.features.socialImages.enabled && !config.site.url) {
+    issues.push({
+      path: ['features', 'socialImages'],
+      message: 'Social pictures need `site.url`: the sites that show a picture fetch it by its full address',
+    })
+  }
+  const socialFonts = config.features.socialImages.font.map((file, index) => {
+    const absolute = path.resolve(root, file)
+    const at = ['features', 'socialImages', 'font', index]
+    if (!/\.(?:ttf|otf|ttc)$/i.test(file)) {
+      issues.push({ path: at, message: `${file} is not a font that can be used here. Name a .ttf, .otf or .ttc file; web fonts (.woff2) cannot be read` })
+    } else if (!existsSync(absolute)) {
+      issues.push({ path: at, message: `File not found: ${file} (looked in ${absolute})` })
+    }
+    return absolute
+  })
+
+  const editions = resolveEditions(config, (yaml.data as { site?: { lang?: unknown } } | null)?.site?.lang !== undefined, issues)
+  // The first language is the one the site is written in: everything that asks for the site's language is told it.
+  if (editions.languages?.[0]?.lang) config.site.lang = editions.languages[0].lang
+
+  // What a live snippet may import. A name that leads nowhere is found here, and not by a reader of the page.
+  const sandboxModules = config.features.sandbox.modules.map((module, index) => {
+    const at = ['features', 'sandbox', 'modules', index]
+    if (SNIPPET_MODULES.includes(module.name)) {
+      issues.push({ path: at, message: `"${module.name}" is there for every snippet already, and cannot be given another meaning` })
+    } else if (config.features.sandbox.modules.findIndex((other) => other.name === module.name) < index) {
+      issues.push({ path: at, message: `"${module.name}" is listed twice` })
+    }
+    if (module.file !== undefined) {
+      const absolute = path.resolve(root, module.file)
+      if (!existsSync(absolute)) issues.push({ path: at, message: `File not found: ${module.file} (looked in ${absolute})` })
+      return { name: module.name, from: absolute }
+    }
+    if (!isInstalled(root, module.name)) {
+      issues.push({ path: at, message: `The package "${module.name}" is not installed where this site can find it. Add it with: npm install ${packageOf(module.name)}` })
+    }
+    return { name: module.name, from: module.name }
+  })
+
+  // One description is written as a mapping and several as a list, and a problem is reported where it is written.
+  const listed = Array.isArray((yaml.data as { openapi?: unknown } | null)?.openapi)
+  const openapi = config.openapi.map((api, index) => {
+    const at = (key: string) => (listed ? ['openapi', index, key] : ['openapi', key])
+    const spec = path.resolve(root, api.spec)
+    if (!existsSync(spec)) issues.push({ path: at('spec'), message: `File not found: ${api.spec} (looked in ${spec})` })
+    const other = config.openapi.findIndex((earlier, position) => position < index && inPath(api.path, earlier.path))
+    if (other >= 0) {
+      const theirs = config.openapi[other]!.path
+      issues.push({
+        path: at('path'),
+        message:
+          api.path === theirs
+            ? `Two descriptions have their pages at ${api.path}. Give each a \`path\` of its own.`
+            : `${api.path} and ${theirs} are one inside the other, so the pages of one API would be among the pages of the other. Give each a \`path\` of its own.`,
+      })
+    }
+    return { spec, prefix: api.path, try: api.try }
+  })
+
   if (issues.length > 0) {
     throw new ShabdError(configFile, locateIssues(issues, yaml), source)
   }
 
   const contentDir = path.resolve(root, config.content.dir)
+  const vars = flattenVars(config.vars)
   const digest = (value: unknown) => createHash('sha1').update(JSON.stringify(value)).digest('hex').slice(0, 12)
   const structureFingerprint = digest([
     PIPELINE_VERSION,
     config.site.base,
+    // A page is read with its variables filled in, so another value is another page.
+    vars,
+    // The site's own plugins, their options, and whether maths is typeset.
+    config.markdown,
     config.theme.code,
     // The presets in the theme menu decide which other syntax themes every code block is coloured in.
     codeThemePlan(config.theme).themes,
     config.features.sandbox.enabled,
-    Object.keys(layouts).sort(),
+    // Which layouts there are, and which of them set code beside prose: pages of those compile differently.
+    Object.keys(layouts)
+      .sort()
+      .map((name) => [name, layouts[name]?.split]),
   ])
   // Token colours are held to a contrast floor against the colours code is drawn on.
   const compileFingerprint = digest([structureFingerprint, codeBackgrounds(config.theme)])
@@ -141,13 +261,155 @@ export function resolveConfig(root: string, configFile: string, source: string):
     components,
     blocks,
     stylesheets,
+    socialFonts,
+    redirects,
+    vars,
+    openapi,
+    generatedDir: path.join(root, '.shabd', 'openapi'),
+    editions,
+    sandboxModules,
+    locate: (path) => yaml.locate(path, 'key'),
     compileFingerprint,
     structureFingerprint,
   }
 }
 
+/**
+ * `versions:` and `languages:` as parts of the site. The first of each is at
+ * the root; each of the others is under a path of its own, and no two may
+ * have the same.
+ */
+function resolveEditions(config: ShabdConfig, langWritten: boolean, issues: { path: (string | number)[]; message: string }[]): Editions {
+  const taken = new Map<string, string>()
+  const claim = (prefix: string, at: (string | number)[], what: string) => {
+    const other = taken.get(prefix.toLowerCase())
+    if (other) issues.push({ path: at, message: `${prefix} is where ${other} has its pages. Give ${what} a path of its own.` })
+    else taken.set(prefix.toLowerCase(), what)
+  }
+
+  const versions = config.versions.map((version, index): Edition => {
+    const at = ['versions', index]
+    if (config.versions.findIndex((other) => other.label === version.label) < index) {
+      issues.push({ path: [...at, 'label'], message: `Two versions are called "${version.label}". A reader picks one by its name.` })
+    }
+    if (index === 0) {
+      if (version.path !== undefined) {
+        issues.push({ path: [...at, 'path'], message: 'The first version is the current one, and its pages are the site\'s own: it has no path. List the older versions after it, each with the folder its pages are in.' })
+      }
+      // Asked for or not, the current version is what a search should find.
+      return { label: version.label, prefix: '', ...(version.index === false ? { noindex: true } : {}) }
+    }
+    if (version.path === undefined) {
+      issues.push({ path: at, message: `Say where the pages of "${version.label}" are: \`path: /v1\` for the pages in ${config.content.dir}/v1.` })
+      return { label: version.label, prefix: '' }
+    }
+    claim(version.path, [...at, 'path'], `the version "${version.label}"`)
+    return { label: version.label, prefix: version.path, ...(version.index === true ? {} : { noindex: true }) }
+  })
+
+  const languages = config.languages.map((language, index): Edition => {
+    const at = ['languages', index]
+    if (config.languages.findIndex((other) => other.code.toLowerCase() === language.code.toLowerCase()) < index) {
+      issues.push({ path: [...at, 'code'], message: `The language ${language.code} is listed twice.` })
+    }
+    // A word of the site's furniture is given by its key. A key that is not one would never be shown.
+    for (const key of Object.keys(language.ui)) {
+      if (Object.hasOwn(UI_TEXT, key)) continue
+      const meant = closestMatch(key, Object.keys(UI_TEXT))
+      issues.push({ path: [...at, 'ui', key], message: `"${key}" is not one of the site's own words.${meant ? ` Did you mean "${meant}"?` : ''}` })
+    }
+    const base = { label: language.label, lang: language.code, ...(language.dir === 'rtl' ? { dir: 'rtl' as const } : {}) }
+    if (index === 0) {
+      if (language.path !== undefined) {
+        issues.push({ path: [...at, 'path'], message: 'The first language is the one the site is written in, and its pages are the site\'s own: it has no path.' })
+      }
+      // One place to say each thing: what the site says of itself is under `site`, and that is in its first language.
+      for (const key of ['nav', 'footer'] as const) {
+        if (language[key] !== undefined) {
+          issues.push({ path: [...at, key], message: `The first language is the site's own: write this under site.${key}.` })
+        }
+      }
+      if (langWritten && config.site.lang.toLowerCase() !== language.code.toLowerCase()) {
+        issues.push({ path: ['site', 'lang'], message: `site.lang is ${config.site.lang}, and the first of \`languages\` is ${language.code}. The first language is the site's own: leave site.lang out, or make the two agree.` })
+      }
+      return { ...base, prefix: '' }
+    }
+    const prefix = language.path ?? `/${language.code.toLowerCase()}`
+    claim(prefix, language.path === undefined ? at : [...at, 'path'], `the language ${language.code}`)
+    return { ...base, prefix }
+  })
+
+  return { ...(languages.length > 0 ? { languages } : {}), ...(versions.length > 0 ? { versions } : {}) }
+}
+
+/** The package a name belongs to: `date-fns/locale` is in `date-fns`, and `@acme/ui/button` in `@acme/ui`. */
+function packageOf(name: string): string {
+  return name.split('/').slice(0, name.startsWith('@') ? 2 : 1).join('/')
+}
+
+/** Is the package in a `node_modules` of the site's folder, or of a folder above it? */
+function isInstalled(root: string, name: string): boolean {
+  for (let dir = root; ; dir = path.dirname(dir)) {
+    if (existsSync(path.join(dir, 'node_modules', ...packageOf(name).split('/'), 'package.json'))) return true
+    if (path.dirname(dir) === dir) return false
+  }
+}
+
+/** Is one address the other, or inside it or around it? `/api` and `/api/v2` are; `/api` and `/api-v2` are not. */
+function inPath(a: string, b: string): boolean {
+  const within = (inner: string, outer: string) => outer === '/' || inner === outer || inner.startsWith(`${outer}/`)
+  return within(a, b) || within(b, a)
+}
+
+/** The page a redirect target names, without its `#heading`. */
+export function redirectRoute(target: string): string {
+  return normalizePath(target.split('#')[0] ?? '/')
+}
+
+/**
+ * Follow each redirect to where it ends. `/a → /b` and `/b → /c` make `/a`
+ * lead straight to `/c`, so a reader is never sent on twice. Two that lead to
+ * each other lead nowhere, which is an error.
+ */
+function resolveRedirects(
+  written: Record<string, string>,
+  issues: { path: (string | number)[]; message: string }[],
+): Redirect[] {
+  const bySource = new Map<string, { key: string; to: string }>()
+  for (const [key, to] of Object.entries(written)) {
+    const from = normalizePath(key)
+    const other = bySource.get(from)
+    if (other) {
+      issues.push({ path: ['redirects', key], message: `"${key}" and "${other.key}" are the same address. Keep one of them.` })
+      continue
+    }
+    bySource.set(from, { key, to })
+  }
+
+  const redirects: Redirect[] = []
+  for (const [from, { key, to }] of bySource) {
+    let target = to
+    const visited = [from]
+    while (!isExternal(target)) {
+      const route = redirectRoute(target)
+      const next = bySource.get(route)
+      if (!next) break
+      if (visited.includes(route)) {
+        issues.push({ path: ['redirects', key], message: `Redirects lead in a circle: ${[...visited, route].join(' → ')}` })
+        target = ''
+        break
+      }
+      visited.push(route)
+      target = next.to
+    }
+    if (target) redirects.push({ key, from, to: target, external: isExternal(target) })
+  }
+  return redirects
+}
+
 export interface LoadedSidebar {
-  input: SidebarInput
+  /** One sidebar, as a list, or several, keyed by the part of the site each belongs to. */
+  input: SidebarsInput
   /** Map a sidebar.yaml data path to a source issue with line and column. */
   locate(issues: { path: (string | number)[]; message: string }[]): SourceIssue[]
   source: string | undefined
@@ -163,6 +425,6 @@ export async function loadSidebar(config: Pick<ResolvedConfig, 'sidebarFile'>): 
 }
 
 export function parseSidebar(file: string, source: string): LoadedSidebar {
-  const { value, yaml } = parseYamlWithSchema(file, source, SidebarSchema, { emptyValue: [] })
+  const { value, yaml } = parseYamlWithSchema(file, source, SidebarsSchema, { emptyValue: [] })
   return { input: value, locate: (issues) => locateIssues(issues, yaml), source }
 }

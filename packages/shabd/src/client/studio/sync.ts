@@ -1,27 +1,19 @@
 /**
  * Draft sync: share what is being typed before it is saved.
  *
- * A StudioChannel carries DraftMessages between editors. Two transports:
+ * A StudioChannel carries the messages of a shared draft (draft.ts) between
+ * editors. Two transports:
  *
  *   tabChannel   BroadcastChannel. Other tabs and windows of the same browser.
  *   PeerChannel  a WebRTC data channel. Another person's browser, directly:
- *                the two exchange an invite and a reply (copy and paste), and
- *                from then on drafts travel peer to peer with no server between.
+ *                the two exchange an invite and a reply, and from then on
+ *                drafts travel peer to peer with no server between.
  *
- * Merging is last-writer-wins on the whole document, ordered by a revision
- * counter. That is enough for taking turns in one file; it is not a CRDT and
- * two people typing in the same sentence at once will overwrite each other.
+ * What travels is each change as it was typed, and the editors merge them:
+ * see draft.ts for how, and for what happens when two editors meet that
+ * each hold a text of their own.
  */
-
-export interface DraftMessage {
-  type: 'draft'
-  /** Page id, e.g. `guide/install.md`. */
-  page: string
-  source: string
-  /** Increases with every edit; ties are broken by peer id. */
-  revision: number
-  peer: string
-}
+import { isDraftMessage, type DraftMessage } from './draft.js'
 
 export interface StudioChannel {
   send(message: DraftMessage): void
@@ -30,12 +22,8 @@ export interface StudioChannel {
   close(): void
 }
 
+/** This editor, among the others it talks to. */
 export const peerId = Math.random().toString(36).slice(2, 10)
-
-/** True when `incoming` should replace a draft at (`revision`, `peer`). */
-export function isNewer(incoming: DraftMessage, revision: number, peer: string): boolean {
-  return incoming.revision > revision || (incoming.revision === revision && incoming.peer > peer)
-}
 
 export function tabChannel(name: string): StudioChannel | null {
   if (typeof BroadcastChannel === 'undefined') return null
@@ -43,8 +31,8 @@ export function tabChannel(name: string): StudioChannel | null {
   return {
     send: (message) => channel.postMessage(message),
     subscribe(listener) {
-      const onMessage = (event: MessageEvent<DraftMessage>) => {
-        if (event.data?.type === 'draft') listener(event.data)
+      const onMessage = (event: MessageEvent<unknown>) => {
+        if (isDraftMessage(event.data)) listener(event.data)
       }
       channel.addEventListener('message', onMessage)
       return () => channel.removeEventListener('message', onMessage)
@@ -116,6 +104,41 @@ function hasUsableCandidate(description: RTCSessionDescription | null): boolean 
 /** A problem worth showing to the person as it is. */
 export class PeerError extends Error {}
 
+/*
+ * An invitation by link. The one who invites leaves their offer with their own dev server
+ * (src/node/vite/signal.ts), and the link is where. Whoever is sent the link reads the offer from it and
+ * leaves the answer there, so neither has a code to copy back. The link leads to the other person's dev
+ * server, which this browser has to be able to reach.
+ */
+
+/** What such a link looks like: a dev server's address, the route, and the name the offer was left under. */
+const INVITE_LINK = /^https?:\/\/\S+\/_shabd\/studio\/signal\/[2-9A-HJ-NP-Z]{12}$/
+
+export const isInviteLink = (text: string): boolean => INVITE_LINK.test(text.trim())
+
+const NOT_REACHED =
+  'That link could not be opened from this machine. It leads to the other person\'s dev server, which has to be reachable from here. Ask them for the code instead.'
+
+/** The offer that was left at a link. */
+export async function offerAt(link: string): Promise<string> {
+  const response = await fetch(link.trim()).catch(() => {
+    throw new PeerError(NOT_REACHED)
+  })
+  const body = (await response.json().catch(() => ({}))) as { offer?: string; error?: string }
+  if (!response.ok || !body.offer) throw new PeerError(body.error ?? 'That link does not lead to an invitation.')
+  return body.offer
+}
+
+/** Leave the answer where the offer was. It is sent as plain text, which a page of another site may send without asking first. */
+export async function answerAt(link: string, answer: string): Promise<void> {
+  const response = await fetch(link.trim(), { method: 'POST', body: answer }).catch(() => {
+    throw new PeerError(NOT_REACHED)
+  })
+  if (response.ok) return
+  const body = (await response.json().catch(() => ({}))) as { error?: string }
+  throw new PeerError(body.error ?? 'The answer could not be left at that link.')
+}
+
 /**
  *   idle       nothing started
  *   waiting    a code was made; the other side has not connected yet
@@ -125,11 +148,14 @@ export class PeerError extends Error {}
 export type PeerState = 'idle' | 'waiting' | 'connected' | 'failed'
 
 /**
- * A two-person WebRTC channel with copy-and-paste signalling.
+ * A two-person WebRTC channel. The two browsers each need a note from the other before they can talk:
  *
- *   host:   const invite = await channel.invite()        → send the code to the guest
- *   guest:  const reply  = await channel.join(invite)    → send the code back
+ *   host:   const invite = await channel.invite()        → the guest is given it
+ *   guest:  const reply  = await channel.join(invite)    → the host is given that
  *   host:   await channel.accept(reply)                  → connected
+ *
+ * How a note gets across is the caller's business: left with the host's dev server and read from a
+ * link (above), or copied and pasted by the two people.
  */
 export class PeerChannel implements StudioChannel {
   #iceServers: RTCIceServer[]
@@ -219,8 +245,8 @@ export class PeerChannel implements StudioChannel {
     channel.addEventListener('close', () => this.#data === channel && this.state === 'connected' && this.#setState('failed'))
     channel.addEventListener('message', (event) => {
       try {
-        const message = JSON.parse(String(event.data)) as DraftMessage
-        if (message.type === 'draft') for (const listener of this.#listeners) listener(message)
+        const message: unknown = JSON.parse(String(event.data))
+        if (isDraftMessage(message)) for (const listener of this.#listeners) listener(message)
       } catch {
         // Not a draft message: ignore it.
       }

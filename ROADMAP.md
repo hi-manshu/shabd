@@ -1,14 +1,14 @@
 # Roadmap
 
-Three parts: where the project lives and what is left to set up there, where version 0.1 stands, and what to build
-next.
+Four parts: where the project lives and what is left to set up there, where version 0.1 stands, what has been
+built since, and what to build next.
 
 ## Part 1: Where the project lives
 
 | | State |
 | --- | --- |
 | Repository | Public, at <https://github.com/hi-manshu/shabd>, under the MIT licence |
-| Tests on GitHub | `ci.yml` runs on every push and pull request, on Linux: one job builds, typechecks and runs the unit tests, another runs the browser tests in Chromium, Firefox and WebKit. First green on 17 November 2026 |
+| Tests on GitHub | `ci.yml` runs on every push and pull request. One job builds, typechecks and runs the unit tests, on Linux, macOS and Windows. Another runs the browser tests in Chromium, Firefox and WebKit, on Linux. First green on 17 November 2026 |
 | Documentation | <https://hi-manshu.github.io/shabd/>, on GitHub Pages. `docs.yml` deploys it again whenever `main` changes |
 | npm | Version 0.1.0, published on 17 November 2026 and tagged `v0.1.0`, under two names (below) |
 | Releases | `release.yml`, started by hand with a version, by the repository's owner only. It has been run as a dry run; no release has gone out through it yet. `npm run release` does the same from a machine |
@@ -55,10 +55,8 @@ What is left to set up:
 | SQLite search store (FTS5, kept in the browser's private file system) | Built, tested. WebKit under test fell back to memory |
 | `llms.txt`, Markdown copies | Built, tested |
 | MCP: dev route, `shabd preview`, stdio | Built; protocol tested with the official client |
-| MCP on a host that runs code | `shabd build --adapter` writes a function for Cloudflare Pages, Vercel or Netlify. Each is run in the tests as its host runs it, with code generation from strings forbidden. None has been deployed to its host |
+| MCP on a serverless host | Handler exported; no adapter, not tested on a host |
 | Studio: dev-server saving, tab sync, conflicts | Built, tested in three browser engines |
-| Studio: an editor that shows Markdown in colour, with keys for indenting, lists, bold and italic | Built, tested in three browser engines. That one undo takes back one such edit was seen in Chromium and Firefox; WebKit under test takes back all typing at once, in any text area |
-| Studio: creating, renaming and deleting pages, with `sidebar.yaml` kept in step | Built, tested in three browser engines |
 | Studio: folder saving (File System Access API) | Built, tested in Chromium against real file handles; the system folder picker itself needs a person |
 | Studio: peer editing over WebRTC | Built, tested between two browser sessions on one machine; not across networks |
 | Live sandboxes | Built, tested in three browser engines |
@@ -66,7 +64,7 @@ What is left to set up:
 | Readable code: every syntax colour at 4.5:1 or more against what is behind it | Built, tested for all 23 presets in both modes on a sample of code in eight languages |
 | Contrast of every preset | Tested: colour against colour for all 23, and text against every pixel of the rendered page for the ten themes, in three browser engines |
 | The starter, under both names | Built, tested, published. Both `npm create` commands were run from the registry: each site installed, passed `shabd check`, built and was served |
-| A site served from a sub-path, as GitHub Pages serves one | Built. Checked on the deployed docs: every page, the links between them, search, the theme menu, the 404 page. `shabd dev` for such a site showed an empty page in 0.1.0. That is fixed, and tested: a unit test asks such a server for everything its page names, and three browser tests open such a site in dev, save a page, and make, move and delete one in the Studio |
+| A site served from a sub-path, as GitHub Pages serves one | Built. Checked on the deployed docs: every page, the links between them, search, the theme menu, the 404 page |
 
 "Three browser engines" means the Chromium, Firefox and WebKit builds that Playwright drives, on macOS and, on
 GitHub, on Linux. It does not mean Chrome, Firefox and Safari as people install them, and it does not cover
@@ -76,17 +74,14 @@ Windows.
 
 On one machine (macOS 26, Node 22.16), with the docs site and a small test site in this repository:
 
-- 283 unit and integration tests pass. They cover config and sidebar validation, the sidebar resolver, the Markdown
+- 227 unit and integration tests pass. They cover config and sidebar validation, the sidebar resolver, the Markdown
   pipeline, layout resolution, the theme presets and their contrast, search ranking, both search stores, the
-  content store, the starter, the MCP endpoint driven by the official MCP client and the functions written for
-  three hosts, a dev server that is told of pages added and removed, a dev server for a site under a sub-path, and
-  the Studio's editor: what it colours and what its keys do.
-- 149 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
+  content store, the starter, and the MCP endpoint driven by the official MCP client.
+- 119 browser tests pass in Playwright's Chromium, Firefox and WebKit: prerendered pages with and without
   JavaScript, hydration, navigation, every layout, the sidebar, the phone-size layout, search, the theme menu, text
-  contrast on every theme's rendered page, sandboxes, hot updates of pages and YAML, the Studio including its
-  editor, conflicts, making, moving and deleting pages, and its folder backend, two editors connecting peer to
-  peer, and a dev server for a site under a sub-path. Sixteen more are skipped where an engine lacks what they
-  need.
+  contrast on every theme's rendered page, sandboxes, hot updates of pages and YAML, the Studio including conflicts
+  and its folder backend, and two editors connecting peer to peer. Sixteen more are skipped where an engine lacks
+  what they need.
 - The search tests also pass with the index held in SQLite, and semantic search with the real embedding model
   finds a section by meaning in all three engines on both stores.
 - Version 0.1.0 was installed from npm into an empty folder under both names. Each site passed `shabd check`,
@@ -96,9 +91,7 @@ On one machine (macOS 26, Node 22.16), with the docs site and a small test site 
   116 ms). That was measured in Chromium for the first commit, and not again since.
 
 On GitHub's Linux machines the same tests pass, except that two editors connecting peer to peer runs in Chromium
-only there, so two fewer pass and two more are skipped. Playwright's Firefox and WebKit connected two pages on
-Linux only some of the time. The suite then runs again on the SQLite search store. The unit tests also run on
-GitHub's macOS and Windows machines.
+only there. Playwright's Firefox and WebKit connected two pages on Linux only some of the time.
 
 On the deployed docs site, on 17 November 2026, in Chromium: all 18 pages open with nothing in the console, the 36
 links between them lead somewhere, and each of these worked when tried as a reader would: search by keyword and
@@ -111,83 +104,174 @@ Not yet checked:
 - Chrome, Firefox and Safari as people install them, and Windows.
 - The system folder picker in the Studio. Its code runs in the tests against real file handles, but the picker
   itself needs a person.
-- Peer editing between two machines on different networks.
+- Peer editing between two machines: on one network by the link, and on different networks by the codes.
 - The MCP handler on a serverless or edge host.
 - Sites with thousands of real pages.
 
-## Part 3: What comes next
+## Part 3: Built since 0.1
+
+Everything in this part was built after 0.1.0, on a branch, `worktree-feature-buildout`. The branch and `main`
+were merged on 21 November 2026, and the result is offered to `main` as a pull request. None of it is released.
+Each row was committed when its tests passed on one machine (macOS 26, Node 22.16).
+
+In the same days, `main` got some of the same things built a second time: the adapters, the code editor, making
+and renaming pages, and the mend for a site with a base. The merge kept the branch's version of each, because more
+was built on top of it there, and kept from `main` what the branch did not have: the tests on three systems on
+GitHub, what the first run on Windows asked for, and tests of a dev server that is told of pages coming and going.
+
+| Area | State |
+| --- | --- |
+| API pages: a form that sends the request ("Try it") | Built, tested in three browser engines |
+| Pages made from an OpenAPI description (`openapi:`) | Built, tested in three browser engines. The docs describe their own files this way |
+| Search: the passage a result was found in, words typed nearly right, and Chinese, Japanese and Thai by keyword | Built, tested |
+| Search: vectors compared outside SQL in the SQLite store, and the embedding model served by the site | Built, tested with the real model |
+| MCP: adapters for Cloudflare, Vercel and Netlify, written by `shabd build --adapter <name>` | Built, with unit tests of what each writes. Not deployed to any of the three |
+| MCP: search by meaning behind `shabd preview`, the dev route and stdio | Built, tested |
+| A header with ink of its own (`theme.headerText`), which the Windows XP preset uses for a blue bar | Built, tested in three browser engines |
+| Type declarations for `shabd/client` | Built. A site's own type check follows them |
+| Lighter pages on a site with a theme menu | Built. The colours of code under the themes a reader has to pick are in one stylesheet, fetched when one is picked. On the docs site the page with the most code went from 98 KB of HTML to 61 KB |
+| A second look at a file that is saved twice in quick succession | Built, tested on macOS. The fault it answers was seen on Linux, where it has not been run |
+| Accessibility: a pass with a checker (axe) and with the keyboard | Built into the browser tests, with what it found fixed. See below |
+| Reading a built site offline (`features.offline`) | Built, tested in three browser engines; without a connection in Chromium and WebKit only |
+| `shabd dev` on a site with a base | Mended. Such a site showed an empty page: it had done so since the first commit. A test now starts the dev server on one |
+| Studio: a code editor, making, renaming and deleting pages, and pasted images | Built, tested in three browser engines |
+| Sandboxes: modules named in the config, a frame of its own for a snippet, colours in the editor | Built, tested in three browser engines |
+| `shabd check`: a live snippet that cannot run, or that imports what the site has not named | Built, tested |
+| Fast Refresh while the theme's own source is edited | Built. A component is in a file of its own, and a test holds the client to that. Tried by hand in Chromium: a change to a link, an icon, a hook or the router's provider is taken in place and the page keeps its state. A change to the router's own file still starts the page again, because the app's entry imports it |
+| Versions of the docs (`versions:`) and languages of the site (`languages:`) | Built, tested in three browser engines, one of the languages written from right to left. Each is a folder of the content, with a sidebar and a search of its own, and a menu leads to the same page in the others. A language can say the site's own words, the header's links and the footer in its own way. What stays as it is written is under "Not checked" below |
+| Studio: drafts that merge (Yjs). Two people type in one page at the same moment and both keep what they typed | Built, tested between two tabs in three browser engines and between two browser sessions on one machine. Not tried between two machines |
+| Studio: an invitation by link. The dev server holds the two notes the browsers need, where two codes were pasted by hand | Built, tested between two browser sessions on one dev server, in three engines. Not opened from a second machine. The codes remain for a machine that cannot reach the dev server |
+| Studio: a tab where a theme's colours are tried beside the page, with their contrast, and written to the config | Built, tested in three browser engines. Only the lines that say the change are written. Colours and the preset, not fonts or sizes |
+| A benchmark for large sites (`npm run bench`) | Built. Its numbers are below |
+
+### What the accessibility pass found
+
+All of it is fixed, and each has a test:
+
+- A badge's word had too little contrast with the tint behind it, in 74 places across the presets.
+- The search dialog: its field had no name, the number of results was not announced, and focus was lost when the
+  dialog closed.
+- Tabs did not answer Home and End, and a panel could not be reached with Tab.
+- On a small screen, what was under the open sidebar panel could still be reached with the keyboard, and Escape
+  did not close the panel.
+- The wrapper that lets a wide table scroll sideways had no role.
+- The frame of an isolated snippet had no colour of its own behind its text.
+
+It was a checker and a keyboard. Nobody has listened to the site with a screen reader.
+
+### Numbers from the benchmark
+
+On an Apple M2 Pro with 10 cores and 16 GB, Node 22.16, while other work was running on the machine. The made-up
+sites are `npm run bench`; the third column is 5,001 pages of MDN's content.
+
+| | 1,000 pages, made up | 5,000 pages, made up | 5,001 pages of MDN |
+| --- | --- | --- | --- |
+| Words | 848,000 | 4.3 million | 3.6 million |
+| Build | 16 s, 1.4 GB of memory | 128 s, 2.7 GB | 154 s, 3.8 GB |
+| Search index | 5.8 MB (1.1 MB compressed), 7,275 sections | 29.6 MB (5.7 MB), 37,089 sections | 30.4 MB (6.2 MB), 51,024 sections |
+| A build with nothing changed | 5.7 s | 50 to 65 s | 66 s |
+| `shabd check` | 0.36 s | 2.2 s | 3.0 s |
+| Dev server listening | 0.18 s | 0.52 s | 1.2 s |
+| A saved edit on screen | 43 ms | about 80 ms | not measured |
+| The first search, then each one after | 0.84 s, then 27 ms | 2.1 s, then 30 ms | not measured |
+
+The benchmark found faults that are fixed. The sidebars took time that grew with the square of the number of
+pages. The list of pages was made again each time it was asked for. And a folder that holds only its own index
+page became a group of one in the sidebar: on MDN's layout, where every page is such a folder, that made the HTML
+of 1,001 pages 224 MB, and it is 71 MB now. At 5,000 pages `shabd check` went from 6.7 s to 2.2 s, and the dev
+server listens after 0.52 s where it took 5.2 s.
+
+It also found that pages were compiled on one core: about 59 s of the 128 at 5,000 pages. A site of a few hundred
+pages or more now has them compiled on up to eight threads (`build.threads`). `shabd check` on 2,000 made-up pages,
+from an empty cache, took 21.8 s on one thread and 6.8 s on eight. The table above is from before that.
+
+It found that every reader was sent the data of the whole site: at 5,000 pages, 2.5 MB (436 KB compressed) in one
+chunk of the first script. That chunk is now 0.92 MB (157 KB compressed). The table of every page, with its file
+and its description, is no longer in it: a page brings its own, and the dev server keeps the table for the Studio.
+And the routes no longer carry a list of what to fetch with each page. With both changes, the 5,000-page site
+built in 64 s where it took 128 s, on the same machine with less else running.
+
+What it found that is not fixed:
+
+- That chunk still holds the whole sidebar and a route for every page, which is why it grows with the site: about
+  450 KB and 375 KB of it at 5,000 pages.
+- The bundler's time grows faster than the number of pages, and most of the memory is the bundler's.
+
+### What has been checked, and what has not
+
+- 783 unit and integration tests pass, on the branch with `main` merged into it.
+- 484 browser tests pass in Playwright's Chromium, Firefox and WebKit, on the same code. 41 more are skipped:
+  where an engine lacks what a test needs, and the tests that belong to a variation that was not switched on for
+  that run.
+- The four variations of the browser tests were run on the branch before `main` was merged into it, and not
+  again after. The whole suite with the search index in SQLite: 480 pass, 32 are skipped and one failed, where a
+  test pressed an arrow key before a search had answered. Search was running twice on a site with versions or
+  languages. It runs once now, and that test and the other tests of search then passed three times over in each
+  engine, on SQLite. Semantic search with the real embedding model: 6 pass, 6 skipped. The same with the model
+  served by the site: 12 pass. Reading offline: 10 pass, 2 skipped in Firefox.
+- GitHub's machines run all of it for the first time on that pull request: the unit tests on Linux, macOS and
+  Windows, and the browser tests on Linux.
+- The docs site builds and passes `shabd check` with every feature above switched on that it can use.
+
+Not checked:
+
+- Everything under "Not yet checked" in Part 2, except sites with thousands of pages.
+- The three adapters on their hosts.
+- The second look at a file, on Linux.
+- Reading offline in Firefox without a connection. The Firefox that the tests drive leaves a service worker its
+  connection, so the two tests that cut it are skipped there.
+- Hot updates of the theme's own source in Firefox and WebKit. They were tried in Chromium. A hot update cannot
+  hand out a second copy of one of the app's stores: none of them stands above a component's file, and a test
+  reads what every file of the client imports to keep it so.
+- Versions and languages. Search within one asks for more results than it shows and leaves out those from
+  elsewhere, so a query can come back short where versions differ a great deal. The MCP endpoint searches every
+  version and every language. The site's title, the words of an API reference and those of a live example are
+  the same in every language. And a page written from right to left has been held to two things by a test, the
+  sidebar on the other side and nothing wider than the window: nobody who reads such a language has looked at one.
+- In the Studio, between two machines: drafts that merge, and the link that invites. Both were tried between two
+  browser sessions on one machine, on one dev server. With more than two editors on a page the merging is tested
+  without a browser.
+- A site's own `content/404.md`. A build writes it into `404.html`, and from reading the code the built-in page
+  takes its place as soon as the page's script runs. That was so before this branch, and has not been looked at
+  in a browser.
+- Beside the open Studio, a page on a screen narrower than about 1,500 pixels: its text is squeezed between the
+  sidebar and the outline. That was so before this branch too.
+- In the Studio: an image is not moved, renamed or deleted with its page; pasting and dropping are tested with
+  events the test makes, not with the real clipboard or a real drag; and while a page is renamed its breadcrumbs
+  and its mark in the sidebar are gone for as long as the next page takes to draw.
+
+## Part 4: What comes next
 
 ### 0.2: Make what exists dependable
 
 - Run the browser tests on Windows and macOS on GitHub. The unit tests run on all three there, the browser tests
   on Linux.
-- On Linux, a file saved twice within 50 ms is seen once: the dev server's file watcher drops the second change.
-  An editor that saves in two writes could leave the server one save behind. Reading the file again a moment
-  after each change would close that. It was found because a test did exactly this.
-- A setting for the colour of the header's text, so that a theme can have a dark header. The Windows XP theme
-  would use it for a blue taskbar.
-- Run the browser tests on a phone-size screen with a long sidebar and on real page lengths. Two faults on the
-  docs site were found only by walking the deployed site: a sidebar longer than the screen sat under the header,
-  and the Studio's footer missed a page update that arrived before the save was confirmed. The test site was too
-  small and too slow to show either.
 - Try the real browsers by hand, Safari above all. WebKit under test did not offer its private file system to the
-  search worker; whether Safari does needs checking.
+  search worker; whether Safari does needs checking. So do frosted panels in Firefox and Safari as people install
+  them, and the logo's animation under "Reduce motion" in Safari.
 - Peer editing between two machines on different networks.
-- An accessibility pass: the sidebar panel on small screens, the search dialog, tabs.
-- A benchmark with 1,000 and 5,000 real pages: startup, build time, index size. The design scans and holds every
-  page in memory, which is fine for hundreds and unmeasured beyond. The search stores have been measured on their
-  own, up to 20,000 synthetic sections.
-- Frosted panels in real browsers. The Firefox and WebKit builds the tests drive do not blur what is behind a
-  translucent header or sidebar; Chromium does. The themes are readable either way, which the contrast test
-  checks, but whether Firefox and Safari as people install them blur it has not been looked at.
-- The logo's animation under "Reduce motion" in Safari. It was checked in Chromium and Firefox.
-- Lighter pages on a site with a theme menu. Each page carries the colours of its own code for every syntax theme
-  the menu can reach, in its HTML and again in its script. On the docs site, which offers all 23 presets, that is
-  about 39 KB in each on the page with the most code. The themes a reader has to pick could live in one shared
-  stylesheet, fetched when one is picked; for the docs site it would be an estimated 78 KB, fetched once.
-- Type declarations for `shabd/client`. It ships as TypeScript source today, which a site's own type check cannot
-  follow into the generated `virtual:` modules.
-- Keep React Fast Refresh working while editing the theme's own source. A few client modules export both components
-  and helpers, which forces a page reload when they change. This affects contributors, not site authors.
+- The adapters for Cloudflare, Vercel and Netlify, each on its host.
+- Listen to the site with a screen reader.
+- From the benchmark: send a reader the sidebar of the part of the site they are in, and the routes as they are
+  needed. Both are still whole in the first script.
 
 ### 0.3: Finish the four headline features
 
-**Search**
+Search, MCP and the sandboxes have what was listed for them. In the Studio, drafts merge and an invitation is a
+link. What is left:
 
-- Serve the embedding model from the site, so nothing is fetched from Hugging Face.
-- In the SQLite store, compare vectors outside SQL. Semantic queries took 72 ms at 20,000 sections against 19 ms in
-  the memory store, because each row crosses from SQLite into JavaScript.
-- Word segmentation for Chinese, Japanese and Thai keyword search.
-
-**MCP**
-
-- Deploy each adapter's output to its host once: Cloudflare Pages, Vercel, Netlify. They are written and tested
-  off the hosts.
-- Semantic search behind the endpoint where the host can afford the model.
-
-**Studio**
-
-- Autocomplete in the editor: links to pages, frontmatter keys, the names of components.
-- When a page is renamed, rewrite the links to it in other pages. Today only `sidebar.yaml` follows.
-- Paste images.
-- A CRDT (Yjs) for drafts, so two people can type at once. Today the newest draft replaces the other.
-- Signalling that does not need two codes pasted by hand.
-
-**Sandboxes**
-
-- Syntax colours in the editor.
-- An option to run a snippet in an isolated frame.
-- More modules to import, declared in the config.
+- An invitation that works between two networks with nothing set up. The link leads to the dev server of the one
+  who invites, so it is for the same machine or the same network: across networks it is still two codes.
+- In a shared draft: where the other person's cursor is.
 
 ### Later
 
-- Translations and versioned docs
-- More than one sidebar, chosen by section
-- `trailingSlash` and `.html` output options
-- Conditions on layout blocks, and a two-column `api` layout with prose beside code
-- Pages generated from an OpenAPI file
-- Remark and rehype plugins named in YAML
-- "Last updated" from Git history, an RSS feed, social images
+- In the Theme tab: the rest of a theme's tokens. It tries colours and the preset today.
+
+The rest of what stood here is built: a place to try a theme's colours and see their contrast, versioned docs and
+translations, more than one sidebar chosen by section, addresses with a trailing slash or
+`.html`, conditions on layout blocks and a two-column `api` layout, pages made from an OpenAPI file, remark and
+rehype plugins named in YAML, and "last updated" from Git history, an RSS feed and social pictures.
 
 ### 1.0
 

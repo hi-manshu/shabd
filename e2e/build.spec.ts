@@ -1,4 +1,6 @@
 /** A production build, served the way a static host serves it. */
+import type { Page } from '@playwright/test'
+import { editorText, snippetEditor } from './support/editor.js'
 import { BUILT, expect, markPage, open, regions, test } from './support/fixtures.js'
 
 test.describe('prerendered pages', () => {
@@ -92,7 +94,8 @@ test.describe('sidebar', () => {
   test('lists sidebar.yaml as written, then the folders it does not mention', async ({ page }) => {
     await open(page, `${BUILT}/guide/intro`)
     const sidebar = page.locator('.sb-region-sidebar')
-    await expect(sidebar.locator('.sb-nav-heading')).toHaveText(['Guide', 'Play', 'API', 'Extras'])
+    // The last one is not a folder of the site: its pages are made from an OpenAPI description (openapi.spec.ts).
+    await expect(sidebar.locator('.sb-nav-heading')).toHaveText(['Guide', 'Play', 'API', 'Extras', 'Fixture store'])
 
     const extras = sidebar.locator('.sb-nav-category', { hasText: 'Extras' })
     await expect(extras.locator('.sb-nav-link')).toHaveText(['Alpha notes', 'Beta notes'])
@@ -158,6 +161,81 @@ test.describe('search', () => {
     await expect(dialog).toHaveCount(0)
   })
 
+  test('forgives a misspelt word, and marks the word it was taken for', async ({ page }) => {
+    await open(page, `${BUILT}/guide/intro`)
+    await page.locator('.sb-search-button').click()
+    const dialog = page.locator('dialog.sb-search')
+    const input = dialog.getByRole('combobox')
+    const hits = dialog.locator('.sb-search-hit')
+
+    // Two letters swapped. No section has the word as typed.
+    await input.fill('pelicnas')
+    await expect(hits).toHaveCount(1)
+    await expect(hits.first()).toContainText('Second step')
+    await expect(hits.first().locator('mark')).toHaveText('Pelicans')
+    // Whichever store the site was built with is the one that forgave it.
+    await expect(dialog).toHaveAttribute('data-store', process.env.SHABD_E2E_STORE ?? 'memory')
+
+    // A word of three letters is too short to guess at.
+    await input.fill('zbe')
+    await expect(dialog.locator('.sb-search-empty')).toContainText('Nothing matches')
+
+    await input.fill('pelicnas')
+    await expect(hits).toHaveCount(1)
+    await input.press('Enter')
+    await expect(page).toHaveURL(`${BUILT}/guide/setup#second-step`)
+    await expect
+      .poll(() => page.evaluate(() => [...(CSS.highlights.get('sb-search') ?? [])].map((range) => String(range))))
+      .toEqual(['Pelicans'])
+  })
+
+  test('finds words in scripts written without spaces, and marks them', async ({ page }) => {
+    await open(page, `${BUILT}/guide/intro`)
+    await page.locator('.sb-search-button').click()
+    const dialog = page.locator('dialog.sb-search')
+    const input = dialog.getByRole('combobox')
+    const hits = dialog.locator('.sb-search-hit')
+    /** What is marked in the first result's excerpt, run together: a word can be marked as two. */
+    const markedInExcerpt = async () => (await hits.first().locator('.sb-search-hit-snippet mark').allTextContents()).join('')
+
+    // [what is typed, the heading of the section it is in]
+    const cases = [
+      ['浏览器', '中文'],
+      ['主题配置', '中文'],
+      ['ブラウザー', '日本語'],
+      ['設定', '日本語'],
+      // Playwright's Firefox cuts these three otherwise than Node does: サイドバー as one word where Node has
+      // サイド and バー, ทำ and งาน where Node has ทำงาน, ติดตั้ง where Node has ติด and ตั้ง. On the SQLite
+      // store the index was cut by Node when the site was built, and Firefox has to find them all the same.
+      ['サイドバー', '日本語'],
+      ['ทำงาน', 'ภาษาไทย'],
+      ['ติดตั้ง', 'ภาษาไทย'],
+      // Firefox leaves this whole in its sentence and cuts it in two, เบราว์ and เซอร์, when it is typed alone.
+      ['เบราว์เซอร์', 'ภาษาไทย'],
+    ] as const
+    for (const [query, heading] of cases) {
+      await input.fill(query)
+      await expect(hits.first().locator('.sb-search-hit-where'), query).toContainText(`Other scripts${heading}`)
+      await expect.poll(markedInExcerpt, query).toBe(query)
+    }
+    await expect(dialog).toHaveAttribute('data-store', process.env.SHABD_E2E_STORE ?? 'memory')
+
+    // A word still being typed is found from its first letter.
+    await input.fill('浏')
+    await expect(hits.first().locator('.sb-search-hit-where')).toContainText('中文')
+    await expect.poll(markedInExcerpt).toBe('浏览')
+
+    // Going to a result marks the word on the page, under its heading.
+    await input.fill('サイドバー')
+    await expect(hits.first().locator('.sb-search-hit-where')).toContainText('日本語')
+    await input.press('Enter')
+    await expect(page).toHaveURL(`${BUILT}/guide/scripts#${encodeURIComponent('日本語')}`)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Other scripts')
+    await expect
+      .poll(() => page.evaluate(() => [...(CSS.highlights.get('sb-search') ?? [])].map((range) => String(range)).join('')))
+      .toBe('サイドバー')
+  })
+
   test('moves through results with the arrow keys', async ({ page }) => {
     await open(page, `${BUILT}/`)
     await page.locator('.sb-search-button').click()
@@ -170,6 +248,132 @@ test.describe('search', () => {
     await expect(hits.nth(1)).toHaveAttribute('aria-selected', 'true')
     await page.keyboard.press('ArrowUp')
     await expect(hits.nth(0)).toHaveAttribute('aria-selected', 'true')
+  })
+
+  /** The words marked on the page, as written there. */
+  const marked = (page: Page) =>
+    page.evaluate(() => [...(CSS.highlights?.get('sb-search') ?? [])].map((range) => String(range)))
+
+  /** Search for the word that one passage of the long section holds, and take the only result. */
+  const findWombats = async (page: Page, choose: 'Enter' | 'click') => {
+    await page.locator('.sb-search-button').click()
+    const dialog = page.locator('dialog.sb-search')
+    await dialog.getByRole('combobox').fill('wombats')
+    const hits = dialog.locator('.sb-search-hit')
+    await expect(hits).toHaveCount(1)
+    await expect(hits.first()).toContainText("The keeper's log")
+    if (choose === 'Enter') await dialog.getByRole('combobox').press('Enter')
+    else await hits.first().click()
+    await expect(dialog).toHaveCount(0)
+  }
+
+  test('a result leads to the passage that matched, with the words of the query marked', async ({ page, problems }) => {
+    await open(page, `${BUILT}/guide/intro`)
+    const address = `${BUILT}/guide/long-read#the-keepers-log`
+    const heading = page.locator('#the-keepers-log')
+    const sentence = page.getByText('three wombats were found asleep in the coal store')
+
+    // The section is indexed as five passages, and the word is in the fourth: some forty lines under the heading.
+    await findWombats(page, 'Enter')
+    // The address is the section's, and says nothing of the passage or the query.
+    await expect(page).toHaveURL(address)
+    await expect.poll(() => marked(page)).toEqual(['wombats'])
+    await expect(sentence).toBeInViewport()
+    await expect(heading).not.toBeInViewport()
+
+    // The mark is drawn in the theme's highlight colour, and the word it is on can be seen.
+    const mark = await page.evaluate(() => {
+      const [range] = CSS.highlights.get('sb-search')!
+      const box = (range as Range).getBoundingClientRect()
+      const probe = document.body.appendChild(document.createElement('i'))
+      probe.style.backgroundColor = 'var(--sb-highlight-soft)'
+      const token = getComputedStyle(probe).backgroundColor
+      probe.remove()
+      return {
+        colour: getComputedStyle(document.querySelector('.sb-content')!, '::highlight(sb-search)').backgroundColor,
+        token,
+        visible: box.top >= 0 && box.bottom <= window.innerHeight && box.width > 0,
+      }
+    })
+    expect(mark.colour).toBe(mark.token)
+    expect(mark.colour).not.toBe('rgba(0, 0, 0, 0)')
+    expect(mark.visible).toBe(true)
+
+    // Escape clears the marks for good: a reload shows the section from its heading, as its address says.
+    await page.keyboard.press('Escape')
+    expect(await marked(page)).toEqual([])
+    await page.reload()
+    await expect(page.locator('html[data-shabd="ready"]')).toBeAttached()
+    await expect(heading).toBeInViewport()
+    expect(await marked(page)).toEqual([])
+
+    // A click on a result does what Enter does. Left alone, the marks are still there after a reload.
+    await findWombats(page, 'click')
+    await expect(page).toHaveURL(address)
+    await expect.poll(() => marked(page)).toEqual(['wombats'])
+    await page.reload()
+    await expect(page.locator('html[data-shabd="ready"]')).toBeAttached()
+    await expect.poll(() => marked(page)).toEqual(['wombats'])
+    await expect(sentence).toBeInViewport()
+    await expect(heading).not.toBeInViewport()
+
+    // They go with the next navigation, and coming back does not bring them again.
+    await page.locator('.sb-region-sidebar').getByRole('link', { name: 'Introduction' }).click()
+    await expect(page).toHaveURL(`${BUILT}/guide/intro`)
+    expect(await marked(page)).toEqual([])
+    await page.goBack()
+    await expect(page).toHaveURL(address)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('A long read')
+    expect(await marked(page)).toEqual([])
+    expect(problems).toEqual([])
+  })
+
+  test('a browser without the Custom Highlight API goes to the passage and marks nothing', async ({ page }) => {
+    await page.addInitScript(() => {
+      delete (window as { Highlight?: unknown }).Highlight
+    })
+    await open(page, `${BUILT}/guide/intro`)
+    expect(await page.evaluate(() => typeof Highlight)).toBe('undefined')
+
+    await findWombats(page, 'Enter')
+    await expect(page).toHaveURL(`${BUILT}/guide/long-read#the-keepers-log`)
+    await expect(page.getByText('three wombats were found asleep in the coal store')).toBeInViewport()
+    await expect(page.locator('#the-keepers-log')).not.toBeInViewport()
+    expect(await marked(page)).toEqual([])
+  })
+
+  test('where the passage is taller than the window, the first marked word is brought into view', async ({ page }) => {
+    // The word is some seven lines into its passage. In a window this short, the start of the passage alone would hide it.
+    await page.setViewportSize({ width: 1280, height: 230 })
+    await open(page, `${BUILT}/guide/intro`)
+    await findWombats(page, 'Enter')
+    await expect.poll(() => marked(page)).toEqual(['wombats'])
+
+    const seen = await page.evaluate(() => {
+      const [range] = CSS.highlights.get('sb-search')!
+      const box = (range as Range).getBoundingClientRect()
+      const header = Number.parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop)
+      return box.top >= header && box.bottom <= window.innerHeight
+    })
+    expect(seen).toBe(true)
+  })
+
+  test('a result in a short section leads to its heading, with the words marked under it', async ({ page }) => {
+    await open(page, `${BUILT}/guide/intro`)
+    await page.locator('.sb-search-button').click()
+    const dialog = page.locator('dialog.sb-search')
+    await dialog.getByRole('combobox').fill('pelicans')
+    await expect(dialog.locator('.sb-search-hit')).toHaveCount(1)
+    await dialog.getByRole('combobox').press('Enter')
+
+    await expect(page).toHaveURL(`${BUILT}/guide/setup#second-step`)
+    await expect(page.locator('#second-step')).toBeInViewport()
+    await expect.poll(() => marked(page)).toEqual(['Pelicans'])
+
+    // A link to another heading of the same page is a navigation too: the marks go.
+    await page.locator('.sb-toc').getByRole('link', { name: 'First step' }).click()
+    await expect(page).toHaveURL(`${BUILT}/guide/setup#first-step`)
+    await expect.poll(() => marked(page)).toEqual([])
   })
 })
 
@@ -225,8 +429,10 @@ test.describe('components', () => {
     await expect(html).toHaveAttribute('data-palette', 'forest')
     await expect(menu).toHaveAttribute('aria-expanded', 'false')
     expect(await token('--sb-accent')).toBe('#1f6f43')
+    // The colours of code under a preset are in a stylesheet that is fetched as the menu opens (code-themes.spec.ts),
+    // so they arrive a moment after the palette does.
+    await expect.poll(ink).not.toBe(own)
     const forest = await ink()
-    expect(forest).not.toBe(own)
 
     // The palette has a dark form of its own, and so does its syntax theme.
     await page.locator('.sb-theme-toggle').click()
@@ -289,8 +495,8 @@ test.describe('sandboxes', () => {
     await button.click()
     await button.click()
 
-    const editor = sandbox.locator('.sb-sandbox-editor')
-    const code = await editor.inputValue()
+    const editor = snippetEditor(sandbox)
+    const code = await editorText(editor)
     await editor.fill(code.replace('Clicked {count} times', 'Pressed {count} times'))
     await expect(button).toHaveText('Pressed 2 times')
 
@@ -412,5 +618,137 @@ test.describe('for agents', () => {
     })
     const body = (await mcp.json()) as { result: { content: { text: string }[] } }
     expect(body.result.content[0]?.text).toContain('path: /guide/setup#second-step')
+  })
+
+  test('a page offers itself as Markdown: to copy, to open and to hand to an assistant', async ({ page, context, browserName }) => {
+    await open(page, `${BUILT}/guide/setup`)
+    const actions = page.locator('.sb-page-actions')
+    await expect(actions.getByRole('link', { name: 'View as Markdown' })).toHaveAttribute('href', '/guide/setup.md')
+    // An assistant is given the address the site is deployed at, since that is where it can fetch the page.
+    const claude = (await actions.getByRole('link', { name: 'Open in Claude' }).getAttribute('href')) ?? ''
+    expect(claude).toMatch(/^https:\/\/claude\.ai\/new\?q=/)
+    expect(decodeURIComponent(claude)).toContain('Read https://fixture.test/guide/setup.md so that')
+
+    if (browserName === 'chromium') {
+      // Clipboard permissions can only be granted to Chromium.
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'])
+      await actions.getByRole('button', { name: 'Copy page' }).click()
+      await expect(actions.getByRole('button')).toContainText('Copied')
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/^# Setting up\n\nThis page has no frontmatter/)
+    }
+
+    // The home page is a splash page: its layout has no such row.
+    await open(page, `${BUILT}/`)
+    await expect(page.locator('.sb-page-actions')).toHaveCount(0)
+  })
+})
+
+test.describe('redirects', () => {
+  test('an address that has moved leads to the new one, with and without JavaScript', async ({ page, browser }) => {
+    await page.goto(`${BUILT}/guide/start`)
+    await expect(page).toHaveURL(`${BUILT}/guide/intro`)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Introduction')
+
+    await page.goto(`${BUILT}/old-setup`)
+    await expect(page).toHaveURL(`${BUILT}/guide/setup#second-step`)
+    await expect(page.locator('#second-step')).toBeInViewport()
+
+    const context = await browser.newContext({ javaScriptEnabled: false })
+    const plain = await context.newPage()
+    await plain.goto(`${BUILT}/guide/start`)
+    await expect(plain).toHaveURL(`${BUILT}/guide/intro`)
+    await context.close()
+  })
+
+  test('the page at the old address says where it went and is kept out of search engines', async ({ request }) => {
+    const html = await (await request.get(`${BUILT}/guide/start`)).text()
+    expect(html).toContain('<link rel="canonical" href="https://fixture.test/guide/intro">')
+    expect(html).toContain('<meta name="robots" content="noindex">')
+    // Only pages are listed for search engines and for agents.
+    expect(await (await request.get(`${BUILT}/sitemap.xml`)).text()).not.toContain('/guide/start')
+    expect(await (await request.get(`${BUILT}/llms.txt`)).text()).not.toContain('/guide/start')
+  })
+})
+
+test.describe('the document', () => {
+  test('carries the tags from site.head', async ({ request }) => {
+    const html = await (await request.get(`${BUILT}/guide/intro`)).text()
+    expect(html).toContain('<meta name="fixture-head" content="written by site.head">')
+  })
+})
+
+test.describe('the feed', () => {
+  test('lists the pages that have a day, and every page says where it is', async ({ page, request }) => {
+    const feed = await request.get(`${BUILT}/rss.xml`)
+    expect(feed.ok()).toBe(true)
+    const xml = await feed.text()
+    expect(xml).toContain('<link>https://fixture.test/extras/alpha</link>')
+    expect(xml).toContain('<pubDate>Tue, 03 Feb 2026 00:00:00 GMT</pubDate>')
+    // A page with no day has no place in a feed.
+    expect(xml).not.toContain('/guide/intro')
+
+    const html = await (await request.get(`${BUILT}/guide/intro`)).text()
+    expect(html).toContain('<link rel="alternate" type="application/rss+xml" title="Fixture" href="/rss.xml">')
+
+    // The browser's own XML parser takes it as it is.
+    await page.goto(`${BUILT}/guide/intro`)
+    const parsed = await page.evaluate(async () => {
+      const document = new DOMParser().parseFromString(await (await fetch('/rss.xml')).text(), 'application/xml')
+      return {
+        error: document.querySelector('parsererror')?.textContent ?? null,
+        root: document.documentElement.nodeName,
+        items: document.querySelectorAll('channel > item').length,
+      }
+    })
+    expect(parsed).toEqual({ error: null, root: 'rss', items: 1 })
+  })
+})
+
+test.describe('on paper', () => {
+  test('a printed page is the page alone, in the light colours, with nothing left to scroll', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'light' })
+    await open(page, `${BUILT}/guide/hosting`)
+    const ink = () => page.evaluate(() => getComputedStyle(document.body).color)
+    const lightInk = await ink()
+
+    // The reader has the dark mode on, and the page has a banner, a header, a sidebar and an outline.
+    await page.locator('.sb-theme-toggle').click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    expect(await ink()).not.toBe(lightInk)
+    for (const region of ['banner', 'header', 'sidebar', 'aside']) await expect(page.locator(`.sb-region-${region}`)).toBeVisible()
+
+    await page.emulateMedia({ media: 'print' })
+    for (const region of ['banner', 'header', 'sidebar', 'aside']) await expect(page.locator(`.sb-region-${region}`)).toBeHidden()
+    await expect(page.locator('h1.sb-page-title')).toBeVisible()
+    await expect(page.locator('.sb-code-copy').first()).toBeHidden()
+    await expect(page.locator('.sb-pagination')).toBeHidden()
+    // Paper is white whatever the device is set to.
+    expect(await ink()).toBe(lightInk)
+
+    // A long line of code wraps instead of running off the sheet.
+    const code = page.locator('figure.sb-code pre').first()
+    expect(await code.evaluate((pre) => pre.scrollWidth <= pre.clientWidth)).toBe(true)
+    // Where a link leads is printed after it.
+    const after = await page
+      .getByRole('link', { name: 'this list' })
+      .evaluate((link) => getComputedStyle(link, '::after').content)
+    expect(after).toContain('https://example.com/hosts')
+  })
+})
+
+test.describe('for search engines', () => {
+  test('robots.txt names the sitemap, and a page that says noindex is left out of it', async ({ request }) => {
+    const text = (path: string) => request.get(`${BUILT}${path}`).then((response) => response.text())
+    expect(await text('/robots.txt')).toBe('User-agent: *\nAllow: /\n\nSitemap: https://fixture.test/sitemap.xml\n')
+
+    const sitemap = await text('/sitemap.xml')
+    expect(sitemap).toContain('<loc>https://fixture.test/extras/alpha</loc>')
+    expect(sitemap).not.toContain('/extras/beta')
+
+    const noindex = '<meta name="robots" content="noindex">'
+    expect(await text('/extras/beta')).toContain(noindex)
+    expect(await text('/extras/alpha')).not.toContain(noindex)
+    // The page that answers for an address that does not exist is not one to list.
+    expect(await text('/no/such/page')).toContain(noindex)
   })
 })

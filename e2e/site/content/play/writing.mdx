@@ -1,0 +1,53 @@
+---
+title: Writing components
+description: Steps, a file tree, an accordion, tabs that follow each other and a marked code sample.
+---
+
+<Steps>
+
+1. Create the site.
+2. Write a page.
+
+   A second paragraph of the same step.
+
+3. Build it.
+
+</Steps>
+
+<FileTree>
+
+- shabd.config.yaml
+- content/
+  - index.md
+  - **guide.md** *the page this is about*
+
+</FileTree>
+
+<Accordion title="Is it folded away at first?">
+
+Yes, until it is opened. Kangaroos are mentioned here and nowhere else.
+
+</Accordion>
+
+<Tabs syncKey="manager">
+  <Tab label="npm">Use npm here.</Tab>
+  <Tab label="pnpm">Use pnpm here.</Tab>
+</Tabs>
+
+Some text between the two sets.
+
+<Tabs syncKey="manager">
+  <Tab label="npm">And npm there.</Tab>
+  <Tab label="pnpm">And pnpm there.</Tab>
+  <Tab label="yarn">And yarn there.</Tab>
+</Tabs>
+
+<Tabs>
+  <Tab label="npm">A set that follows nobody.</Tab>
+  <Tab label="pnpm">Still nobody.</Tab>
+</Tabs>
+
+```ts ins={2} del={1}
+const answer = 41
+const answer = 42
+```

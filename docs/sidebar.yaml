@@ -15,6 +15,8 @@
   items:
     - guide/introduction
     - guide/installation
+    - file: guide/importing
+      badge: New
     - guide/project-structure
     - folder: Writing content
       collapsed: false
@@ -23,6 +25,7 @@
         - file: guide/writing/components
           label: Components in MDX
           badge: MDX
+    - guide/deploying
 
 - category: Configuration
   items:
@@ -41,6 +44,14 @@
       badge: Beta
     - file: features/sandbox
       badge: { text: Beta, variant: caution }
+    - features/feed
+    - features/social-images
+    - file: features/openapi
+      badge: New
+    - file: features/offline
+      badge: New
+    - file: features/versions
+      badge: New
 
 - link: https://github.com/hi-manshu/shabd
   label: GitHub

@@ -1,4 +1,6 @@
+import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -8,6 +10,7 @@ import { BUILTIN_LAYOUT_DEFINITIONS, resolveLayouts, resolvePageLayout } from '.
 import { FrontmatterSchema, type FrontmatterInput } from '../src/shared/schema.js'
 import { VERSION } from '../src/shared/version.js'
 import { packageName } from '../src/node/paths.js'
+import { WORK } from './helpers/build.js'
 // @ts-expect-error A plain script: it has no types of its own.
 import { PACKAGES, aliasNote, renamed } from '../../../scripts/release/publish.mjs'
 // @ts-expect-error A plain script: it has no types of its own.
@@ -89,6 +92,91 @@ describe('package', () => {
     for (const file of ['README.md', '../create-shabd/README.md']) {
       expect(read(file), file).not.toMatch(/not on npm|not published|until (they|it) (are|is) published/i)
       expect(read(file), file).not.toMatch(/\]\(\.{1,2}\//)
+    }
+  })
+
+  it('gives a site declarations for the client, so that its own type check does not read Shabd\'s source', async () => {
+    // The browser code is published as source, which the site's build compiles. Its types are published as
+    // declarations: a type check that followed the source would hold it to the site's own rules, and would
+    // stop at the modules a build generates (`virtual:shabd/...`).
+    const { exports, scripts } = JSON.parse(read('package.json')) as { exports: Record<string, unknown>; scripts: Record<string, string> }
+    expect(exports['./client']).toEqual({ types: './dist/client/index.d.ts', default: './src/client/index.ts' })
+    expect(scripts.build).toContain('tsc -p tsconfig.client-types.json')
+
+    await mkdir(WORK, { recursive: true })
+    const dir = await mkdtemp(path.join(WORK, 'types-'))
+    // The compiler's own script, run by Node. What is in node_modules/.bin is a shell script, and on Windows
+    // a .cmd file beside it, which `execFile` does not start.
+    const tsc = path.join(root, '..', '..', 'node_modules', 'typescript', 'bin', 'tsc')
+    const run = (args: string[]) =>
+      new Promise<string>((resolve) =>
+        execFile(process.execPath, [tsc, ...args], { cwd: root }, (error, stdout, stderr) =>
+          // A compiler that could not be started at all has said nothing: that is not the same as nothing to say.
+          resolve(`${stdout}${stderr}`.trim() || (error ? `tsc did not run: ${error.message}` : '')),
+        ),
+      )
+    try {
+      // The declarations, written here and not read from dist/, which may be older than the source.
+      expect(await run(['-p', 'tsconfig.client-types.json', '--outDir', path.join(dir, 'declared')])).toBe('')
+      const declared = await readdir(path.join(dir, 'declared'), { recursive: true })
+      const files = declared.filter((file) => file.endsWith('.d.ts'))
+      expect(files).toContain(path.join('client', 'index.d.ts'))
+      for (const file of files) {
+        expect(await readFile(path.join(dir, 'declared', file), 'utf8'), file).not.toMatch(/from 'virtual:|import\('virtual:/)
+      }
+
+      // A component as a site writes one, checked more strictly than Shabd checks itself and with nothing
+      // of Vite's in scope. It passes on the declarations alone.
+      await writeFile(
+        path.join(dir, 'Note.tsx'),
+        [
+          `import { Badge, Link, useHref, usePage, useSidebar, useSite, type Frontmatter, type SidebarNode } from '@himanshoe/shabd/client'`,
+          '',
+          'export function Note() {',
+          '  const { site, features } = useSite()',
+          '  const { title, frontmatter, toc } = usePage()',
+          '  const href = useHref()',
+          '  const sidebar: SidebarNode[] = useSidebar()',
+          `  const layout: Frontmatter['layout'] = frontmatter.layout`,
+          '  return (',
+          '    <p>',
+          '      <Badge text="New" variant="success" />',
+          `      <Link href={href('/')}>{site.title}: {title}</Link>`,
+          '      {layout} {toc.length} {sidebar.length} {String(features.search.enabled)}',
+          '    </p>',
+          '  )',
+          '}',
+          '',
+        ].join('\n'),
+      )
+      await writeFile(
+        path.join(dir, 'tsconfig.json'),
+        JSON.stringify({
+          compilerOptions: {
+            target: 'es2022',
+            module: 'esnext',
+            moduleResolution: 'bundler',
+            jsx: 'react-jsx',
+            lib: ['es2023', 'dom'],
+            types: [],
+            strict: true,
+            exactOptionalPropertyTypes: true,
+            noUncheckedIndexedAccess: true,
+            noPropertyAccessFromIndexSignature: true,
+            skipLibCheck: false,
+            noEmit: true,
+            paths: { '@himanshoe/shabd/client': ['./declared/client/index.d.ts'] },
+          },
+          include: ['Note.tsx'],
+        }),
+      )
+      expect(await run(['-p', path.join(dir, 'tsconfig.json')])).toBe('')
+
+      // The same check is not empty when something is wrong, so an empty one means what it seems to.
+      await writeFile(path.join(dir, 'Note.tsx'), `import { useSite } from '@himanshoe/shabd/client'\nexport const title: number = useSite().site.title\n`)
+      expect(await run(['-p', path.join(dir, 'tsconfig.json')])).toContain(`Type 'string' is not assignable to type 'number'`)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
     }
   })
 
@@ -186,6 +274,15 @@ describe('layouts', () => {
       'social',
       'theme-toggle',
     ])
+  })
+
+  it('offers a page as Markdown only on a site that writes the Markdown copies', () => {
+    const main = (features: string) => {
+      const { config } = resolveConfig('/site', '/site/shabd.config.yaml', `site:\n  title: Docs\n${features}`)
+      return blocksOf(resolvePageLayout({ ...site, site: config.site, features: config.features }, page({}), toc).regions.main)
+    }
+    expect(main('')).toEqual(['breadcrumbs', 'page-header', 'page-actions', 'content', 'page-footer', 'pagination'])
+    expect(main('features:\n  llms: false\n')).not.toContain('page-actions')
   })
 
   it('applies page switches on top of the layout', () => {

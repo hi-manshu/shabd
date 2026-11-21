@@ -1,0 +1,14 @@
+{
+  // Declarations for `@himanshoe/shabd/client`, which is published as source. A site's own type check
+  // reads these and stops there: it has no reason to check Shabd's source by the site's rules, and it
+  // could not follow that source into the modules the build generates (`virtual:shabd/...`).
+  "extends": "./tsconfig.client.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/client/index.ts", "src/client/virtual.d.ts"]
+}

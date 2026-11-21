@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { PageLayout } from '../layout/PageLayout.js'
-import { RouterProvider } from './router.js'
+import { RouterProvider } from './RouterProvider.js'
 import { useSite } from './store.js'
 import type { LoadedPage } from './types.js'
 import { useUi } from './ui.js'

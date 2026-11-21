@@ -26,6 +26,105 @@ A file ending in `.mdx` can use components alongside Markdown. The built-in ones
   </Tab>
 </Tabs>
 
+Give sets of tabs the same `syncKey` and they follow each other: choosing "pnpm" in one chooses it in every set
+with that key, on this page and on the next, and the browser keeps the choice for the next visit. A set without a
+tab of that label stays as it is.
+
+```mdx
+<Tabs syncKey="package-manager">
+  <Tab label="npm">…</Tab>
+  <Tab label="pnpm">…</Tab>
+</Tabs>
+```
+
+With the keyboard, the left and right arrows move between the tabs of a set and round its ends, Home and End go
+to the first and the last, and Tab goes from a tab into what it shows.
+
+On paper every tab of a set is printed, each under its label.
+
+## Steps
+
+Wrap an ordered list in `<Steps>` to draw it as a procedure. It is still a list, so a step can hold paragraphs and
+code.
+
+````mdx
+<Steps>
+
+1. Create the site.
+
+   ```sh
+   npm create @himanshoe/shabd@latest my-docs
+   ```
+
+2. Start the dev server.
+3. Edit a page and watch it change.
+
+</Steps>
+````
+
+<Steps>
+
+1. Create the site.
+
+   ```sh
+   npm create @himanshoe/shabd@latest my-docs
+   ```
+
+2. Start the dev server.
+3. Edit a page and watch it change.
+
+</Steps>
+
+## File tree
+
+Wrap a list in `<FileTree>` to draw it as a folder. An entry with a list inside it is a folder; everything else is
+a file. Bold marks the entry the text is about, and italics are a note beside a name.
+
+```mdx
+<FileTree>
+
+- shabd.config.yaml
+- sidebar.yaml *optional*
+- content/
+  - index.mdx
+  - guide/
+    - **installation.md**
+
+</FileTree>
+```
+
+<FileTree>
+
+- shabd.config.yaml
+- sidebar.yaml *optional*
+- content/
+  - index.mdx
+  - guide/
+    - **installation.md**
+
+</FileTree>
+
+## Accordion
+
+`<Accordion>` folds content away until the reader asks for it. Add `open` to start it unfolded.
+
+```mdx
+<Accordion title="Does the folded text still count for search?">
+  Yes. It is in the page whether it is open or not.
+</Accordion>
+```
+
+<Accordion title="Does the folded text still count for search?">
+  Yes. It is in the page whether it is open or not, so the site's search finds it, the browser's own find-in-page
+  opens it, and it is in the Markdown copy.
+</Accordion>
+
+<Accordion title="Does it need JavaScript?">
+  No. It is the browser's own `<details>` element.
+</Accordion>
+
+A closed accordion is not printed.
+
 ## Cards
 
 <CardGrid>

@@ -28,12 +28,16 @@ import { VFile } from 'vfile'
 import type { PageSection, TocEntry } from '../../shared/types.js'
 import { ShabdError } from '../config/errors.js'
 import { cacheKey, SlotCache } from './cache.js'
-import { initPageData } from './page-data.js'
+import { initPageData, type PageData } from './page-data.js'
 import { CodeHighlighter, rehypeCode, type CodeOptions } from './plugins/rehype-code.js'
 import { rehypeHeadings } from './plugins/rehype-headings.js'
+import { rehypeHtml } from './plugins/rehype-html.js'
 import { rehypeLinks } from './plugins/rehype-links.js'
+import { rehypeSplit } from './plugins/rehype-split.js'
 import { remarkCallouts } from './plugins/remark-callouts.js'
+import { remarkHtml } from './plugins/remark-html.js'
 import { remarkLiftTitle } from './plugins/remark-lift-title.js'
+import type { UserPlugins } from './user-plugins.js'
 
 /** Compiled pages import their component map from here. Resolved by the Vite plugin. */
 export const MDX_COMPONENTS_ID = 'virtual:shabd/mdx-components'
@@ -43,6 +47,8 @@ export interface CompilerOptions extends CodeOptions {
   fingerprint: string
   /** Directory for the on-disk cache. Omit to cache in memory only. */
   cacheDir?: string | undefined
+  /** The site's own plugins, and those an option brings. They run after Shabd's. */
+  plugins?: Pick<UserPlugins, 'remark' | 'rehype' | 'rehypeBeforeCode'> | undefined
 }
 
 export interface CompileInput {
@@ -58,6 +64,8 @@ export interface CompileInput {
   hash?: string | undefined
   /** Use a leading `# heading` as the title and remove it from the body. */
   liftTitle?: boolean | undefined
+  /** Set code beside prose, as the page's layout asks (`split: true`). */
+  split?: boolean | undefined
 }
 
 export interface CompiledPage {
@@ -69,10 +77,24 @@ export interface CompiledPage {
   sections: PageSection[]
   /** Route paths this page links to. */
   links: string[]
+  /** The line each of `links` is written on, in the same order. Zero where it is not known. */
+  linkLines: number[]
+  /** Links to other sites, and pictures with no alternative text: what `shabd check` asks about. */
+  external: PageData['external']
+  unlabelled: PageData['unlabelled']
+  /** Tags in a `.md` page that are written like components. */
+  strays: PageData['strays']
+  /** The page's live snippets, which `shabd check` tries. */
+  snippets: PageData['snippets']
   /** Heading ids on this page. */
   anchors: string[]
-  /** The colours of the page's code tokens, as a stylesheet. The page module exports it. */
+  /** The colours of the page's code tokens in the site's own syntax themes, as a stylesheet. The page module exports it. */
   codeCss: string
+  /**
+   * The same tokens under every syntax theme the theme menu can reach. A
+   * build gathers these from every page into one stylesheet for the site.
+   */
+  codeColours: Record<string, string[]>
 }
 
 export interface CompileResult extends CompiledPage {
@@ -107,16 +129,23 @@ export class MarkdownCompiler {
     this.highlighter.forget()
   }
 
+  /** Where a page is kept in the cache, and what it was compiled from and with. */
+  #place(input: CompileInput): { slot: string; key: string } {
+    return {
+      slot: input.id ?? input.file,
+      key: cacheKey(this.options.fingerprint, input.format, input.routePath, input.liftTitle, input.split === true, input.hash ?? input.source),
+    }
+  }
+
+  /** Is the page compiled already, as it is now and as the site is set up now? */
+  async has(input: CompileInput): Promise<boolean> {
+    const { slot, key } = this.#place(input)
+    return (await this.cache.get(slot, key)) !== undefined
+  }
+
   async compile(input: CompileInput): Promise<CompileResult> {
     const started = performance.now()
-    const slot = input.id ?? input.file
-    const key = cacheKey(
-      this.options.fingerprint,
-      input.format,
-      input.routePath,
-      input.liftTitle,
-      input.hash ?? input.source,
-    )
+    const { slot, key } = this.#place(input)
 
     const cached = await this.cache.get(slot, key)
     if (cached) return { ...cached, cached: true, ms: performance.now() - started }
@@ -139,12 +168,24 @@ export class MarkdownCompiler {
       liftTitle: input.liftTitle ?? false,
       routePath: input.routePath,
       id: input.id,
+      split: input.split,
     })
 
     try {
       await this.#processor(input.format).process(file)
     } catch (error) {
       throw toShabdError(error, input)
+    }
+    // KaTeX does not stop at maths it cannot read: it leaves the source on the page in red and says so
+    // in a message. A mistake in a page is reported where it is, like any other.
+    const maths = file.messages.find((message) => message.source === 'rehype-katex')
+    if (maths) {
+      const why = (maths.cause as Error | undefined)?.message?.replace(/^KaTeX parse error: /, '') ?? maths.reason
+      throw new ShabdError(
+        input.file,
+        [{ path: [], message: `This maths could not be typeset. ${why}`, ...(maths.line ? { line: maths.line, column: maths.column ?? 1 } : {}) }],
+        input.source,
+      )
     }
 
     return {
@@ -153,20 +194,46 @@ export class MarkdownCompiler {
       toc: data.toc,
       sections: data.sections,
       links: data.links,
+      linkLines: data.linkLines,
+      external: data.external,
+      unlabelled: data.unlabelled,
+      strays: data.strays,
+      snippets: data.snippets,
       anchors: data.anchors,
       codeCss: data.codeCss,
+      codeColours: data.codeColours,
     }
   }
 
   #processor(format: 'md' | 'mdx'): Processor {
     let processor = this.#processors.get(format)
     if (!processor) {
+      const user = this.options.plugins
+      // HTML written in a .md page is text to the MDX compiler, which would leave it out of the page
+      // without a word. It is read as HTML here, before anything else looks at the page, so that a
+      // heading written as a tag gets its id and a link written as one is rewritten like any other.
+      // An .mdx page has none of it to read: there a tag is JSX from the start.
+      const html = format === 'md' ? { remark: [remarkHtml], rehype: [rehypeHtml] } : { remark: [], rehype: [] }
       processor = createProcessor({
         format,
         jsxImportSource: 'react',
         providerImportSource: MDX_COMPONENTS_ID,
-        remarkPlugins: [remarkFrontmatter, remarkGfm, remarkLiftTitle, remarkCallouts],
-        rehypePlugins: [rehypeHeadings, rehypeLinks, [rehypeCode, this.highlighter], rehypeMdxImportMedia],
+        // The site's plugins are loaded by name, so all that is known of one is that it is a function.
+        remarkPlugins: [remarkFrontmatter, remarkGfm, remarkLiftTitle, remarkCallouts, ...html.remark, ...(user?.remark ?? [])] as NonNullable<
+          Parameters<typeof createProcessor>[0]
+        >['remarkPlugins'],
+        rehypePlugins: [
+          ...html.rehype,
+          // First, while the page is still as its author wrote it: the outline, what is searched, the links.
+          rehypeHeadings,
+          rehypeLinks,
+          ...(user?.rehypeBeforeCode ?? []),
+          [rehypeCode, this.highlighter],
+          ...(user?.rehype ?? []),
+          // Last of all, once every piece of the page is what it will be: this one only moves them.
+          rehypeSplit,
+          rehypeMdxImportMedia,
+        ] as NonNullable<Parameters<typeof createProcessor>[0]>['rehypePlugins'],
       })
       this.#processors.set(format, processor)
     }

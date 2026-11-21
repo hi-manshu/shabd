@@ -41,6 +41,8 @@ export interface CodeOptions {
   lineNumbers?: boolean
   /** Turn ```` ```tsx live ```` fences into <Sandbox> components. */
   sandbox: boolean
+  /** Turn ```` ```mermaid ```` fences into <Mermaid> components, which draw the diagram in the browser. */
+  mermaid?: boolean
 }
 
 const PLAIN_LANGUAGES = new Set(['', 'text', 'txt', 'plain', 'plaintext'])
@@ -54,6 +56,8 @@ interface Block {
   lang: string
   meta: CodeMeta
   rawMeta: string
+  /** The line the fence opens on. */
+  line: number | undefined
 }
 
 /** A highlighter plus a memo of blocks it has already rendered. Create one per site and reuse it. */
@@ -137,22 +141,38 @@ export class CodeHighlighter {
   }
 
   /**
-   * The stylesheet for a page that uses these token classes. Each class sets
-   * `--sb-tok`, which the theme's stylesheet reads as the token's colour:
-   * first for the site's light theme, then for its dark one, then for each
-   * theme a preset from the menu brings (`data-code` on the root element
-   * says which). The rules are nested to state each condition once.
+   * The stylesheet for a page that uses these token classes, in the site's
+   * own two syntax themes. Each class sets `--sb-tok`, which the theme's
+   * stylesheet reads as the token's colour: first for the light theme, then
+   * for the dark one. The rules are nested to state each condition once.
+   *
+   * This is what every page carries. The colours under the themes a preset
+   * from the menu brings are in `coloursFor`: only a reader who picks a
+   * preset needs them, and a page that carried them for every reader was
+   * many times the size.
+   *
+   * Only the light theme's colours apply off the screen. A printed page is
+   * white, whatever colour mode and preset the reader has on.
    */
   cssFor(classes: Iterable<string>): string {
     const names = [...new Set(classes)].filter((name) => this.#colours.has(name)).sort()
     if (names.length === 0) return ''
     const rules = (index: number) => names.map((name) => `.${name}{--sb-tok:${this.#colours.get(name)![index]}}`).join('')
     const dark = rules(1)
-    let css = `${rules(0)}[data-theme=dark]{${dark}}`
     // Without JavaScript nothing sets data-theme, and the page follows the device.
-    css += `@media (prefers-color-scheme:dark){:root:not([data-theme]){${dark}}}`
-    if (this.keys.length > 2) this.keys.forEach((key, index) => (css += `:root[data-code=${key}]{${rules(index)}}`))
-    return css
+    return `${rules(0)}@media screen{[data-theme=dark]{${dark}}}@media screen and (prefers-color-scheme:dark){:root:not([data-theme]){${dark}}}`
+  }
+
+  /**
+   * The colour of each of these token classes under every syntax theme of
+   * the plan, in the order of `keys`: what `themedCodeCss` writes a
+   * stylesheet from. Empty on a site with no theme menu, whose two themes
+   * are already in `cssFor`.
+   */
+  coloursFor(classes: Iterable<string>): Record<string, string[]> {
+    if (this.keys.length <= 2) return {}
+    const names = [...new Set(classes)].filter((name) => this.#colours.has(name)).sort()
+    return Object.fromEntries(names.map((name) => [name, this.#colours.get(name)!]))
   }
 
   /** Load the highlighter ahead of the first page, off the critical path. */
@@ -168,6 +188,8 @@ export class CodeHighlighter {
     const highlighter = await this.#get()
     const lang = await this.#language(highlighter, block.lang)
     const highlighted = new Set(block.meta.highlight)
+    const inserted = new Set(block.meta.inserted)
+    const deleted = new Set(block.meta.deleted)
     const { flags } = block.meta
     const numbered = flags.has('showLineNumbers') || (this.options.lineNumbers === true && !flags.has('noLineNumbers'))
     const wrapped = flags.has('wrap') || (this.options.wrap === true && !flags.has('noWrap'))
@@ -187,6 +209,10 @@ export class CodeHighlighter {
           name: 'shabd',
           line(node, line) {
             if (highlighted.has(line)) this.addClassToHast(node, 'sb-line-highlight')
+            // A line that was added or removed is marked at its edge and with a sign. Nothing is laid behind
+            // its text, so the colours of its tokens are still drawn on what they were made readable on.
+            if (inserted.has(line)) this.addClassToHast(node, 'sb-line-ins')
+            else if (deleted.has(line)) this.addClassToHast(node, 'sb-line-del')
           },
           // Shiki writes a token's colour in each theme as inline variables. Swap them for a class.
           // A token in the themes' own foreground is marked plain instead, so that a site's theme
@@ -231,7 +257,9 @@ export class CodeHighlighter {
   }
 
   async #language(highlighter: Highlighter, lang: string): Promise<string> {
-    if (PLAIN_LANGUAGES.has(lang) || !(lang in bundledLanguages)) return 'text'
+    // Its own names only. `in` is also true of what every object has, and a fence that says `constructor`
+    // would have Shiki load that as a grammar: no language loads after it, on this page or any other.
+    if (PLAIN_LANGUAGES.has(lang) || !Object.hasOwn(bundledLanguages, lang)) return 'text'
     if (!highlighter.getLoadedLanguages().includes(lang)) {
       await highlighter.loadLanguage(lang as BundledLanguage)
     }
@@ -262,6 +290,7 @@ export function rehypeCode(highlighter: CodeHighlighter) {
         lang,
         meta: parseCodeMeta(rawMeta),
         rawMeta,
+        line: node.position?.start.line,
       })
       return SKIP
     })
@@ -272,6 +301,16 @@ export function rehypeCode(highlighter: CodeHighlighter) {
         const live = highlighter.options.sandbox && block.meta.flags.has('live') && SANDBOX_LANGUAGES.has(block.lang)
         if (live) {
           block.parent.children[block.index] = sandboxElement(block)
+          pageData(file).snippets.push({
+            code: block.code,
+            ...(block.line ? { line: block.line } : {}),
+            ...(block.meta.flags.has('isolated') ? { isolated: true } : {}),
+          })
+          return
+        }
+        if (highlighter.options.mermaid && block.lang === 'mermaid') {
+          // A diagram, resolved from the MDX component map like a sandbox. It carries its source, and is drawn in the browser.
+          block.parent.children[block.index] = { type: 'element', tagName: 'Mermaid', properties: { code: block.code }, children: [] }
           return
         }
         const pre = await highlighter.highlight(block)
@@ -286,7 +325,24 @@ export function rehypeCode(highlighter: CodeHighlighter) {
     )
     // The page carries the colours of exactly the tokens it shows.
     pageData(file).codeCss = highlighter.cssFor(classes)
+    pageData(file).codeColours = highlighter.coloursFor(classes)
   }
+}
+
+/**
+ * The colours of code under each syntax theme a reader can reach from the
+ * theme menu, as a stylesheet. `data-code` on the root element says which
+ * theme applies, and a rule here outranks the page's own for the same token.
+ *
+ * `keys` are the plan's themes in order, and `colours` holds, for each token
+ * class, its colour under each of them. A build writes this once for the
+ * whole site; the dev server puts it in each page.
+ */
+export function themedCodeCss(keys: readonly string[], colours: Record<string, string[]>): string {
+  const names = Object.keys(colours).sort()
+  if (keys.length <= 2 || names.length === 0) return ''
+  const rules = (index: number) => names.map((name) => `.${name}{--sb-tok:${colours[name]![index]}}`).join('')
+  return `@media screen{${keys.map((key, index) => `:root[data-code=${key}]{${rules(index)}}`).join('')}}`
 }
 
 /** A `live` fence becomes a <Sandbox>, resolved from the MDX component map. */
@@ -299,6 +355,8 @@ function sandboxElement(block: Block): Element {
       lang: block.lang,
       ...(block.meta.title ? { title: block.meta.title } : {}),
       ...(block.meta.attrs.group ? { group: block.meta.attrs.group } : {}),
+      // `isolated`: the snippet runs in a frame of its own, which can reach nothing of the page.
+      ...(block.meta.flags.has('isolated') ? { isolated: true } : {}),
     },
     children: [],
   }

@@ -15,8 +15,10 @@
  *     to one canonical shape here, so the rest of the codebase handles one form.
  */
 import { z } from 'zod'
+import { ADAPTERS } from './adapters.js'
 import { BADGE_VARIANTS, normalizeBadge, type Badge, type BadgeVariant } from './badge.js'
 import { REGIONS } from './blocks.js'
+import { URL_STYLES } from './paths.js'
 import {
   CODE_FRAMES,
   COLOR_TOKENS,
@@ -147,6 +149,56 @@ const NavItemSchema = z.strictObject({
   badge: BadgeSchema.optional(),
 })
 
+export type NavItem = z.output<typeof NavItemSchema>
+
+export const HEAD_TAGS = ['meta', 'link', 'script', 'style', 'noscript'] as const
+
+/** Elements that have no closing tag, and so no content. */
+const VOID_HEAD_TAGS: ReadonlySet<string> = new Set(['meta', 'link'])
+
+/**
+ * One tag for the `<head>` of every page: an analytics script, a
+ * verification tag, a preconnect.
+ *
+ *   - { tag: meta, attrs: { name: google-site-verification, content: abc123 } }
+ *   - { tag: script, attrs: { src: https://example.com/a.js, defer: true } }
+ *   - { tag: script, content: "window.plausible = window.plausible || []" }
+ */
+const HeadTagSchema = z
+  .strictObject({
+    tag: z.enum(HEAD_TAGS),
+    /** `true` writes the attribute with no value, `false` leaves it out. */
+    attrs: z
+      .record(
+        z.string().regex(/^[A-Za-z_:][A-Za-z0-9_:.-]*$/, { error: 'An attribute name is letters, digits, "-", "_", ":" and "."' }),
+        z.union([z.string(), z.number(), z.boolean()]),
+      )
+      .default({}),
+    /** What goes between the opening and the closing tag. */
+    content: z.string().optional(),
+  })
+  .check((ctx) => {
+    const { tag, content } = ctx.value
+    if (content === undefined) return
+    if (VOID_HEAD_TAGS.has(tag)) {
+      ctx.issues.push({
+        code: 'custom',
+        path: ['content'],
+        message: `<${tag}> has no content. Write its values under \`attrs\``,
+        input: content,
+      })
+    } else if (content.toLowerCase().includes(`</${tag}`)) {
+      // The content is written into the page as it is, so it must not be able to end its own tag.
+      ctx.issues.push({
+        code: 'custom',
+        path: ['content'],
+        message: `The content of <${tag}> must not contain "</${tag}"`,
+        input: content,
+      })
+    }
+  })
+export type HeadTag = z.output<typeof HeadTagSchema>
+
 const SiteSchema = z.strictObject({
   title: z.string().min(1),
   description: z.string().default(''),
@@ -157,14 +209,48 @@ const SiteSchema = z.strictObject({
     .string()
     .default('/')
     .transform((b) => `/${b.replace(/^\/+|\/+$/g, '')}/`.replace(/\/{2,}/g, '/')),
+  /**
+   * How a page's address is written. `clean`: `/guide/install`. `slash`:
+   * `/guide/install/`. `html`: `/guide/install.html`, written as a file of
+   * that name. Which one suits depends on the host.
+   */
+  urls: z.enum(URL_STYLES).default('clean'),
   lang: z.string().min(2).default('en'),
   logo: LogoSchema.optional(),
   favicon: z.string().optional(),
+  /**
+   * The picture other sites show when a page is shared: a path in `public/`
+   * or a full address. A page can name its own with `image` in frontmatter.
+   */
+  image: z.string().min(1).optional(),
   repo: RepoSchema.optional(),
   social: SocialSchema.default([]),
   /** Links shown in the header. */
   nav: z.array(NavItemSchema).default([]),
   footer: z.string().optional(),
+  /** Tags added to the `<head>` of every page, after Shabd's own. */
+  head: z.array(HeadTagSchema).default([]),
+  /**
+   * Ask search engines not to list any page of this site: a staging copy, a
+   * preview of a pull request. A page can ask for itself with `noindex` in
+   * its frontmatter.
+   */
+  noindex: z.boolean().default(false),
+  /**
+   * robots.txt. `false` writes none. An object lists paths crawlers should
+   * stay out of. Left out, the file is written when the site is served from
+   * the root of its host, which is the only place crawlers read it.
+   */
+  robots: z
+    .union([
+      z.boolean(),
+      z.strictObject({
+        disallow: z
+          .array(z.string().regex(/^\/\S*$/, { error: 'A path crawlers should stay out of starts with /, such as /drafts/' }))
+          .default([]),
+      }),
+    ])
+    .optional(),
 })
 
 /* ──────────────────────────────── theme ───────────────────────────────── */
@@ -203,6 +289,11 @@ const ColorsSchema = z.strictObject({
   button: modeColor.optional(),
   /** Background of the header. Defaults to `background`. A translucent colour blurs the page behind it. */
   header: modeColor.optional(),
+  /**
+   * The colour of the title, the links and the buttons in the header, for a
+   * header that is darker or lighter than the page. Defaults to `text`.
+   */
+  headerText: modeColor.optional(),
   /** Background of the sidebar. Defaults to `background`. A translucent colour blurs what is behind it. */
   sidebar: modeColor.optional(),
   /** Background of the content area, the outline beside it and the footer. See-through by default. */
@@ -387,18 +478,40 @@ const ThemeSchema = z
 
 /* ─────────────────────────────── layouts ──────────────────────────────── */
 
+/** The pages a block is shown on. Left out, it is shown on every page whose layout places it. */
+export interface BlockCondition {
+  /**
+   * Paths the page may have: `/guide/**`. `*` stands for one part of a path
+   * and `**` for any number of them. A pattern that starts with `!` takes
+   * pages away again: `['/**', '!/blog/**']`.
+   */
+  path?: string[] | undefined
+  /** Frontmatter the page must have: each key listed here must equal the page's value. */
+  frontmatter?: Record<string, unknown> | undefined
+}
+
 export interface BlockRef {
   block: string
   props: Record<string, unknown>
+  when?: BlockCondition | undefined
 }
 
-/** `- toc` or `- { block: toc, props: { title: Contents } }`. */
+const BlockConditionSchema = z.strictObject({
+  path: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
+    .optional()
+    .transform((path) => (typeof path === 'string' ? [path] : path)),
+  frontmatter: z.record(z.string(), z.unknown()).optional(),
+})
+
+/** `- toc`, or `- { block: toc, props: { title: Contents }, when: { path: /guide/** } }`. */
 const BlockRefSchema = z
   .union([
     z.string().min(1),
     z.strictObject({
       block: z.string().min(1),
       props: z.record(z.string(), z.unknown()).default({}),
+      when: BlockConditionSchema.optional(),
     }),
   ])
   .transform((ref): BlockRef => (typeof ref === 'string' ? { block: ref, props: {} } : ref))
@@ -410,6 +523,11 @@ const LayoutSchema = z.strictObject({
   extends: z.string().min(1).optional(),
   /** Width of the main column. */
   width: z.enum(LAYOUT_WIDTHS).optional(),
+  /**
+   * Set a page's code samples beside its prose, section by section, on a
+   * screen wide enough for both. The built-in `api` layout does.
+   */
+  split: z.boolean().optional(),
   regions: z.partialRecord(z.enum(REGIONS), z.array(BlockRefSchema)).default({}),
 })
 export type LayoutDefinition = z.output<typeof LayoutSchema>
@@ -446,6 +564,8 @@ const DefaultsSchema = z.strictObject({
     .refine((t) => t.minDepth <= t.maxDepth, { error: 'toc.minDepth must not be greater than toc.maxDepth' }),
   editLink: z.boolean().default(true),
   pagination: z.boolean().default(true),
+  /** Show the day each page was last changed, read from the Git history of its file. */
+  lastUpdated: z.boolean().default(false),
 })
 
 /* ─────────────────────────────── features ─────────────────────────────── */
@@ -467,6 +587,13 @@ const SearchFeatureSchema = z.strictObject({
   semantic: z.boolean().default(true),
   /** Embedding model, loaded by Transformers.js at build time and in the visitor's browser. */
   model: z.string().min(1).default('Xenova/all-MiniLM-L6-v2'),
+  /**
+   * Where the visitor's browser gets the model from. `huggingface` downloads
+   * it from the Hugging Face Hub, and the runtime that executes it from
+   * jsDelivr. `site` serves both from the site itself: the build copies them
+   * into the output, and the browser asks no other host for anything.
+   */
+  modelSource: z.enum(['huggingface', 'site']).default('huggingface'),
   maxResults: z.int().min(1).max(50).default(8),
   /** How similar a section must be to a query to count as a semantic match. Depends on the model. */
   minSimilarity: z.number().min(0).max(1).default(0.35),
@@ -484,6 +611,13 @@ const McpFeatureSchema = z.strictObject({
     .string()
     .regex(/^\/[\w\-/]*$/, { error: 'route must be an absolute path such as /mcp' })
     .default('/mcp'),
+  /**
+   * Let `search_docs` rank by meaning as well as by keyword where a Node process serves the endpoint:
+   * `shabd dev`, `shabd preview` and `shabd mcp`. It takes effect when `search.semantic` is on and
+   * `@huggingface/transformers` is installed. `false` keeps the endpoint to keywords, and that process
+   * never loads the embedding model.
+   */
+  semantic: z.boolean().default(true),
 })
 
 const LlmsFeatureSchema = z.strictObject({
@@ -498,8 +632,51 @@ const StudioFeatureSchema = z.strictObject({
   sync: z.enum(['off', 'tabs', 'peers']).default('tabs'),
 })
 
+/** `date-fns`, or `{ name: charts, file: ./components/charts.ts }` for a file of the site's own. */
+const SandboxModuleSchema = z
+  .union([z.string().min(1), z.strictObject({ name: z.string().min(1), file: z.string().min(1) })])
+  .transform((module): SandboxModule => (typeof module === 'string' ? { name: module } : module))
+
+export interface SandboxModule {
+  /** What a snippet writes after `from`. */
+  name: string
+  /** A file of the site that the name stands for. Left out, the name is a package the site has installed. */
+  file?: string | undefined
+}
+
 const SandboxFeatureSchema = z.strictObject({
   enabled: z.boolean().default(true),
+  /**
+   * What a live snippet may import, besides React and Shabd's own client:
+   * packages the site has installed, and files of its own under a name.
+   */
+  modules: z.array(SandboxModuleSchema).default([]),
+})
+
+const FeedFeatureSchema = z.strictObject({
+  enabled: z.boolean().default(false),
+  /** The feed's own title. Defaults to the site's. */
+  title: z.string().min(1).optional(),
+  /** A content folder whose pages make up the feed, such as `changelog`. Left out, every page with a day is in it. */
+  directory: z.string().min(1).optional(),
+  /** How many pages the feed holds, newest first. */
+  limit: z.int().min(1).max(500).default(20),
+})
+
+const SocialImagesFeatureSchema = z.strictObject({
+  enabled: z.boolean().default(false),
+  /**
+   * The font files the pictures are set in: TrueType or OpenType, a regular
+   * and a bold face. Left out, a font of the machine that builds is used.
+   */
+  font: z
+    .union([z.string().min(1), z.array(z.string().min(1)).min(1)])
+    .default([])
+    .transform((font) => (typeof font === 'string' ? [font] : font)),
+})
+
+const OfflineFeatureSchema = z.strictObject({
+  enabled: z.boolean().default(false),
 })
 
 const FeaturesSchema = z.strictObject({
@@ -508,6 +685,12 @@ const FeaturesSchema = z.strictObject({
   llms: feature(LlmsFeatureSchema, true),
   studio: feature(StudioFeatureSchema, true),
   sandbox: feature(SandboxFeatureSchema, true),
+  /** rss.xml: the pages that have a day, newest first. Needs `site.url`. */
+  feed: feature(FeedFeatureSchema, false),
+  /** A picture for each page, shown where the page is shared. Needs `site.url` and `@resvg/resvg-js`. */
+  socialImages: feature(SocialImagesFeatureSchema, false),
+  /** Keep the built site in the reader's browser after a first visit, so that it can be read without a connection. */
+  offline: feature(OfflineFeatureSchema, false),
 })
 
 /* ──────────────────────────────── content ─────────────────────────────── */
@@ -519,6 +702,116 @@ const ContentSchema = z.strictObject({
   sidebar: z.string().min(1).default('sidebar.yaml'),
 })
 
+/* ───────────────────────────────── build ──────────────────────────────── */
+
+const BuildSchema = z.strictObject({
+  /**
+   * The host the site is deployed to: `cloudflare`, `vercel` or `netlify`.
+   * A build then also writes what that host needs to answer the MCP route
+   * and to redirect addresses that have moved. `shabd build --adapter`
+   * takes the same names, and wins over this.
+   */
+  adapter: z.enum(ADAPTERS).optional(),
+  /**
+   * How many threads compile pages, in a build and in `shabd check`. `auto`
+   * is as many as are of use on the machine, up to eight. `1` compiles on
+   * the thread that does the rest, as a small site is compiled whatever
+   * this says.
+   */
+  threads: z.union([z.literal('auto'), z.number().int().min(1).max(64)]).default('auto'),
+})
+
+/* ─────────────────────────────── redirects ────────────────────────────── */
+
+/** Where a redirect starts: a path on this site. */
+const redirectSource = z
+  .string()
+  .regex(/^\/[^?#\s]*$/, { error: 'A redirect starts from a path on this site, such as /old-page' })
+
+/** Where it leads: a page path, with a `#heading` if wanted, or a full address. */
+const redirectTarget = z
+  .string()
+  .regex(/^(?:\/(?!\/)\S*|https?:\/\/\S+)$/i, {
+    error: 'A redirect leads to a path on this site, such as /new-page, or to an address that starts with https://',
+  })
+
+/* ───────────────────────────────── check ──────────────────────────────── */
+
+/** How `shabd check` treats what a rule finds. Only `error` makes the check fail. */
+export const CHECK_LEVELS = ['off', 'note', 'warning', 'error'] as const
+export type CheckLevel = (typeof CHECK_LEVELS)[number]
+
+/**
+ * The rules of `shabd check` that are a matter of the site's own standards.
+ * What is plainly wrong (a link to a page that is not there) is always an
+ * error and is not listed here.
+ */
+const CheckSchema = z.strictObject({
+  /** A picture with no alternative text, which says nothing to a reader who cannot see it. */
+  altText: z.enum(CHECK_LEVELS).default('warning'),
+  /** A page with no description. Search results, llms.txt and shared links show one where there is one. */
+  descriptions: z.enum(CHECK_LEVELS).default('off'),
+  /** A link to another site that does not answer. It needs the network and takes time: `--external` asks for it once. */
+  externalLinks: z.enum(CHECK_LEVELS).default('off'),
+})
+
+/* ──────────────────────────────── openapi ─────────────────────────────── */
+
+const OpenApiSchema = z.strictObject({
+  /** The description of the API: a YAML or JSON file, by its path from the site folder. OpenAPI 3.0 or 3.1. */
+  spec: z.string().min(1),
+  /** Where its pages are on the site: the overview at this address, and a page for each operation under it. */
+  path: z
+    .string()
+    .regex(/^\/[^?#]*$/, 'Write the address as it is on the site, starting with a slash: /api')
+    .default('/api')
+    .transform((address) => address.replace(/\/+$/, '') || '/'),
+  /** Offer each request to be sent from its page: the "Try it" form of an API page. */
+  try: z.boolean().default(false),
+})
+
+export type OpenApiConfig = z.output<typeof OpenApiSchema>
+
+/* ──────────────────────────────── markdown ────────────────────────────── */
+
+export interface PluginRef {
+  /** A package name, or a path to a file of the site's own. */
+  name: string
+  options: Record<string, unknown> | undefined
+}
+
+/** `remark-emoji`, or `[remark-toc, { heading: contents }]` to give the plugin options. */
+const PluginRefSchema = z
+  .union([z.string().min(1), z.tuple([z.string().min(1), z.record(z.string(), z.unknown())])])
+  .transform((ref): PluginRef => (typeof ref === 'string' ? { name: ref, options: undefined } : { name: ref[0], options: ref[1] }))
+
+const MarkdownSchema = z.strictObject({
+  /**
+   * remark plugins, which work on the Markdown, and rehype plugins, which
+   * work on the HTML made from it. They run after Shabd's own, in the order
+   * written.
+   */
+  remarkPlugins: z.array(PluginRefSchema).default([]),
+  rehypePlugins: z.array(PluginRefSchema).default([]),
+  /** Typeset maths written between dollar signs. Needs `remark-math` and `rehype-katex` installed. */
+  math: z.boolean().default(false),
+  /** Draw ```` ```mermaid ```` fences as diagrams, in the reader's browser. Needs `mermaid` installed. */
+  mermaid: z.boolean().default(false),
+})
+
+/* ──────────────────────────────── variables ───────────────────────────── */
+
+export type VarsInput = { [name: string]: string | number | boolean | VarsInput }
+
+const varName = z
+  .string()
+  .regex(/^[A-Za-z_][A-Za-z0-9_-]*$/, { error: 'A variable name is letters, digits, "-" and "_", and does not start with a digit' })
+
+/** Values a page uses by name, as `{{name}}`. A group of values is written `{{group.name}}`. */
+const VarsSchema: z.ZodType<VarsInput> = z.lazy(() =>
+  z.record(varName, z.union([z.string(), z.number(), z.boolean(), VarsSchema])),
+)
+
 /* ───────────────────────────── shabd.config.yaml ───────────────────────── */
 
 const componentName = z
@@ -528,6 +821,50 @@ const blockName = z
   .string()
   .regex(/^[a-z][a-z0-9-]*$/, { error: 'Block names must be kebab-case, e.g. announcement-bar' })
 
+/* ─────────────────────────── versions and languages ────────────────────────── */
+
+/** Where a version or a language starts: one folder of the content, by its name. */
+const editionPath = z.string().regex(/^\/[A-Za-z0-9][A-Za-z0-9._-]*$/, { error: 'A path such as /v1: a slash, then the name of one folder' })
+
+const VersionSchema = z.strictObject({
+  /** What a reader picks it by: `2.x`. */
+  label: z.string().min(1),
+  /**
+   * Where its pages are: `/v1` for the pages of `content/v1`. The first
+   * version is the current one, whose pages are the site's own, and has none.
+   */
+  path: editionPath.optional(),
+  /**
+   * Whether search engines are asked to list its pages. They are asked not
+   * to list an older version's, so that a search leads to the current docs.
+   */
+  index: z.boolean().optional(),
+})
+
+const LanguageSchema = z.strictObject({
+  /** The language's code, as a page's `lang` says it: `de`, `pt-BR`. */
+  code: z.string().regex(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/, { error: 'A language code such as de or pt-BR' }),
+  /** Its name, in the language itself: `Deutsch`. */
+  label: z.string().min(1),
+  /**
+   * Where its pages are. Left out, it is the code in lower case: `/de`. The
+   * first language is the one the site is written in, and has no path.
+   */
+  path: editionPath.optional(),
+  /** The direction it is written in. */
+  dir: z.enum(['ltr', 'rtl']).default('ltr'),
+  /** The words of the site's own furniture in this language: "Search", "On this page". Each is named by a key. */
+  ui: z.record(z.string(), z.string()).default({}),
+  /**
+   * The header's links in this language. Left out, they are `site.nav`,
+   * each leading to its page in this language where there is one. The first
+   * language is the site's own, and its links are `site.nav`.
+   */
+  nav: z.array(NavItemSchema).optional(),
+  /** The site's footer in this language. Left out, it is `site.footer`. */
+  footer: z.string().optional(),
+})
+
 export const ConfigSchema = z.strictObject({
   site: SiteSchema,
   content: ContentSchema.prefault({}),
@@ -536,10 +873,29 @@ export const ConfigSchema = z.strictObject({
   /** Override a built-in layout, or define a new one for `layout:` frontmatter. */
   layouts: z.record(z.string().min(1), LayoutSchema).default({}),
   features: FeaturesSchema.prefault({}),
+  /** What a build writes besides the static site. */
+  build: BuildSchema.prefault({}),
   /** Components available in every .mdx file without an import. Name → file path. */
   components: z.record(componentName, z.string().min(1)).default({}),
   /** Custom layout blocks. Name → file path. */
   blocks: z.record(blockName, z.string().min(1)).default({}),
+  /** Addresses that have moved. Old path → new path, or a full address. */
+  redirects: z.record(redirectSource, redirectTarget).default({}),
+  /** The versions of the docs, the current one first. Each of the others is a folder of the content. */
+  versions: z.array(VersionSchema).default([]),
+  /** The languages the site is in, the one it is written in first. Each of the others is a folder of the content. */
+  languages: z.array(LanguageSchema).default([]),
+  /** Values every page can use by name: `{{version}}`. */
+  vars: VarsSchema.default({}),
+  /** How Markdown is read: the site's own plugins, and maths. */
+  markdown: MarkdownSchema.prefault({}),
+  /** How strict `shabd check` is about what is a matter of taste. */
+  check: CheckSchema.prefault({}),
+  /** Pages made from an OpenAPI description: one description, or a list of them. */
+  openapi: z
+    .union([OpenApiSchema, z.array(OpenApiSchema)])
+    .default([])
+    .transform((written) => (Array.isArray(written) ? written : [written])),
 })
 
 export type ShabdConfigInput = z.input<typeof ConfigSchema>
@@ -641,6 +997,27 @@ export const SidebarSchema = z.array(
 )
 export type SidebarInput = SidebarEntryInput[]
 
+/**
+ * sidebar.yaml is one sidebar, written as a list, or several, written as a
+ * map from the part of the site each belongs to:
+ *
+ *   /guide/:
+ *     - guide/introduction
+ *   /reference/:
+ *     - reference/cli
+ *
+ * A page gets the sidebar of the longest path it is under. `/` is the
+ * sidebar of every page that is under none of the others.
+ */
+export const SidebarsSchema = z.union([
+  SidebarSchema,
+  z.record(
+    z.string().regex(/^\/\S*$/, { error: 'A sidebar is named by the part of the site it belongs to, such as /guide/' }),
+    SidebarSchema,
+  ),
+])
+export type SidebarsInput = SidebarInput | Record<string, SidebarInput>
+
 /* ─────────────────────────────── frontmatter ──────────────────────────── */
 
 const HeroSchema = z.strictObject({
@@ -667,6 +1044,13 @@ const ApiSchema = z.strictObject({
   baseUrl: z.string().optional(),
   auth: z.string().optional(),
   deprecated: z.boolean().default(false),
+  /**
+   * Let a reader send the request from the page, and see what the API answers.
+   * The pages made from an OpenAPI description set it when asked to.
+   */
+  try: z.boolean().default(false),
+  /** A body for the request to start from, for a reader who tries it: any value, written as YAML. */
+  body: z.unknown().optional(),
 })
 
 const PageSidebarSchema = z
@@ -687,6 +1071,9 @@ const PageSidebarSchema = z
   .optional()
   .transform((s) => (typeof s === 'boolean' ? { visible: s } : (s ?? {})))
 
+/** A calendar day. YAML reads `2026-11-17` without quotes as text, so that is how it is written. */
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { error: 'A day is written as year-month-day, such as 2026-11-17' })
+
 /**
  * Frontmatter is loose: authors may add their own keys for custom blocks
  * and components. The keys Shabd understands are validated strictly.
@@ -702,10 +1089,21 @@ export const FrontmatterSchema = z.looseObject({
   badges: z.array(BadgeSchema).default([]),
   /** Drafts are visible in dev and left out of production builds. */
   draft: z.boolean().default(false),
+  /** Ask search engines not to list this page. It stays in the site's own search and navigation. */
+  noindex: z.boolean().default(false),
   hero: HeroSchema.optional(),
   api: ApiSchema.optional(),
   editLink: z.boolean().optional(),
   pagination: z.boolean().optional(),
+  /**
+   * The day this page was last changed, as `2026-11-17`, in place of the day
+   * Git has for it. `false` shows no day on this page.
+   */
+  lastUpdated: z.union([z.literal(false), day]).optional(),
+  /** The day this page was published, as `2026-11-17`. The feed lists the page under it. */
+  date: day.optional(),
+  /** The picture other sites show when this page is shared: a path in `public/` or a full address. */
+  image: z.string().min(1).optional(),
 })
 
 export type FrontmatterInput = z.input<typeof FrontmatterSchema>
