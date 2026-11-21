@@ -96,7 +96,10 @@ for (const [where, origin] of [
       const size = () => frame.locator('html').evaluate((element) => ({ content: element.getBoundingClientRect().height, window: window.innerHeight, background: getComputedStyle(document.body).backgroundColor }))
       await expect.poll(async () => Math.abs((await size()).content - (await size()).window)).toBeLessThanOrEqual(1)
       expect((await size()).content).toBeGreaterThan(40)
-      expect((await size()).background).toBe('rgba(0, 0, 0, 0)')
+      // It is drawn in the colour of the stage it is on, so that its text is on a colour of its own.
+      const behind = () => sandbox(page, 'Apart').locator('.sb-sandbox-result').evaluate((element) => getComputedStyle(element).backgroundColor)
+      expect((await size()).background).toBe(await behind())
+      expect(await behind()).not.toBe('rgba(0, 0, 0, 0)')
 
       // The reader turns the page dark, and the frame follows without starting again.
       await frame.getByRole('button', { name: 'Raise' }).click()
@@ -106,6 +109,7 @@ for (const [where, origin] of [
       const [darkPage, darkFrame] = await look()
       expect(darkFrame).toEqual(darkPage)
       expect(darkFrame.color).not.toBe(frameLook.color)
+      expect((await size()).background).toBe(await behind())
       // Still the snippet that was running: its state is where it was left.
       await expect(frame.locator('[data-gauge]')).toHaveText('3 bar')
     })

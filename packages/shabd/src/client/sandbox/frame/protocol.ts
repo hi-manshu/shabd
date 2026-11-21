@@ -70,7 +70,9 @@ export function frameDocument(base: string, lang: string): string {
     `<base href="${escape(base)}">`,
     // After the page's stylesheets, which the script puts before this one.
     '<style id="sb-frame">',
-    'html, body { background: transparent !important; margin: 0 !important; min-block-size: 0 !important; block-size: auto !important; }',
+    // The colour the stage behind the frame is drawn in, once the page's styles are here to name it. A
+    // frame that only let that colour show through would have text on no colour of its own.
+    'html, body { background: var(--sb-background, transparent) !important; margin: 0 !important; min-block-size: 0 !important; block-size: auto !important; }',
     'body { padding: 1rem !important; overflow: hidden !important; }',
     '#root > :first-child { margin-block-start: 0; }',
     '#root > :last-child { margin-block-end: 0; }',
