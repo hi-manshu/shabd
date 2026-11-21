@@ -9,23 +9,23 @@
  * Loaded only in `shabd dev`, and only when the Studio is opened.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { withBase } from '../../shared/paths.js'
 import { onPageUpdate } from '../app/hmr.js'
 import { Icon } from '../app/icons.js'
-import { usePage, useRouter } from '../app/router.js'
-import { routeStore, siteStore, useSite } from '../app/store.js'
+import { usePage } from '../app/router.js'
+import { useSite } from '../app/store.js'
 import { setUi } from '../app/ui.js'
-import { Editor } from './Editor.js'
+import { IMAGE_BYTES_LIMIT, IMAGE_TOO_LARGE, imageMarkdown } from '../../shared/image-file.js'
+import { CodeEditor, type EditorInsertion } from '../editor/CodeEditor.js'
 import {
   ConflictError,
   connectFolder,
-  connectPages,
   connectServer,
   folderAccessSupported,
   restoreFolder,
   type SourceFile,
   type StudioBackend,
 } from './backends.js'
+import { PageActions } from './PageActions.js'
 import {
   isNewer,
   PeerChannel,
@@ -71,10 +71,14 @@ function describe(status: Status): string {
 }
 
 export default function Studio() {
-  const { features, contentDir } = useSite()
-  const { id, title } = usePage()
+  const { features, contentDir, pages } = useSite()
+  const { id, path, title } = usePage()
+  /** A page made from an OpenAPI description is written again whenever the description changes, so it is not edited here. */
+  const generated = pages[path]?.generated === true
   const [backend, setBackend] = useState<StudioBackend | null>(null)
   const [text, setText] = useState('')
+  /** The page whose text is in the editor. It trails `id` for as long as the next page's file takes to read. */
+  const [shown, setShown] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>({ kind: 'loading' })
 
   /** State the save loop needs without re-subscribing effects on every keystroke. */
@@ -108,25 +112,32 @@ export default function Studio() {
     }
   }, [])
 
-  const load = useCallback(async (from: StudioBackend, page: string) => {
-    const file = await from.read(page)
+  /** Put a file that has been read into the editor. */
+  const show = useCallback((page: string, file: SourceFile) => {
     live.current = { ...live.current, text: file.source, saved: file.source, version: file.version }
     setText(file.source)
+    setShown(page)
     setStatus({ kind: 'idle' })
   }, [])
 
   useEffect(() => {
     if (!backend || !id) return
     setStatus({ kind: 'loading' })
+    // A file that arrives after the Studio has moved on to another page is dropped: it is not that page's text.
     let current = true
-    load(backend, id).catch((error: unknown) => {
-      if (current) setStatus({ kind: 'error', message: error instanceof Error ? error.message : String(error) })
-    })
+    backend.read(id).then(
+      (file) => {
+        if (current) show(id, file)
+      },
+      (error: unknown) => {
+        if (current) setStatus({ kind: 'error', message: error instanceof Error ? error.message : String(error) })
+      },
+    )
     return () => {
       current = false
       window.clearTimeout(live.current.timer)
     }
-  }, [backend, id, load])
+  }, [backend, id, show])
 
   /* ── saving ── */
 
@@ -174,11 +185,57 @@ export default function Studio() {
     [id, save],
   )
 
+  /* ── for making, renaming and deleting pages, which must not start with a draft on its way ── */
+
+  const settle = useCallback(async () => {
+    await save()
+    return live.current.text === live.current.saved
+  }, [save])
+
+  /** A page that is about to be deleted is not saved first. */
+  const discard = useCallback(() => window.clearTimeout(live.current.timer), [])
+
+  const version = useCallback(() => live.current.version, [])
+
+  /**
+   * True while a page is being made, renamed or deleted. The editor is not typed into then: the page stays on
+   * screen until the Studio has gone to the next one, and what was typed in that time would be lost with it.
+   */
+  const [acting, setActing] = useState(false)
+
+  /* ── an image pasted or dropped into the editor ── */
+
+  const [imageProblem, setImageProblem] = useState('')
+
+  const addImages = useCallback(
+    async (files: File[]): Promise<EditorInsertion | undefined> => {
+      if (!backend || !id) return undefined
+      const links: string[] = []
+      let problem = ''
+      for (const file of files) {
+        try {
+          // Said here as well as where the image is saved, so that one that is too large is not read first.
+          if (file.size > IMAGE_BYTES_LIMIT) throw new Error(IMAGE_TOO_LARGE)
+          links.push(imageMarkdown(await backend.addImage(id, file.name, new Uint8Array(await file.arrayBuffer()))))
+        } catch (error) {
+          problem = error instanceof Error ? error.message : String(error)
+        }
+      }
+      setImageProblem(problem)
+      // The cursor is left between the brackets of the first: the words for someone who cannot see it are still to be written.
+      return links.length > 0 ? { text: links.join('\n'), cursor: 2 } : undefined
+    },
+    [backend, id],
+  )
+
+  useEffect(() => setImageProblem(''), [id])
+
   /* ── the page hot-updated ── */
 
   useEffect(() => {
     if (!id || !backend) return
-    return onPageUpdate((updated) => {
+    let watching = true
+    const stop = onPageUpdate((updated) => {
       if (updated !== id) return
       const state = live.current
       const sinceSave = performance.now() - state.saveStarted
@@ -189,10 +246,19 @@ export default function Studio() {
         state.saveStarted = 0
       } else if (state.text === state.saved) {
         // Someone else changed the file (an editor, git). Nothing unsaved here, so follow it.
-        void load(backend, id).catch(() => {})
+        backend.read(id).then(
+          (file) => {
+            if (watching) show(id, file)
+          },
+          () => {},
+        )
       }
     })
-  }, [id, backend, load])
+    return () => {
+      watching = false
+      stop()
+    }
+  }, [id, backend, show])
 
   /* ── while typing, a half-written line of frontmatter is an "error" for a moment ── */
 
@@ -294,16 +360,24 @@ export default function Studio() {
         </button>
       </header>
 
-      <PageFiles id={id} contentDir={contentDir} unsaved={status.kind === 'unsaved' || status.kind === 'saving'} />
+      {backend && (
+        <PageActions backend={backend} page={id && !generated ? { id, path } : null} settle={settle} discard={discard} version={version} acting={setActing} />
+      )}
 
-      {id ? (
-        <Editor
-          value={text}
-          mdx={id.toLowerCase().endsWith('.mdx')}
+      {generated ? (
+        <p className="sb-studio-empty">This page is made from an OpenAPI description. Change the description, and the page follows.</p>
+      ) : id ? (
+        // The key makes each page a document of its own: a new page starts with nothing to undo.
+        <CodeEditor
+          key={shown ?? ''}
+          className="sb-studio-editor"
+          language="markdown"
           label={`Markdown source of ${title}`}
-          disabled={status.kind === 'loading'}
+          value={text}
+          readOnly={status.kind === 'loading' || acting}
           onChange={edit}
           onSave={() => void save()}
+          onFiles={addImages}
         />
       ) : (
         <p className="sb-studio-empty">There is no page at this address to edit.</p>
@@ -319,6 +393,11 @@ export default function Studio() {
       )}
 
       <footer className="sb-studio-footer" data-state={status.kind}>
+        {imageProblem && (
+          <p className="sb-studio-problem" role="alert">
+            {imageProblem}
+          </p>
+        )}
         <p role="status">{describe(status)}</p>
         {status.kind === 'conflict' && (
           <p className="sb-studio-choices">
@@ -332,125 +411,6 @@ export default function Studio() {
         )}
       </footer>
     </aside>
-  )
-}
-
-/** Wait for the page list to change after the dev server said it would. It follows within a few frames. */
-async function untilRoute(path: string, exists: boolean): Promise<void> {
-  for (let waited = 0; waited < 4000; waited += 50) {
-    if (Boolean(routeStore.get()[path] && siteStore.get().pages[path]) === exists) return
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  }
-}
-
-/**
- * New page, rename, delete. Each asks for what it needs in the same strip,
- * does it through the dev server, and then goes where the page now is.
- */
-function PageFiles({ id, contentDir, unsaved }: { id: string | null; contentDir: string; unsaved: boolean }) {
-  const { path, navigate } = useRouter()
-  /** Go to a page of this site. The dev server names a page by its route; the address bar has the site's base before it. */
-  const go = (route: string, options?: { replace?: boolean }) => navigate(withBase(siteStore.get().site.base, route), options)
-  const [mode, setMode] = useState<'new' | 'rename' | 'delete' | null>(null)
-  const [value, setValue] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [problem, setProblem] = useState('')
-  const [notice, setNotice] = useState('')
-
-  const open = (next: 'new' | 'rename' | 'delete') => {
-    const folder = id?.includes('/') ? id.slice(0, id.lastIndexOf('/') + 1) : ''
-    setValue(next === 'new' ? `${folder}new-page.md` : (id ?? ''))
-    setProblem('')
-    setNotice('')
-    setMode(next)
-  }
-
-  const run = async () => {
-    if (!mode || busy) return
-    setBusy(true)
-    setProblem('')
-    try {
-      const pages = await connectPages()
-      if (mode === 'new') {
-        const made = await pages.create(value.trim())
-        await untilRoute(made.path, true)
-        await go(made.path)
-        setNotice(`Created ${contentDir}/${made.id}.`)
-      } else if (mode === 'rename' && id) {
-        const moved = await pages.rename(id, value.trim())
-        await untilRoute(moved.path, true)
-        await go(moved.path, { replace: true })
-        setNotice(`Now ${contentDir}/${moved.id}.${moved.sidebar === 'updated' ? ' sidebar.yaml follows.' : ''}`)
-      } else if (mode === 'delete' && id) {
-        const gone = await pages.remove(id)
-        await untilRoute(path, false)
-        await go('/', { replace: true })
-        setNotice(
-          `Deleted ${contentDir}/${id}.` +
-            (gone.sidebar === 'updated' ? ' Its entry is out of sidebar.yaml.' : gone.sidebar === 'mentions' ? ' sidebar.yaml still lists it.' : ''),
-        )
-      }
-      setMode(null)
-    } catch (error) {
-      setProblem(error instanceof Error ? error.message : String(error))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="sb-studio-pages">
-      {mode === null ? (
-        <p className="sb-studio-page-buttons">
-          <button type="button" className="sb-studio-action" onClick={() => open('new')}>
-            New page
-          </button>
-          {id && (
-            <>
-              <button type="button" className="sb-studio-action" onClick={() => open('rename')} disabled={unsaved}>
-                Rename
-              </button>
-              <button type="button" className="sb-studio-action" onClick={() => open('delete')}>
-                Delete
-              </button>
-            </>
-          )}
-          {notice && <span role="status">{notice}</span>}
-        </p>
-      ) : (
-        <form
-          className="sb-studio-page-form"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void run()
-          }}
-        >
-          {mode === 'delete' ? (
-            <p>
-              Delete <strong>{`${contentDir}/${id}`}</strong>? The file is removed from disk.
-            </p>
-          ) : (
-            <label>
-              {mode === 'new' ? `New page, under ${contentDir}/` : `Move to, under ${contentDir}/`}
-              <input value={value} onChange={(event) => setValue(event.target.value)} spellCheck={false} autoFocus />
-            </label>
-          )}
-          <p className="sb-studio-page-buttons">
-            <button type="submit" className="sb-studio-action" disabled={busy}>
-              {mode === 'new' ? 'Create' : mode === 'rename' ? 'Rename' : 'Delete the page'}
-            </button>
-            <button type="button" className="sb-studio-action" onClick={() => setMode(null)} disabled={busy}>
-              Cancel
-            </button>
-          </p>
-          {problem && (
-            <p className="sb-studio-page-problem" role="alert">
-              {problem}
-            </p>
-          )}
-        </form>
-      )}
-    </div>
   )
 }
 

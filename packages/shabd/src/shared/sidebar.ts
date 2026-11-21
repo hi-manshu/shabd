@@ -1,6 +1,18 @@
 /** Read-only helpers over a resolved sidebar tree. Used by navigation blocks and llms.txt. */
 import type { SidebarGroup, SidebarNode, SidebarPage } from './types.js'
 
+/**
+ * The sidebar a page is shown with. A site may give parts of itself a
+ * sidebar each; a page under none of them has the site's own.
+ */
+export function sidebarFor(
+  site: { sidebar: SidebarNode[]; sidebars?: { prefix: string; sidebar: SidebarNode[] }[] | undefined },
+  path: string,
+): SidebarNode[] {
+  const section = site.sidebars?.find(({ prefix }) => path === prefix || path.startsWith(`${prefix}/`))
+  return section ? section.sidebar : site.sidebar
+}
+
 /** Pages in reading order, for previous/next links. */
 export function flattenSidebar(nodes: SidebarNode[]): SidebarPage[] {
   return nodes.flatMap((node) =>

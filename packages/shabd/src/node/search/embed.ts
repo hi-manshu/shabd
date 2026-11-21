@@ -24,6 +24,8 @@ export interface Embedder {
 
 /** The slice of Transformers.js this module uses. */
 interface TransformersModule {
+  /** Where it keeps the model files it downloads: a folder, in Node. */
+  env: { cacheDir: string | null }
   pipeline(
     task: 'feature-extraction',
     model: string,
@@ -50,6 +52,11 @@ async function importTransformers(root: string): Promise<TransformersModule | nu
   } catch {
     return null
   }
+}
+
+/** The folder Transformers.js downloads model files into, or null when it is not installed. */
+export async function modelCacheDir(root: string): Promise<string | null> {
+  return (await importTransformers(root))?.env.cacheDir ?? null
 }
 
 const embedders = new Map<string, Promise<Embedder | null>>()

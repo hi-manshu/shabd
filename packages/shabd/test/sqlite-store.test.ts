@@ -4,8 +4,15 @@
  * bytes the way the browser opens it.
  */
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm'
-import { beforeAll, describe, expect, it } from 'vitest'
-import { MemoryStore, type SearchDoc, type SearchIndexFile } from '../src/shared/search-core.js'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import {
+  MemoryStore,
+  setSegmenter,
+  tokenize,
+  type SearchDoc,
+  type SearchHit,
+  type SearchIndexFile,
+} from '../src/shared/search-core.js'
 import {
   openSearchDatabase,
   readSearchMeta,
@@ -122,7 +129,44 @@ describe('keyword search through FTS5', () => {
   })
 })
 
-describe('semantic search through a SQL function', () => {
+describe('typos, which FTS5 knows nothing of', () => {
+  it('finds a section by a misspelt word', () => {
+    expect(headings(store.search('colurs ', null, 5))).toEqual(['Colours'])
+    expect(headings(store.search('tyopgraphy ', null, 5))).toEqual(['Typography'])
+    expect(headings(store.search('typografy ', null, 5))).toEqual(['Typography'])
+    expect(headings(store.search('srever ', null, 5))).toEqual(['Install', 'Hosting'])
+    expect(headings(store.search('instaler', null, 5))).toEqual(['Install'])
+  })
+
+  it('does not forgive a word of three letters, or more edits than the word is allowed', () => {
+    expect(store.search('fnt ', null, 5)).toEqual([])
+    expect(store.search('colrs ', null, 5)).toEqual([])
+  })
+
+  it('ranks an exact match above a match by a misspelt word', () => {
+    // FTS5 scores the words of a query alike, so the misspelt one is asked for apart and its score halved.
+    expect(headings(store.search('font colours ', null, 5))).toEqual(['Colours', 'Typography'])
+    expect(headings(store.search('font colurs ', null, 5))).toEqual(['Typography', 'Colours'])
+  })
+
+  it('marks what a misspelt word was taken for', () => {
+    expect(store.search('hihglight ', null, 5)[0]?.marks).toEqual(['highlight'])
+    expect(store.search('accent colour', null, 5)[0]?.marks).toEqual(['accent', 'colour'])
+  })
+
+  it('reads the terms of the index out only when a word is not found', () => {
+    const database = openSearchDatabase(sqlite3, bytes)
+    const fresh = new SqliteStore(database)
+    const listed = () => database.selectValue("SELECT count(*) FROM sqlite_temp_master WHERE name = 'sections_terms'")
+    fresh.search('colours typog', null, 5)
+    expect(listed()).toBe(0)
+    fresh.search('colurs ', null, 5)
+    expect(listed()).toBe(1)
+    fresh.close()
+  })
+})
+
+describe('semantic search over vectors read out of the database', () => {
   it('finds a section that shares no word with the query, and says so', () => {
     const hits = store.search('publish my documentation online', pointingAt('Hosting'), 3)
     expect(hits[0]?.doc.heading).toBe('Hosting')
@@ -139,6 +183,48 @@ describe('semantic search through a SQL function', () => {
     const weak = docs.map((d) => (d.heading === 'Hosting' ? 0.2 : 0))
     expect(store.search('zzqqxx', weak, 3)).toEqual([])
     expect(headings(store.search('zzqqxx', weak, 3, 0.1))).toEqual(['Hosting'])
+  })
+
+  it('reads the vectors once, and not before a query comes with one', () => {
+    const database = openSearchDatabase(sqlite3, bytes)
+    // Every statement the store runs that reads the vector column.
+    const reads: string[] = []
+    const watched = new Proxy(database, {
+      get(target, name) {
+        const value = Reflect.get(target, name) as unknown
+        if (typeof value !== 'function') return value
+        return (...args: unknown[]) => {
+          if (typeof args[0] === 'string' && /\bvector\b/.test(args[0])) reads.push(args[0])
+          return (value as (...args: unknown[]) => unknown).apply(target, args)
+        }
+      },
+    })
+    const fresh = new SqliteStore(watched)
+
+    fresh.search('font ', null, 3)
+    fresh.search('colurs ', null, 3)
+    expect(reads).toEqual([])
+
+    for (const heading of ['Hosting', 'Typography', 'Install']) {
+      expect(fresh.search('zzqqxx ', pointingAt(heading), 3)[0]?.doc.heading).toBe(heading)
+    }
+    expect(reads).toHaveLength(1)
+    fresh.close()
+  })
+
+  it('ranks without vectors when the database holds some that do not line up with its sections', () => {
+    // A copy of the database that can be written to, with one section's vector taken out.
+    const copy = new sqlite3.oo1.DB()
+    const { capi, wasm } = sqlite3
+    const resizeable = (capi as unknown as { SQLITE_DESERIALIZE_RESIZEABLE: number }).SQLITE_DESERIALIZE_RESIZEABLE
+    const flags = capi.SQLITE_DESERIALIZE_FREEONCLOSE | resizeable
+    copy.checkRc(capi.sqlite3_deserialize(copy.pointer!, 'main', wasm.allocFromTypedArray(bytes), bytes.length, bytes.length, flags))
+    copy.exec('UPDATE sections SET vector = NULL WHERE id = 2')
+
+    const broken = new SqliteStore(copy)
+    expect(broken.search('zzqqxx ', pointingAt('Hosting'), 3)).toEqual([])
+    expect(headings(broken.search('font ', pointingAt('Hosting'), 3))).toEqual(['Typography'])
+    broken.close()
   })
 })
 
@@ -158,5 +244,162 @@ describe('the two stores', () => {
       const fromMemory = memory.search(query, vector, 3)[0]?.doc.heading
       expect(fromSqlite, query).toBe(fromMemory)
     }
+  })
+
+  it('take a misspelt word for the same words, and list what they find in the same order', () => {
+    const cases: [string, number[] | null][] = [
+      ['colurs ', null],
+      ['tyopgraphy ', null],
+      ['typografy ', null],
+      ['instaler', null],
+      ['srever ', null],
+      ['hedings ', null],
+      ['cofee ', null],
+      // A misspelt word beside one that is spelt right, in either order.
+      ['font colurs ', null],
+      ['colurs font ', null],
+      ['server instaler ', null],
+      ['uplaod dist', null],
+      // Nothing to forgive: too short, too far off, a number, and no word at all.
+      ['fnt ', null],
+      ['colrs ', null],
+      ['8081 ', null],
+      ['zzqqxx ', null],
+      // With a section found by meaning as well.
+      ['hedings ', pointingAt('Hosting')],
+    ]
+    const found = (hits: SearchHit[]) => hits.map((hit) => [hit.doc.heading, hit.marks, hit.matched])
+    for (const [query, vector] of cases) {
+      expect(found(store.search(query, vector, 5)), query).toEqual(found(memory.search(query, vector, 5)))
+    }
+    // The cases above are not all empty on both sides.
+    expect(headings(memory.search('server instaler ', null, 5))).toEqual(['Install', 'Hosting'])
+  })
+
+  it('rank sections by meaning in the same order', () => {
+    // Vectors that point every which way, so that a query is near many sections and far from none.
+    let seed = 20261119
+    const next = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296) - 0.5
+    const many = Array.from({ length: 60 }, (_, i) => doc(`/p${i}`, `Section ${i}`, `Text of section ${i}.`))
+    const dims = 16
+    const unit = () => {
+      const values = Array.from({ length: dims }, next)
+      const length = Math.hypot(...values)
+      return values.map((value) => value / length)
+    }
+    const stored = new Int8Array(many.length * dims)
+    many.forEach((_, i) => stored.set(unit().map((value) => Math.round(value * 127)), i * dims))
+    const file: SearchIndexFile = { version: 1, docs: many, semantic: { model: 'test-model', dims } }
+    const inMemory = new MemoryStore(file, stored)
+    const inSqlite = new SqliteStore(openSearchDatabase(sqlite3, writeSearchDatabase(sqlite3, file, stored, 'vectors')))
+
+    for (let query = 0; query < 20; query++) {
+      const vector = unit()
+      for (const minimum of [0, 0.2, 0.35]) {
+        const fromSqlite = inSqlite.search('zzqqxx ', vector, 10, minimum).map((hit) => [hit.doc.heading, hit.score])
+        const fromMemory = inMemory.search('zzqqxx ', vector, 10, minimum).map((hit) => [hit.doc.heading, hit.score])
+        expect(fromSqlite).toEqual(fromMemory)
+      }
+    }
+    // With no threshold every query has its ten nearest sections to show.
+    expect(inSqlite.search('zzqqxx ', unit(), 10, 0)).toHaveLength(10)
+    inSqlite.close()
+  })
+
+  it('hold the same terms, cut by the same tokeniser', () => {
+    const database = openSearchDatabase(sqlite3, bytes)
+    database.exec("CREATE VIRTUAL TABLE temp.terms USING fts5vocab('main', 'sections_fts', 'row')")
+    const inSqlite = database.selectValues('SELECT term FROM temp.terms').map(String).sort()
+    database.close()
+    const inMemory = [...new Set(docs.flatMap((d) => tokenize(`${d.title} ${d.heading} ${d.text}`)))].sort()
+    expect(inSqlite).toEqual(inMemory)
+    // FTS5's own tokenisers cut a Devanagari word at its marks, and leave an accent on.
+    expect(inSqlite).toEqual(expect.arrayContaining(['शब्द', 'अर्थ', 'cafe']))
+  })
+
+  it('take a misspelt word for the same words in a script with combining marks', () => {
+    // थ for त: one edit from अर्थ, which is four characters long.
+    expect(headings(store.search('अर्त ', null, 5))).toEqual(['शब्द'])
+    expect(headings(memory.search('अर्त ', null, 5))).toEqual(['शब्द'])
+  })
+})
+
+describe('text in a script without spaces, which FTS5 does not cut into words', () => {
+  afterEach(() => setSegmenter(undefined))
+
+  const pages = [
+    doc('/zh', '搜索', '搜索功能在读者的浏览器中运行，不需要任何搜索服务。侧边栏的宽度可以在主题配置中修改。'),
+    doc('/ja', 'サイドバー', 'サイドバーの幅はテーマの設定で変更できます。検索は読者のブラウザーで実行されます。'),
+    doc('/th', 'การค้นหา', 'การค้นหาทำงานในเบราว์เซอร์ของผู้อ่าน ติดตั้งแพ็กเกจแล้วเริ่มเซิร์ฟเวอร์สำหรับนักพัฒนา'),
+    doc('/en', 'Install', 'Run the installer, then start the dev server.'),
+  ]
+  const file: SearchIndexFile = { version: 1, docs: pages, semantic: null }
+  const inMemory = new MemoryStore(file, null)
+  let inSqlite: SqliteStore
+  beforeAll(() => {
+    inSqlite = new SqliteStore(openSearchDatabase(sqlite3, writeSearchDatabase(sqlite3, file, null, 'scripts')))
+  })
+  const found = (hits: SearchHit[]) => hits.map((hit) => [hit.doc.path, hit.marks])
+  const queries = [
+    '浏览器',
+    '读者',
+    '侧边栏',
+    '主题配置 ',
+    '搜索功能',
+    '浏',
+    'サイドバー',
+    'ブラウザー',
+    '設定 ',
+    'ブラウ',
+    'ทำงาน',
+    'เบราว์เซอร์ ',
+    'ติดตั้ง',
+    'แพ็กเกจ',
+    '读者 読者 ',
+    'installer 浏览器',
+    '没有这个词 ',
+  ]
+
+  it('is found by its words', () => {
+    expect(found(inSqlite.search('浏览器', null, 5)).map(([path]) => path)).toEqual(['/zh'])
+    expect(found(inSqlite.search('ブラウザー', null, 5)).map(([path]) => path)).toEqual(['/ja'])
+    expect(found(inSqlite.search('เบราว์เซอร์', null, 5)).map(([path]) => path)).toEqual(['/th'])
+    expect(found(inSqlite.search('浏', null, 5)).map(([path]) => path)).toEqual(['/zh'])
+  })
+
+  it('is found the same way in both stores', () => {
+    for (const query of queries) {
+      expect(found(inSqlite.search(query, null, 5)), query).toEqual(found(inMemory.search(query, null, 5)))
+    }
+  })
+
+  it('is found the same way in both stores when the browser cuts a word otherwise than the build did', () => {
+    const own = new Intl.Segmenter('en', { granularity: 'word' })
+    const cuts: Record<string, string[]> = {
+      サイドバー: ['サイドバー'],
+      ทำงาน: ['ทำ', 'งาน'],
+      เบราว์เซอร์: ['เบราว์', 'เซอร์'],
+      ติดตั้ง: ['ติดตั้ง'],
+    }
+    const segment = (text: string) => {
+      const pieces = cuts[text]
+      if (!pieces) return own.segment(text)
+      let index = 0
+      return pieces.map((piece) => ({ segment: piece, index: (index += piece.length) - piece.length, input: text }))
+    }
+    setSegmenter({ segment } as unknown as Intl.Segmenter)
+    for (const query of Object.keys(cuts)) {
+      const hits = found(inSqlite.search(`${query} `, null, 5))
+      expect(hits, query).toEqual(found(inMemory.search(`${query} `, null, 5)))
+      expect(hits.length, query).toBe(1)
+    }
+  })
+
+  it('is found the same way in both stores when the browser has no dictionary to cut by', () => {
+    setSegmenter(null)
+    for (const query of queries) {
+      expect(found(inSqlite.search(query, null, 5)), query).toEqual(found(inMemory.search(query, null, 5)))
+    }
+    expect(found(inSqlite.search('サイドバー', null, 5)).map(([path]) => path)).toEqual(['/ja'])
   })
 })

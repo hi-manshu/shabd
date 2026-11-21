@@ -15,6 +15,7 @@ export function useMDXComponents() {
   return {
     Callout: ({ type, title, children }) => h('aside', { 'data-callout': type, 'data-title': title }, children),
     Sandbox: ({ code, lang, group }) => h('div', { 'data-sandbox': lang, 'data-group': group }, code),
+    Mermaid: ({ code }) => h('div', { 'data-mermaid': '' }, code),
   }
 }
 `

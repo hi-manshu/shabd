@@ -3,7 +3,7 @@ title: Installation
 description: Create a site, run the dev server and build for production.
 ---
 
-Shabd needs Node.js 22 or newer.
+Shabd needs Node.js {{node}} or newer.
 
 ## Create a site
 
@@ -91,7 +91,8 @@ The static site is written to `dist/`. Any static host can serve it.
 
 > [!NOTE]
 > The MCP endpoint needs a server, because it answers `POST` requests. `shabd preview` serves it locally. For
-> production, see [MCP and llms.txt](../features/mcp.md).
+> production, `shabd build --adapter` writes what Cloudflare, Vercel or Netlify needs to answer it: see
+> [Deploying](./deploying.md).
 
 ## From the repository
 

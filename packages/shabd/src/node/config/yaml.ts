@@ -96,6 +96,11 @@ function flatten(issue: ZodIssue, prefix: Path, schema: z.ZodType): FlatIssue[] 
     })
   }
 
+  // A map whose keys have a shape of their own (`redirects:`): say what is wrong with the key, at the key.
+  if (issue.code === 'invalid_key' && issue.issues.length > 0) {
+    return issue.issues.map((nested) => ({ path, message: nested.message, target: 'key' as const }))
+  }
+
   if (issue.code === 'invalid_union' && issue.errors.length > 0) {
     const branch = pickUnionBranch(issue.errors)
     if (branch) return branch.flatMap((nested) => flatten(nested, path, schema))

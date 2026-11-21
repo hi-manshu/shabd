@@ -22,6 +22,7 @@ import {
   ThemeToggle,
 } from './blocks/Header.js'
 import { Hero } from './blocks/Hero.js'
+import { PageActions } from './blocks/PageActions.js'
 import { PageFooter } from './blocks/PageFooter.js'
 import { PageHeader } from './blocks/PageHeader.js'
 import { Pagination } from './blocks/Pagination.js'
@@ -45,6 +46,7 @@ const builtinBlocks: Record<BuiltinBlockName, AnyBlock> = {
   'sidebar-nav': SidebarNav,
   breadcrumbs: Breadcrumbs,
   'page-header': PageHeader,
+  'page-actions': PageActions,
   'api-endpoint': ApiEndpoint,
   hero: Hero,
   content: Content,

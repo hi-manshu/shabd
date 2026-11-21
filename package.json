@@ -15,6 +15,7 @@
     "test": "vitest run",
     "typecheck": "npm run typecheck -w packages/shabd",
     "test:e2e": "npm run build -w packages/shabd && playwright test",
+    "bench": "node scripts/bench/run.mjs",
     "logo": "node scripts/logo/make-logo.mjs",
     "release": "node scripts/release/publish.mjs"
   },
@@ -22,8 +23,13 @@
     "node": ">=22"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.65.1",
+    "@resvg/resvg-js": "^2.6.2",
     "@sqlite.org/sqlite-wasm": "^3.54.1-build1",
+    "mermaid": "^12.3.0",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
   }

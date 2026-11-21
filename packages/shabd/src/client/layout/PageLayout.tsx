@@ -19,11 +19,11 @@
  * Changing what a page looks like is therefore a frontmatter or YAML edit,
  * and a new layout needs no new component.
  */
-import { Component, useLayoutEffect, useRef, type ComponentType, type ReactNode, type RefObject } from 'react'
+import { Component, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type ReactNode, type RefObject } from 'react'
 import { REGIONS, type RegionName } from '../../shared/blocks.js'
 import type { BlockRef } from '../../shared/schema.js'
 import { usePage } from '../app/router.js'
-import { useUi } from '../app/ui.js'
+import { setUi, useUi } from '../app/ui.js'
 import { blockRegistry } from './registry.js'
 
 /** The element each region renders as, so the page has proper landmarks. */
@@ -64,11 +64,70 @@ function usePanelTop(shell: RefObject<HTMLDivElement | null>, open: boolean) {
   }, [shell, open])
 }
 
+/** The width under which the sidebar is a panel over the page. The stylesheet (layout.css) has the same number. */
+const NARROW = '(max-width: 59.99rem)'
+
+/** Is the window that narrow? Not known on the server, nor in the first render in the browser, which has to match it. */
+function useNarrow(): boolean {
+  const [narrow, setNarrow] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia(NARROW)
+    const update = () => setNarrow(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
+  return narrow
+}
+
+/**
+ * The sidebar as a panel over the page, on a narrow screen.
+ *
+ * While it is open the page under it cannot be seen, so it cannot be reached
+ * either: the regions it covers are made inert, and the keyboard's focus
+ * stays in the header and the panel. Escape closes the panel from inside it
+ * and puts the focus back on the button that opened it. On a wide screen the
+ * sidebar is a column and nothing is open: a panel left open is closed when
+ * the window grows.
+ *
+ * Returns whether the panel is covering the page now.
+ */
+function usePanel(shell: RefObject<HTMLDivElement | null>, open: boolean): boolean {
+  const narrow = useNarrow()
+  const covering = open && narrow
+
+  useEffect(() => {
+    if (open && !window.matchMedia(NARROW).matches) setUi({ sidebarOpen: false })
+  }, [open, narrow])
+
+  useEffect(() => {
+    if (!covering) return undefined
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Something nearer the key has taken it already: the search dialog, the palette menu.
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      const toggle = shell.current?.querySelector<HTMLElement>('.sb-menu-toggle')
+      const panel = shell.current?.querySelector('.sb-region-sidebar')
+      const focused = document.activeElement
+      if (focused !== toggle && !panel?.contains(focused)) return
+      setUi({ sidebarOpen: false })
+      toggle?.focus()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [shell, covering])
+
+  return covering
+}
+
+/** The regions the panel does not cover: the banner and the header above it, and itself. */
+const ABOVE_THE_PANEL: readonly RegionName[] = ['banner', 'header', 'sidebar']
+
 export function PageLayout() {
   const { layout, path } = usePage()
   const { sidebarOpen } = useUi()
   const shell = useRef<HTMLDivElement>(null)
   usePanelTop(shell, sidebarOpen)
+  const covering = usePanel(shell, sidebarOpen)
 
   return (
     <div
@@ -86,19 +145,32 @@ export function PageLayout() {
       {REGIONS.map((region) => {
         const blocks = layout.regions[region]
         // Remount the main region per page so its error boundary resets on navigation.
-        return blocks ? <Region key={region === 'main' ? `main:${path}` : region} name={region} blocks={blocks} /> : null
+        return blocks ? (
+          <Region
+            key={region === 'main' ? `main:${path}` : region}
+            name={region}
+            blocks={blocks}
+            covered={covering && !ABOVE_THE_PANEL.includes(region)}
+          />
+        ) : null
       })}
     </div>
   )
 }
 
-function Region({ name, blocks }: { name: RegionName; blocks: BlockRef[] }) {
+/** The id of the sidebar, which the button that opens it on a narrow screen names as what it controls (blocks/Header.tsx). */
+const SIDEBAR_ID = 'sb-sidebar'
+
+function Region({ name, blocks, covered }: { name: RegionName; blocks: BlockRef[]; covered: boolean }) {
   const Element = REGION_ELEMENT[name]
   return (
     <Element
       className={`sb-region sb-region-${name}`}
       aria-label={REGION_LABEL[name]}
+      // Under the open panel: not to be reached by a key or read out, since it cannot be seen.
+      inert={covered ? true : undefined}
       {...(name === 'main' ? { id: 'sb-main', tabIndex: -1 } : {})}
+      {...(name === 'sidebar' ? { id: SIDEBAR_ID } : {})}
     >
       {blocks.map((ref, index) => (
         <Block key={`${ref.block}:${index}`} blockRef={ref} />

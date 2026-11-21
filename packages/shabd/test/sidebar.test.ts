@@ -163,6 +163,38 @@ describe('resolveSidebar', () => {
     ])
   })
 
+  it('lists a folder that holds only its index page as that page, not as a group of one', () => {
+    const { sidebar, unlisted } = resolveSidebar(
+      [{ category: 'Glossary', autogenerate: 'glossary' }],
+      pages({
+        'glossary/index.md': { title: 'Glossary' },
+        // Each term in a folder of its own, as sites that keep a page's pictures beside it do.
+        'glossary/cache/index.md': { title: 'Cache' },
+        'glossary/zone/index.md': { title: 'Zone', sidebar: { order: 1 } },
+        'glossary/api/index.md': { title: 'API', sidebar: { label: 'APIs' } },
+        // A folder with more in it than its index is still a group.
+        'glossary/http/index.md': { title: 'HTTP' },
+        'glossary/http/status.md': { title: 'Status codes' },
+        // And so is one with no index page at all.
+        'glossary/misc/other.md': { title: 'Other' },
+      }),
+    )
+    expect(outline(sidebar)).toEqual([
+      'Glossary (category)',
+      '  Glossary → /glossary',
+      // Placed by its own `order` and its own label, as any page is.
+      '  Zone → /glossary/zone',
+      '  APIs → /glossary/api',
+      '  Cache → /glossary/cache',
+      '  Http (folder auto)',
+      '    HTTP → /glossary/http',
+      '    Status codes → /glossary/http/status',
+      '  Misc (folder auto)',
+      '    Other → /glossary/misc/other',
+    ])
+    expect(unlisted).toEqual([])
+  })
+
   it('warns about entries that match no page instead of failing', () => {
     const { sidebar, warnings } = resolveSidebar(
       [{ category: 'Guide', items: ['guide/introduction', 'guide/missing'] }, { category: 'Gone', autogenerate: 'nope' }],

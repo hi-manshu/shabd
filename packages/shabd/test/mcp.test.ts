@@ -79,6 +79,10 @@ describe('MCP endpoint', () => {
     const result = await client.callTool({ name: 'search_docs', arguments: { query: 'install with npm' } })
     expect(text(result)).toContain('Installation > With npm')
     expect(text(result)).toContain('path: /guide/install#with-npm')
+
+    // An agent that misspells a word is forgiven as a reader is.
+    const misspelt = await client.callTool({ name: 'search_docs', arguments: { query: 'comand line' } })
+    expect(text(misspelt)).toContain('path: /guide/install#with-npm')
   })
 
   it('says so when nothing matches', async () => {

@@ -8,6 +8,11 @@
 import type { VFile } from 'vfile'
 import type { PageSection, TocEntry } from '../../shared/types.js'
 
+/** Something in a page, and the line it is written on when that is known. */
+export interface Located {
+  line?: number
+}
+
 export interface PageData {
   /* inputs */
   /** Lift a leading `# heading` out of the body and report it as the title. */
@@ -16,6 +21,8 @@ export interface PageData {
   routePath: string | undefined
   /** Content-relative path of the file, used to resolve `./other.md` links. */
   id: string | undefined
+  /** Set the page's code beside its prose, row by row. The page's layout asks for it. */
+  split?: boolean | undefined
 
   /* outputs */
   title: string | undefined
@@ -23,16 +30,42 @@ export interface PageData {
   sections: PageSection[]
   /** Internal links found in the page, as route paths (with `#hash` when present). */
   links: string[]
-  /** The colours of the page's code tokens, as a stylesheet. Empty when the page has no highlighted code. */
+  /** The line each of `links` is written on, in the same order. Zero where it is not known. */
+  linkLines: number[]
+  /** Links to other sites, for `shabd check --external`. */
+  external: ({ url: string } & Located)[]
+  /** Pictures with no alternative text. */
+  unlabelled: ({ src: string } & Located)[]
+  /** Tags in a `.md` page that are written like components, which only work in `.mdx`. */
+  strays: ({ name: string } & Located)[]
+  /** The live snippets of the page as they are written, each with the line its fence opens on. `isolated` ones run in a frame of their own. */
+  snippets: ({ code: string; isolated?: boolean } & Located)[]
+  /** The colours of the page's code tokens in the site's own two syntax themes, as a stylesheet. Empty when the page has no highlighted code. */
   codeCss: string
+  /** Each token class of the page with its colour under every syntax theme the theme menu can reach. Empty without a menu. */
+  codeColours: Record<string, string[]>
   /** Every heading id on the page, for checking `#fragment` links that point here. */
   anchors: string[]
 }
 
 const KEY = 'shabd'
 
-export function initPageData(file: VFile, input: Pick<PageData, 'liftTitle' | 'routePath' | 'id'>): PageData {
-  const data: PageData = { ...input, title: undefined, toc: [], sections: [], links: [], anchors: [], codeCss: '' }
+export function initPageData(file: VFile, input: Pick<PageData, 'liftTitle' | 'routePath' | 'id' | 'split'>): PageData {
+  const data: PageData = {
+    ...input,
+    title: undefined,
+    toc: [],
+    sections: [],
+    links: [],
+    linkLines: [],
+    external: [],
+    unlabelled: [],
+    strays: [],
+    snippets: [],
+    anchors: [],
+    codeCss: '',
+    codeColours: {},
+  }
   file.data[KEY] = data
   return data
 }

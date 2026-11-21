@@ -12,7 +12,7 @@ doc:
   width: content
   regions:
     sidebar: [sidebar-nav]
-    main: [breadcrumbs, page-header, content, page-footer, pagination]
+    main: [breadcrumbs, page-header, page-actions, content, page-footer, pagination]
     aside: [toc]
 ```
 
@@ -48,10 +48,11 @@ A page has up to six regions. A region with no blocks is not rendered, and the p
 | `sidebar-nav` | sidebar | The [sidebar](./sidebar.md) |
 | `breadcrumbs` | main | The sidebar groups above this page |
 | `page-header` | main | Title, badges and description |
-| `api-endpoint` | main | The request line from `api:` frontmatter |
+| `page-actions` | main | [The page as Markdown](../features/mcp.md#on-the-page): copy it, open it, hand it to an assistant |
+| `api-endpoint` | main | The request line from `api:` frontmatter, and the form to [try the request](./frontmatter.md#trying-a-request) when the page offers it |
 | `hero` | main | The opening of a splash page, from `hero:` frontmatter |
 | `content` | main | The Markdown body |
-| `page-footer` | main | "Edit this page" |
+| `page-footer` | main | "Edit this page", and the day the page was [last changed](./site.md#when-a-page-was-last-changed) |
 | `pagination` | main | Previous and next page |
 | `toc` | aside | "On this page" |
 | `footer` | footer | The text from `site.footer` |
@@ -66,7 +67,7 @@ names that exist.
 | `base` | | `header`, `footer`. The other three extend it |
 | `doc` | `content` | adds `sidebar`, `main` and `aside` |
 | `splash` | `wide` | adds `main` with `hero` and `content` |
-| `api` | `full` | adds `sidebar` and `main` with `api-endpoint`. No `aside` |
+| `api` | `full` | adds `sidebar` and `main` with `api-endpoint`. No `aside`. Sets [prose beside code](#prose-beside-code) |
 
 `width` sets how wide the main column may grow: `content` is the reading width from the
 [theme](./theme.md), `wide` is 68rem, and `full` has no limit.
@@ -80,7 +81,7 @@ layouts:
   doc:
     regions:
       # No "Edit this page" and no previous/next links
-      main: [breadcrumbs, page-header, content]
+      main: [breadcrumbs, page-header, page-actions, content]
 ```
 
 Every built-in layout extends `base`, so a change to `base` shows on every page. This site adds its announcement bar
@@ -127,7 +128,60 @@ regions:
       props: { title: Contents }
 ```
 
-`toc` takes `title`, and `search` takes `label`. Your own blocks receive whatever you pass.
+`toc` takes `title`, `search` takes `label`, and `page-actions` takes
+[the options listed with it](../features/mcp.md#on-the-page). Your own blocks receive whatever you pass.
+
+## Show a block on some pages only
+
+A block written as an object can carry a condition, `when`. The block is then part of the layout only on the pages
+that meet it.
+
+```yaml title="shabd.config.yaml"
+layouts:
+  base:
+    regions:
+      banner:
+        - block: announcement
+          when:
+            path: /guide/**
+```
+
+| Key | Meaning |
+| --- | --- |
+| `path` | A pattern the page's address must match, or a list of them. `*` stands for one part of a path and `**` for any number, so `/guide/**` is every page under `/guide`, and `/guide` itself. A pattern that starts with `!` takes pages away again |
+| `frontmatter` | Values the page's frontmatter must have. Every key listed must equal the page's value |
+
+```yaml
+when:
+  path: ["/**", "!/blog/**"] # everywhere but the blog
+  frontmatter: { beta: true } # and only on pages that say `beta: true`
+```
+
+With both keys, both must hold. A region whose blocks are all left out is not drawn, as with any other region
+that has nothing in it.
+
+## Prose beside code
+
+A layout with `split: true` sets a page's code samples beside its text on a screen wide enough for both. The page
+is cut into rows at its headings; in each row the text is on the left and the code on the right, and the code stays
+in view while the text beside it is read. On a narrow screen the code follows the text.
+
+The built-in `api` layout does this. The [llms.txt endpoint](../reference/endpoints/llms-txt.md) page shows it. To
+have it on a layout of your own, or to take it off `api`:
+
+```yaml title="shabd.config.yaml"
+layouts:
+  reference:
+    extends: doc
+    width: full
+    split: true
+  api:
+    split: false
+```
+
+A page with no code is left as one column. Only fenced code, [sandboxes](../features/sandbox.mdx) and
+[diagrams](../guide/writing/markdown.md#diagrams) go to the right; tables, callouts and pictures stay with the
+text.
 
 ## Your own blocks
 
@@ -149,6 +203,10 @@ export default function Announcement({ message }: { message?: string }) {
 
 `useSite()` returns the site data and `usePage()` returns the current page: its path, title, frontmatter and outline.
 A block registered under a built-in block's name replaces it.
+
+What `@himanshoe/shabd/client` exports has type declarations, so a site that checks its own TypeScript can check its
+blocks and components against them. Add `@types/react` to the site for that. Shabd compiles a `.tsx` file whether
+or not anything checks it.
 
 ## What a page can switch off
 

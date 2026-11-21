@@ -6,10 +6,12 @@
  *   shabd preview [root]   serve dist/ (with the MCP route)
  *   shabd check [root]     validate config, sidebar, frontmatter and links
  *   shabd mcp [root]       run the docs MCP server over stdio
+ *   shabd import <site>    make a Shabd site from one made with another tool
  */
 import path from 'node:path'
 import { parseArgs } from 'node:util'
 import pc from 'picocolors'
+import { ADAPTERS, isAdapterName, unknownAdapter } from '../shared/adapters.js'
 import { isShabdError } from './config/errors.js'
 import { packageVersion } from './paths.js'
 
@@ -25,14 +27,21 @@ ${pc.bold('Commands')}
   preview   Serve the built site, including the MCP route
   check     Validate config, sidebar, frontmatter and internal links
   mcp       Run the docs MCP server over stdio, for local AI agents
+  import    Make a Shabd site from a Docusaurus, VitePress, Starlight or MkDocs site
+            ${pc.dim('shabd import <site> [--out <folder>] [--from <tool>] [--force]')}
 
 ${pc.bold('Options')}
   --port <number>   Port for dev and preview
   --host [address]  Expose the server on the network
   --open            Open the browser when the server starts
   --no-semantic     Build without embeddings (keyword search only)
-  --adapter <host>  With build: also write the MCP endpoint as a function for
-                    cloudflare, vercel or netlify
+  --adapter <host>  Build for a host as well: ${ADAPTERS.join(', ')}
+  --external        check: also ask links to other sites whether they answer
+  --format <name>   check: text ${pc.dim('(default)')}, json, or github for annotations in a pull request
+  --out <folder>    Where import writes the new site ${pc.dim('(default: <site>-shabd)')}
+  --from <tool>     The tool that made the site to import: docusaurus, vitepress,
+                    starlight or mkdocs ${pc.dim('(default: its config file decides)')}
+  --force           Let import write into a folder that is not empty
   -h, --help        Show this help
   -v, --version     Show the version
 `
@@ -47,6 +56,11 @@ export async function main(argv: string[]): Promise<void> {
       open: { type: 'boolean' },
       'no-semantic': { type: 'boolean' },
       adapter: { type: 'string' },
+      external: { type: 'boolean' },
+      format: { type: 'string' },
+      out: { type: 'string' },
+      from: { type: 'string' },
+      force: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
       version: { type: 'boolean', short: 'v' },
     },
@@ -68,6 +82,8 @@ export async function main(argv: string[]): Promise<void> {
     fail(`--port must be a number between 0 and 65535, got "${values.port}"`)
   }
   const host = values.host === undefined ? undefined : values.host === '' ? true : values.host
+  const adapter = values.adapter
+  if (adapter !== undefined && !isAdapterName(adapter)) fail(unknownAdapter(adapter))
 
   try {
     switch (command) {
@@ -80,28 +96,39 @@ export async function main(argv: string[]): Promise<void> {
       }
       case 'build': {
         const { build } = await import('./build/build.js')
-        const { ADAPTERS, isAdapter } = await import('./build/adapters.js')
-        const adapter = values.adapter
-        if (adapter !== undefined && !isAdapter(adapter)) {
-          fail(`--adapter takes one of ${ADAPTERS.join(', ')}. Got "${adapter}".`)
-        }
-        await build(root, { semantic: !values['no-semantic'], ...(adapter ? { adapter } : {}) })
+        await build(root, { semantic: !values['no-semantic'], adapter })
         break
       }
       case 'preview': {
         const { preview } = await import('./build/preview.js')
-        await preview(root, { port, host })
+        const server = await preview(root, { port, host })
+        server.printUrls()
         break
       }
       case 'check': {
-        const { check } = await import('./check.js')
-        const ok = await check(root)
+        const { check, CHECK_FORMATS } = await import('./check.js')
+        const format = values.format ?? 'text'
+        if (!(CHECK_FORMATS as readonly string[]).includes(format)) {
+          fail(`--format must be one of ${CHECK_FORMATS.join(', ')}, got "${format}"`)
+        }
+        const ok = await check(root, { external: values.external === true, format: format as (typeof CHECK_FORMATS)[number] })
         if (!ok) process.exitCode = 1
         break
       }
       case 'mcp': {
         const { serveStdio } = await import('./mcp/stdio.js')
         await serveStdio(root)
+        break
+      }
+      case 'import': {
+        if (positionals[1] === undefined) {
+          fail('shabd import needs the folder of the site to import: shabd import <site> [--out <folder>]')
+        }
+        const { formatReport, hasErrors, importSite } = await import('./import/index.js')
+        const result = await importSite(positionals[1], { out: values.out, from: values.from, force: values.force })
+        console.log(formatReport(result))
+        // The site is written either way. The exit code says whether Shabd would build it as it is.
+        if (hasErrors(result)) process.exitCode = 1
         break
       }
       default:
@@ -112,6 +139,7 @@ export async function main(argv: string[]): Promise<void> {
       console.error(`\n${error.pretty()}\n`)
       process.exit(1)
     }
+    if (error instanceof Error && error.name === 'ImportError') fail(error.message)
     throw error
   }
 }

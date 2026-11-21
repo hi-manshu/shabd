@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
+import { PORTS } from './e2e/support/ports.mjs'
 
 /**
  * Browser tests. Two servers run for the whole session, each on its own copy
@@ -8,6 +9,7 @@ import { defineConfig, devices } from '@playwright/test'
  *   :4412  `shabd preview`  a production build, for everything else
  *
  * Tests run one at a time: the dev tests share one set of files.
+ * `SHABD_E2E_PORT` moves both servers, for a second checkout running the tests at the same time.
  */
 export default defineConfig({
   testDir: 'e2e',
@@ -42,13 +44,13 @@ export default defineConfig({
   webServer: [
     {
       command: 'node e2e/support/serve.mjs dev',
-      url: 'http://localhost:4411/',
+      url: `http://localhost:${PORTS.dev}/`,
       reuseExistingServer: false,
       timeout: 60_000,
     },
     {
       command: 'node e2e/support/serve.mjs preview',
-      url: 'http://localhost:4412/',
+      url: `http://localhost:${PORTS.preview}/`,
       reuseExistingServer: false,
       timeout: 120_000,
     },

@@ -4,6 +4,9 @@
  * Authors link the way they would on GitHub (`[Install](./install.md)`), so
  * the Markdown works in both places. Every internal link is also recorded so
  * `shabd check` can report links that point at pages which do not exist.
+ *
+ * The same walk notes what else `shabd check` asks about: links that leave
+ * the site, and pictures that say nothing to a reader who cannot see them.
  */
 import path from 'node:path'
 import type { Element, Root } from 'hast'
@@ -14,6 +17,7 @@ import { pageData } from '../page-data.js'
 
 const PAGE_FILE = /\.mdx?$/i
 const OTHER_FILE = /\.[a-z0-9]{1,8}$/i
+const WEB_ADDRESS = /^https?:\/\//i
 
 /** Resolve an href written in a page to a route path. Returns undefined for links to leave alone. */
 export function resolvePageLink(href: string, id: string | undefined): string | undefined {
@@ -44,11 +48,28 @@ export function rehypeLinks() {
   return (tree: Root, file: VFile) => {
     const data = pageData(file)
     visit(tree, 'element', (node: Element) => {
+      const line = node.position?.start.line
+
+      if (node.tagName === 'img') {
+        const alt = node.properties.alt
+        if (typeof alt !== 'string' || alt.trim() === '') {
+          data.unlabelled.push({ src: String(node.properties.src ?? ''), ...(line ? { line } : {}) })
+        }
+        return
+      }
+
       if (node.tagName !== 'a' || typeof node.properties.href !== 'string') return
-      const resolved = resolvePageLink(node.properties.href, data.id)
+      const href = node.properties.href
+      if (WEB_ADDRESS.test(href)) {
+        data.external.push({ url: href, ...(line ? { line } : {}) })
+        return
+      }
+      const resolved = resolvePageLink(href, data.id)
       if (resolved === undefined) return
       node.properties.href = resolved
       data.links.push(resolved)
+      // Zero stands for "not known": a link that a plugin made has no place in the file.
+      data.linkLines.push(line ?? 0)
     })
   }
 }

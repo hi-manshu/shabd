@@ -17,9 +17,10 @@ import {
   type ReactNode,
 } from 'react'
 import { resolvePageLayout, type ActiveLayout } from '../../shared/layout.js'
+import type { PassageTarget } from '../../shared/passage.js'
 import { normalizePath, stripBase } from '../../shared/paths.js'
 import type { Frontmatter } from '../../shared/schema.js'
-import type { SiteData, TocEntry } from '../../shared/types.js'
+import type { PageUpdated, SiteData, TocEntry } from '../../shared/types.js'
 import { onPageUpdate, pageModules } from './hmr.js'
 import { NotFound } from './NotFound.js'
 import { routeStore, siteStore, useSite } from './store.js'
@@ -73,13 +74,15 @@ export interface PageView {
   toc: TocEntry[]
   /** The colours of the page's code tokens, as a stylesheet. */
   codeCss: string
+  /** The day the page was last changed, when the site shows it and has one. */
+  updated?: PageUpdated | undefined
   /** The layout chosen by frontmatter, with this page's region switches applied. */
   layout: ActiveLayout
   Content: ComponentType<Record<string, unknown>>
   notFound: boolean
 }
 
-const NO_FRONTMATTER = { sidebar: {}, badges: [], draft: false, toc: undefined } as Frontmatter
+const NO_FRONTMATTER = { sidebar: {}, badges: [], draft: false, noindex: false, toc: undefined } as Frontmatter
 
 export function toPageView(site: SiteData, page: LoadedPage): PageView {
   const meta = site.pages[page.path]
@@ -93,7 +96,7 @@ export function toPageView(site: SiteData, page: LoadedPage): PageView {
       frontmatter,
       toc: [],
       codeCss: '',
-      layout: resolvePageLayout(site, frontmatter, []),
+      layout: resolvePageLayout(site, frontmatter, [], page.path),
       Content: NotFound,
       notFound: true,
     }
@@ -101,13 +104,14 @@ export function toPageView(site: SiteData, page: LoadedPage): PageView {
   const { frontmatter, toc } = page.module
   return {
     codeCss: page.module.codeCss ?? '',
+    updated: page.module.updated,
     path: page.path,
     id: meta.id,
     title: meta.title,
     description: meta.description,
     frontmatter,
     toc,
-    layout: resolvePageLayout(site, frontmatter, toc),
+    layout: resolvePageLayout(site, frontmatter, toc, page.path),
     Content: page.module.default,
     notFound: false,
   }
@@ -117,7 +121,21 @@ export function toPageView(site: SiteData, page: LoadedPage): PageView {
 
 interface RouterValue {
   path: string
-  navigate(to: string, options?: { replace?: boolean }): Promise<void>
+  /**
+   * Go to a page of the site. `passage` is what a search result passes on: the
+   * page then opens at that passage, with the words of the query marked.
+   *
+   * `keepFocus` leaves focus where it is. A new page normally takes it; the Studio keeps it when it is
+   * the Studio that moved the reader, to a page it has just made or renamed.
+   */
+  navigate(to: string, options?: { replace?: boolean; passage?: PassageTarget; keepFocus?: boolean }): Promise<void>
+  /**
+   * Dev: keep the page that is on screen there, though its file goes, until the function this returns is
+   * called. The Studio holds a page while it renames or deletes it. Without that the page is "not found"
+   * from the moment its file is gone until the Studio has gone to where the page went, and for a long page
+   * that is most of a second.
+   */
+  hold(): () => void
 }
 
 const RouterContext = createContext<RouterValue | null>(null)
@@ -143,12 +161,72 @@ interface ScrollTarget {
   /** Pixel offset to restore, or null to go to the hash (or the top). */
   top: number | null
   focus: boolean
+  /** The passage a search result led to, within the section the hash names. */
+  passage?: PassageTarget | undefined
+}
+
+/**
+ * What an entry of the browser's history holds. A passage travels here and
+ * not in the address, so the address of a search result is the address of
+ * its section and nothing more.
+ */
+interface EntryState {
+  key?: string
+  passage?: PassageTarget
 }
 
 const scrollPositions = new Map<string, number>()
 let keySeed = 0
 const newKey = () => `${Date.now().toString(36)}${keySeed++}`
-const historyKey = (): string => (history.state as { key?: string } | null)?.key ?? ''
+const entryState = (): EntryState => (history.state as EntryState | null) ?? {}
+const historyKey = (): string => entryState().key ?? ''
+
+/**
+ * The passage the current entry holds. History outlives a deploy, so what is
+ * read back may have been put there by another version of the site: anything
+ * that is not a passage as this version knows it is left alone.
+ */
+function heldPassage(): PassageTarget | undefined {
+  const held: Partial<Record<keyof PassageTarget, unknown>> | undefined = entryState().passage
+  const isPassage =
+    typeof held?.text === 'string' && Array.isArray(held.words) && held.words.every((word) => typeof word === 'string')
+  return isPassage ? (held as PassageTarget) : undefined
+}
+
+/**
+ * Take the passage out of the current entry. It is kept while the reader is
+ * at it, so that a reload shows the same thing again, and dropped when they
+ * clear the marks or leave: coming back does not mark the page a second time.
+ */
+function forgetPassage(): void {
+  const { key, passage } = entryState()
+  if (passage) history.replaceState({ key }, '')
+}
+
+/** Removes the marks a search result left on the page. Null when there are none. */
+let removeMarks: (() => void) | null = null
+
+function clearMarks(): void {
+  removeMarks?.()
+  removeMarks = null
+}
+
+function goToPassage(passage: PassageTarget, hash: string): void {
+  const key = historyKey()
+  // Fetched when it is needed: only a reader who arrives from search has a passage to go to,
+  // and the search dialog has loaded this module by then.
+  void import('../search/passage.js').then(
+    ({ showPassage }) => {
+      // The reader may have gone somewhere else while it loaded.
+      if (historyKey() !== key) return
+      clearMarks()
+      removeMarks = showPassage(passage, hash ? decodeURIComponent(hash.slice(1)) : '', forgetPassage)
+    },
+    () => {
+      // The page is at the section's heading, which is where a result led before there were passages.
+    },
+  )
+}
 
 function applyScroll(target: ScrollTarget): void {
   if (target.top !== null) {
@@ -161,6 +239,7 @@ function applyScroll(target: ScrollTarget): void {
   }
   // Move focus to the content so keyboard and screen-reader users start at the new page.
   if (target.focus) document.getElementById('sb-main')?.focus({ preventScroll: true })
+  if (target.passage) goToPassage(target.passage, target.hash)
 }
 
 export function RouterProvider({ initial, children }: { initial: LoadedPage; children: ReactNode }) {
@@ -172,6 +251,8 @@ export function RouterProvider({ initial, children }: { initial: LoadedPage; chi
   const scrollTarget = useRef<ScrollTarget | null>(null)
 
   const show = useCallback((next: LoadedPage, target: ScrollTarget) => {
+    // The marks of a search result belong to the visit they were made for.
+    clearMarks()
     pathRef.current = next.path
     scrollTarget.current = target
     setPage(next)
@@ -188,10 +269,14 @@ export function RouterProvider({ initial, children }: { initial: LoadedPage; chi
       }
       const next = await loadPage(path)
       scrollPositions.set(keyRef.current, window.scrollY)
+      // The entry being left gives up its passage, so that coming back to it marks nothing.
+      forgetPassage()
       keyRef.current = newKey()
-      history[options.replace ? 'replaceState' : 'pushState']({ key: keyRef.current }, '', url.href)
+      const { passage } = options
+      const state: EntryState = { key: keyRef.current, ...(passage ? { passage } : {}) }
+      history[options.replace ? 'replaceState' : 'pushState'](state, '', url.href)
       setUi({ sidebarOpen: false })
-      show(next, { hash: url.hash, top: null, focus: path !== pathRef.current })
+      show(next, { hash: url.hash, top: null, focus: !options.keepFocus && path !== pathRef.current, passage })
     },
     [show],
   )
@@ -204,11 +289,15 @@ export function RouterProvider({ initial, children }: { initial: LoadedPage; chi
     if (!historyKey()) history.replaceState({ key: newKey() }, '')
     keyRef.current = historyKey()
     // On first load the browser looked for the hash before the page rendered.
-    if (location.hash) applyScroll({ hash: location.hash, top: null, focus: false })
+    // After a reload, the entry may still hold the passage a search result led to.
+    const passage = heldPassage()
+    if (location.hash || passage) applyScroll({ hash: location.hash, top: null, focus: false, passage })
 
     const onPopState = async () => {
       scrollPositions.set(keyRef.current, window.scrollY)
       keyRef.current = historyKey()
+      // Back at an entry that was left with its marks on: they went when the reader did.
+      forgetPassage()
       const next = await loadPage(currentRoute())
       show(next, { hash: location.hash, top: scrollPositions.get(keyRef.current) ?? null, focus: false })
     }
@@ -250,6 +339,8 @@ export function RouterProvider({ initial, children }: { initial: LoadedPage; chi
   useEffect(
     () =>
       onPageUpdate((id, module) => {
+        // The body is rendered again from the new module, so the text a search result's marks were on is gone.
+        if (siteStore.get().pages[pathRef.current]?.id === id) clearMarks()
         setPage((current) => (siteStore.get().pages[current.path]?.id === id ? { path: current.path, module } : current))
       }),
     [],
@@ -275,13 +366,26 @@ export function RouterProvider({ initial, children }: { initial: LoadedPage; chi
     if (target) applyScroll(target)
   }, [navigation])
 
-  const view = useMemo(() => toPageView(site, page), [site, page])
+  const found = useMemo(() => toPageView(site, page), [site, page])
+  /** The page a caller of `hold` asked to keep on screen. It is shown for as long as there is no page at the address. */
+  const [held, setHeld] = useState<PageView | null>(null)
+  const view = held && found.notFound ? held : found
+  const shown = useRef(view)
+  useEffect(() => {
+    shown.current = view
+  })
+
+  const hold = useCallback(() => {
+    const kept = shown.current
+    setHeld(kept)
+    return () => setHeld((current) => (current === kept ? null : current))
+  }, [])
 
   useEffect(() => {
     document.title = view.title && view.title !== site.site.title ? `${view.title} | ${site.site.title}` : site.site.title
   }, [view.title, site.site.title])
 
-  const router = useMemo<RouterValue>(() => ({ path: page.path, navigate }), [page.path, navigate])
+  const router = useMemo<RouterValue>(() => ({ path: page.path, navigate, hold }), [page.path, navigate, hold])
 
   return (
     <RouterContext value={router}>

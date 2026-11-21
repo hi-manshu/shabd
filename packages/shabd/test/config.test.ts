@@ -3,7 +3,7 @@ import { isShabdError, type ShabdError } from '../src/node/config/errors.js'
 import { parseSidebar, resolveConfig } from '../src/node/config/load.js'
 import { renderDocument } from '../src/node/build/html.js'
 import { colorModeScript, paletteChoices, themeBaseCss, themePaletteCss, themeToCss } from '../src/node/config/theme-css.js'
-import { PRESET_NAMES, THEME_PRESETS, codeThemePlan, type ThemePreset } from '../src/shared/presets.js'
+import { HEADER_MUTED, PRESET_NAMES, THEME_PRESETS, codeThemePlan, type ThemePreset } from '../src/shared/presets.js'
 
 const load = (yaml: string) => resolveConfig('/site', '/site/shabd.config.yaml', yaml)
 
@@ -78,7 +78,16 @@ features:
     expect(config.theme.colors.accent).toEqual({ light: '#ff0000', dark: '#ff0000' })
     expect(config.features.search.enabled).toBe(false)
     expect(config.features.search.model).toBe('Xenova/all-MiniLM-L6-v2')
-    expect(config.features.mcp).toEqual({ enabled: true, route: '/agents' })
+    expect(config.features.mcp).toEqual({ enabled: true, route: '/agents', semantic: true })
+  })
+
+  it('takes the embedding model from Hugging Face unless the site is to serve it', () => {
+    expect(load('site:\n  title: Docs\n').config.features.search.modelSource).toBe('huggingface')
+    const served = load('site:\n  title: Docs\nfeatures:\n  search: { modelSource: site }\n')
+    expect(served.config.features.search.modelSource).toBe('site')
+    const error = failure(() => load('site:\n  title: Docs\nfeatures:\n  search: { modelSource: cdn }\n'))
+    expect(error.issues[0]?.path).toEqual(['features', 'search', 'modelSource'])
+    expect(error.issues[0]?.line).toBe(4)
   })
 
   it('points at the line and column of a typo and suggests the fix', () => {
@@ -317,6 +326,67 @@ describe('theme presets and the reader\'s menu', () => {
     expect(mine.typography.mono).toMatch(/^"SF Mono"/)
     expect(mine.colors.sidebar).toEqual({ light: '#ffffff', dark: '#ffffff' })
     expect(themeToCss(mine)).toMatch(/^:root \{[^}]*--sb-title-bar: 0\.16em;/)
+  })
+
+  it('writes the header in the page\'s colours until it is given an ink of its own', () => {
+    // The body of one rule. No rule in the theme has braces inside it.
+    const block = (css: string, selector: string) => {
+      const start = css.indexOf(`${selector} {`)
+      return start < 0 ? '' : css.slice(start, css.indexOf('}', start))
+    }
+
+    const plain = themeToCss(theme('  radius: 8px\n'))
+    const page = block(plain, ':root')
+    expect(page).toContain('--sb-header-text: var(--sb-text);')
+    expect(page).toContain('--sb-header-muted: var(--sb-muted);')
+    expect(page).toContain('--sb-header-hover: var(--sb-surface);')
+    expect(page).toContain('--sb-header-focus: var(--sb-accent);')
+    // No value, so that a badge in the header keeps the colour of its kind.
+    expect(page).toContain('--sb-header-badge: initial;')
+    // The logo follows the page: the one drawn for a light page in the light mode, the other in the dark.
+    expect(page).toContain('--sb-header-logo-light: inline-block;')
+    expect(page).toContain('--sb-header-logo-dark: none;')
+    const night = block(plain, ":root[data-theme='dark']")
+    expect(night).toContain('--sb-header-logo-light: none;')
+    expect(night).toContain('--sb-header-logo-dark: inline-block;')
+    // The rest follows the page's colours by itself, and is not written twice.
+    expect(night).not.toContain('--sb-header-muted')
+
+    // A dark bar on a light page, and a light one on a dark page.
+    const own = theme('  colors:\n    header: { light: "#102a43", dark: "#f0f4f8" }\n    headerText: { light: "#ffffff", dark: "#102a43" }\n')
+    expect(own.colors.headerText).toEqual({ light: '#ffffff', dark: '#102a43' })
+    const css = themeToCss(own)
+    const light = block(css, ':root')
+    expect(light).toContain('--sb-header-text: #ffffff;')
+    // The quieter tones are made from the ink, see-through so that they are right on any header.
+    expect(light).toContain(`--sb-header-muted: color-mix(in oklab, var(--sb-header-text) ${HEADER_MUTED * 100}%, transparent);`)
+    expect(light).toContain('--sb-header-hover: color-mix(in oklab, var(--sb-header-text) 14%, transparent);')
+    expect(light).toContain('--sb-header-focus: var(--sb-header-text);')
+    expect(light).toContain('--sb-header-badge: var(--sb-header-text);')
+    // A light ink means a dark bar, which takes the logo drawn for the dark, whatever the page is.
+    expect(light).toContain('--sb-header-logo-light: none;')
+    expect(light).toContain('--sb-header-logo-dark: inline-block;')
+    const dark = block(css, ":root[data-theme='dark']")
+    expect(dark).toContain('--sb-header-text: #102a43;')
+    expect(dark).toContain('--sb-header-logo-light: inline-block;')
+    expect(dark).toContain('--sb-header-logo-dark: none;')
+
+    // An ink that cannot be read here says nothing about the bar, and the logo follows the page.
+    const unread = block(themeToCss(theme('  colors:\n    headerText: var(--brand-ink)\n')), ':root')
+    expect(unread).toContain('--sb-header-text: var(--brand-ink);')
+    expect(unread).toContain('--sb-header-logo-light: inline-block;')
+
+    // A preset from the menu sets all of it again: the site's header may have an ink, and the preset's may not.
+    const menu = themeToCss(theme('  picker: [xp, forest]\n  colors:\n    headerText: "#ffffff"\n'))
+    const forest = block(menu, ":root[data-palette='forest']")
+    expect(forest).toContain('--sb-header-text: var(--sb-text);')
+    expect(forest).toContain('--sb-header-muted: var(--sb-muted);')
+    expect(forest).toContain('--sb-header-logo-light: inline-block;')
+    // Windows XP has a blue bar written in white.
+    const xp = block(menu, ":root[data-palette='xp']")
+    expect(xp).toContain('--sb-header-text: #ffffff;')
+    expect(xp).toContain('--sb-header-focus: var(--sb-header-text);')
+    expect(xp).toContain('--sb-header-logo-dark: inline-block;')
   })
 
   it('gives a reader who picks a preset its look as well as its colours', () => {
