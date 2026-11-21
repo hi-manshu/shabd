@@ -33,7 +33,7 @@ describe('features.sandbox.modules', () => {
       // A path inside a package is that package's to answer.
       { name: 'date-fns/locale', from: 'date-fns/locale' },
       { name: '@acme/ui/button', from: '@acme/ui/button' },
-      { name: 'charts', from: `${dir}/components/charts.ts` },
+      { name: 'charts', from: path.join(dir, 'components', 'charts.ts') },
     ])
     expect(resolveConfig(dir, `${dir}/shabd.config.yaml`, 'site:\n  title: Docs\n').sandboxModules).toEqual([])
   })

@@ -76,7 +76,8 @@ browser: that is a note, and nothing is held against the page. Addresses on name
 ### For a program, and for pull requests
 
 `--format json` prints one JSON object and nothing else: the number of pages, of errors, warnings and notes, and
-every finding with its `level`, `rule`, `file`, `line` and `message`.
+every finding with its `level`, `rule`, `file`, `line` and `message`. A `file` is written from the site's folder
+with `/` between its folders, on Windows too, so a report reads the same wherever it was made.
 
 `--format github` prints each finding as a GitHub Actions annotation, which GitHub shows beside the line in a pull
 request:

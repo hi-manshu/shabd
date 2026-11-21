@@ -78,14 +78,19 @@ describe('a file of the client that exports a component', () => {
  * app's entry, and the page starts again.
  */
 describe('a module of the client that keeps something for the life of the page', () => {
-  const files = (readdirSync(CLIENT, { recursive: true }) as string[]).filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.d.ts')).sort()
+  /** A file by its path from the client's folder, with `/` between its folders on every system. */
+  const named = (file: string) => file.split(path.sep).join('/')
+  const files = (readdirSync(CLIENT, { recursive: true }) as string[])
+    .map(named)
+    .filter((file) => /\.tsx?$/.test(file) && !file.endsWith('.d.ts'))
+    .sort()
   const source = new Map(files.map((file) => [file, readFileSync(path.join(CLIENT, file), 'utf8')]))
 
   /** The file of the client a module imports from, for an import that is not of types alone. */
   const resolve = (from: string, specifier: string): string | undefined => {
     if (!specifier.startsWith('.')) return undefined
     const base = path.join(path.dirname(path.join(CLIENT, from)), specifier.replace(/\.js$/, ''))
-    for (const ending of ['.ts', '.tsx', '/index.ts', '/index.tsx']) if (existsSync(base + ending)) return path.relative(CLIENT, base + ending)
+    for (const ending of ['.ts', '.tsx', '/index.ts', '/index.tsx']) if (existsSync(base + ending)) return named(path.relative(CLIENT, base + ending))
     return undefined
   }
   const imports = (file: string): string[] =>

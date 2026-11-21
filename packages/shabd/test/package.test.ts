@@ -105,9 +105,16 @@ describe('package', () => {
 
     await mkdir(WORK, { recursive: true })
     const dir = await mkdtemp(path.join(WORK, 'types-'))
-    const tsc = path.join(root, '..', '..', 'node_modules', '.bin', 'tsc')
+    // The compiler's own script, run by Node. What is in node_modules/.bin is a shell script, and on Windows
+    // a .cmd file beside it, which `execFile` does not start.
+    const tsc = path.join(root, '..', '..', 'node_modules', 'typescript', 'bin', 'tsc')
     const run = (args: string[]) =>
-      new Promise<string>((resolve) => execFile(tsc, args, { cwd: root }, (_error, stdout, stderr) => resolve(`${stdout}${stderr}`.trim())))
+      new Promise<string>((resolve) =>
+        execFile(process.execPath, [tsc, ...args], { cwd: root }, (error, stdout, stderr) =>
+          // A compiler that could not be started at all has said nothing: that is not the same as nothing to say.
+          resolve(`${stdout}${stderr}`.trim() || (error ? `tsc did not run: ${error.message}` : '')),
+        ),
+      )
     try {
       // The declarations, written here and not read from dist/, which may be older than the source.
       expect(await run(['-p', 'tsconfig.client-types.json', '--outDir', path.join(dir, 'declared')])).toBe('')

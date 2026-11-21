@@ -22,7 +22,7 @@ import { stripBase } from '../../shared/paths.js'
 import { COLOR_TOKENS, OPTIONAL_COLOR_TOKENS, PRESET_NAMES, THEME_PRESETS } from '../../shared/presets.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
 import { FEED_FILE, renderFeed } from '../build/feed.js'
-import { collectProblems, type Problem } from '../check.js'
+import { collectProblems, fileFrom, type Problem } from '../check.js'
 import { isShabdError } from '../config/errors.js'
 import { resolveConfig } from '../config/load.js'
 import { planRedirect } from '../config/redirect-edit.js'
@@ -462,7 +462,7 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
         error.issues.map((issue) => ({
           level: 'error' as const,
           rule: 'page',
-          file: path.relative(config.root, error.file),
+          file: fileFrom(config.root, error.file),
           line: issue.line,
           message: issue.message,
         })),

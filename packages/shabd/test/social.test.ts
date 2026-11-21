@@ -120,8 +120,9 @@ describe('social pictures', () => {
       load('site:\n  title: Docs\n  url: https://docs.example\nfeatures:\n  socialImages:\n    font: [./a.ttf, ./b.ttf]\n'),
     )
     expect(missing.issues.map((issue) => issue.message)).toEqual([
-      'File not found: ./a.ttf (looked in /site/a.ttf)',
-      'File not found: ./b.ttf (looked in /site/b.ttf)',
+      // Where it looked is a path of the machine: `/site/a.ttf` here, and on Windows one with a drive in it.
+      `File not found: ./a.ttf (looked in ${path.resolve('/site', 'a.ttf')})`,
+      `File not found: ./b.ttf (looked in ${path.resolve('/site', 'b.ttf')})`,
     ])
   })
 

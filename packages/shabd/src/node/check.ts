@@ -24,7 +24,7 @@ export interface Problem {
   level: ProblemLevel
   /** Which check found it: `link`, `redirect`, `sidebar`, `variable`, `alt-text`, `description`, `external-link`, `openapi`, `snippet`. */
   rule: string
-  /** File the problem is in, relative to the site root. */
+  /** File the problem is in, relative to the site root, with `/` between its folders on every system. */
   file: string
   line?: number | undefined
   message: string
@@ -48,11 +48,18 @@ export interface CheckOptions {
 /** How many notes about one OpenAPI description are given in full. */
 const MOST_NOTES = 12
 
+/**
+ * A file as a problem names it: from the site's folder, with `/` between its folders. Windows would write
+ * `content\guide\install.md`, and a report that is read by a program, or pasted into an issue, would then
+ * differ by the machine it was made on.
+ */
+export const fileFrom = (root: string, file: string): string => path.relative(root, file).split(path.sep).join('/')
+
 /** Compile every page and collect problems with content, navigation and links. */
 export async function collectProblems(context: ShabdContext, options: CheckOptions = {}): Promise<CheckResult> {
   const { config, store } = context
   const rules = config.config.check
-  const relative = (file: string) => path.relative(config.root, file)
+  const relative = (file: string) => fileFrom(config.root, file)
   const problems: Problem[] = []
   const detailed: ShabdError[] = []
   const at = (line: number | undefined) => (line ? { line } : {})
@@ -231,7 +238,7 @@ function fromDetailed(error: ShabdError, root: string): Problem[] {
   return error.issues.map((issue) => ({
     level: 'error' as const,
     rule: 'page',
-    file: path.relative(root, error.file),
+    file: fileFrom(root, error.file),
     ...(issue.line !== undefined ? { line: issue.line } : {}),
     message: issue.message,
   }))

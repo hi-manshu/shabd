@@ -48,7 +48,10 @@ export class ShabdError extends Error {
 
   /** Coloured, multi-issue report for the terminal. */
   pretty(cwd = process.cwd()): string {
-    return formatIssues(path.relative(cwd, this.file) || this.file, this.issues, this.source, true)
+    // The file from the folder the command was run in, with `/` between its folders on every system: the
+    // way `shabd check` names the file of every other problem it lists beside this one.
+    const shown = path.relative(cwd, this.file).split(path.sep).join('/') || this.file
+    return formatIssues(shown, this.issues, this.source, true)
   }
 }
 
