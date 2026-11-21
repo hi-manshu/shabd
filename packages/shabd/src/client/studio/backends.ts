@@ -108,6 +108,34 @@ async function ask<Answer>(path: string, method: string, body?: unknown): Promis
   return answer
 }
 
+/** Where an offer was left with the dev server, and where the dev server can be reached (src/node/vite/signal.ts). */
+export interface Invitation {
+  room: string
+  local: string[]
+  network: string[]
+}
+
+/** Leave an offer with the dev server, for the other person's Studio to read and to answer. */
+export function openInvitation(offer: string): Promise<Invitation> {
+  return ask<Invitation>('signal', 'POST', { offer })
+}
+
+/** The answer to an invitation, once there is one. Nothing, when the invitation ran out or was taken back first. */
+export async function answerTo(room: string, stop: AbortSignal): Promise<string | undefined> {
+  while (!stop.aborted) {
+    const response = await fetch(endpoint(`signal/${room}/answer`), { headers: await serverHeaders(), signal: stop })
+    if (response.status === 200) return ((await response.json()) as { answer: string }).answer
+    // 204 says that nobody has answered yet: the dev server holds a request for so long, and is asked again.
+    if (response.status !== 204) return undefined
+  }
+  return undefined
+}
+
+/** Take an invitation back. */
+export async function closeInvitation(room: string): Promise<void> {
+  await fetch(endpoint(`signal/${room}`), { method: 'DELETE', headers: await serverHeaders() }).catch(() => {})
+}
+
 /** One line of what `shabd check` reports. */
 export interface CheckProblem {
   level: 'error' | 'warning' | 'note'

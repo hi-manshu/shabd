@@ -18,17 +18,20 @@ import { IMAGE_BYTES_LIMIT, IMAGE_TOO_LARGE, imageMarkdown } from '../../shared/
 import { CodeEditor, type EditorHandle, type EditorInsertion } from '../editor/CodeEditor.js'
 import { endsLinesWithCrLf, toCrLf, toLineFeeds, type Replacement } from '../editor/text.js'
 import {
+  answerTo,
+  closeInvitation,
   ConflictError,
   connectFolder,
   connectServer,
   folderAccessSupported,
+  openInvitation,
   restoreFolder,
   type SourceFile,
   type StudioBackend,
 } from './backends.js'
 import { SharedDraft, type Link } from './draft.js'
 import { PageActions } from './PageActions.js'
-import { PeerChannel, PeerError, peerId, tabChannel, type PeerState, type StudioChannel } from './sync.js'
+import { answerAt, isInviteLink, offerAt, PeerChannel, PeerError, peerId, tabChannel, type PeerState, type StudioChannel } from './sync.js'
 
 /** How long typing must pause before the file is written. */
 const SAVE_DELAY = 250
@@ -450,16 +453,37 @@ export default function Studio() {
 }
 
 /**
- * Pair editing over WebRTC. Signalling is two pasted codes: an invite from
- * the host and a reply from the guest. After that the browsers talk directly.
+ * Pair editing over WebRTC. The two browsers each need a note from the other
+ * before they can talk. The one who invites leaves theirs with the dev
+ * server and sends a link to it: the other pastes the link, and their Studio
+ * reads the note and leaves its own. Where the link cannot be opened from
+ * the other machine, the two notes are codes that the two people copy to
+ * each other instead. After that the browsers talk directly.
  */
 function PeerPanel({ onChannel }: { onChannel: (channel: PeerChannel) => () => void }) {
+  const { site } = useSite()
   const [peer, setPeer] = useState<PeerChannel | null>(null)
   const [state, setState] = useState<PeerState>('idle')
   const [role, setRole] = useState<'host' | 'guest' | null>(null)
   const [code, setCode] = useState('')
+  /** Where the offer was left for the other person, when the dev server took it. */
+  const [link, setLink] = useState<{ url: string; reach: 'network' | 'machine' } | null>(null)
+  /** The one who invites has asked for the codes: the link cannot be opened from the other machine. */
+  const [byCode, setByCode] = useState(false)
   const [pasted, setPasted] = useState('')
   const [problem, setProblem] = useState('')
+  /** The invitation that waits for its answer, to be taken back when it is no longer wanted. */
+  const waiting = useRef<{ room: string; stop: AbortController } | null>(null)
+
+  const takeBack = () => {
+    const held = waiting.current
+    waiting.current = null
+    if (!held) return
+    held.stop.abort()
+    void closeInvitation(held.room)
+  }
+
+  useEffect(() => takeBack, [])
 
   useEffect(() => {
     if (!peer) return
@@ -475,10 +499,13 @@ function PeerPanel({ onChannel }: { onChannel: (channel: PeerChannel) => () => v
   }, [peer])
 
   const startAgain = () => {
+    takeBack()
     setPeer(null)
     setState('idle')
     setRole(null)
     setCode('')
+    setLink(null)
+    setByCode(false)
     setPasted('')
     setProblem('')
   }
@@ -499,23 +526,60 @@ function PeerPanel({ onChannel }: { onChannel: (channel: PeerChannel) => () => v
       const created = new PeerChannel()
       setPeer(created)
       setRole('host')
-      setCode(await created.invite())
+      const offer = await created.invite()
+      setCode(offer)
+      // The offer is left with the dev server too, so that a link can be sent in place of the code. A dev
+      // server that does not take it leaves the code, which gets across wherever a message does.
+      try {
+        const invitation = await openInvitation(offer)
+        const stop = new AbortController()
+        waiting.current = { room: invitation.room, stop }
+        // A page opened at this machine's own name is no address to send to another: the dev server says
+        // where else it listens, if anywhere.
+        const own = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+        const here = new URL(site.base, location.origin).href
+        const address = own ? (invitation.network[0] ?? here) : here
+        setLink({
+          url: `${address.replace(/\/$/, '')}/_shabd/studio/signal/${invitation.room}`,
+          reach: !own || invitation.network.length > 0 ? 'network' : 'machine',
+        })
+        void answerTo(invitation.room, stop.signal).then(
+          (answer) => {
+            if (!answer || waiting.current?.room !== invitation.room) return
+            waiting.current = null
+            created.accept(answer).catch(() => setProblem('The answer that was left at the link could not be read. Start again.'))
+          },
+          // Taken back, or the dev server has gone: the codes are still there.
+          () => {},
+        )
+      } catch {
+        setLink(null)
+      }
     })
 
   const submit = () =>
     attempt(async () => {
       if (role === 'host' && peer) {
         await peer.accept(pasted)
+        takeBack()
       } else {
         const created = new PeerChannel()
         setPeer(created)
         setRole('guest')
-        setCode(await created.join(pasted))
+        if (isInviteLink(pasted)) {
+          // Read from the link and answered there: nothing to send back by hand.
+          await answerAt(pasted, await created.join(await offerAt(pasted)))
+        } else {
+          setCode(await created.join(pasted))
+        }
       }
       setPasted('')
     })
 
   const label = state === 'connected' ? 'Connected' : state === 'waiting' ? 'Waiting' : state === 'failed' ? 'Not connected' : ''
+  const select = (event: { currentTarget: HTMLInputElement | HTMLTextAreaElement }) => event.currentTarget.select()
+  /** The codes are shown to the one who invites when there is no link, or when they ask for them. */
+  const codes = role === 'host' && code !== '' && (!link || byCode)
 
   return (
     <details className="sb-studio-peers">
@@ -524,7 +588,7 @@ function PeerPanel({ onChannel }: { onChannel: (channel: PeerChannel) => () => v
         <span data-state={state}>{label}</span>
       </summary>
       {state === 'connected' ? (
-        <p>You are connected. Edits to this page appear in both editors, and each one saves to its own files.</p>
+        <p>You are connected. What either of you types in this page appears in both editors, and each one saves to its own files.</p>
       ) : state === 'failed' ? (
         <p role="alert">
           <span>The two browsers could not reach each other, or the connection dropped.</span>
@@ -539,22 +603,49 @@ function PeerPanel({ onChannel }: { onChannel: (channel: PeerChannel) => () => v
               <button type="button" className="sb-studio-action" onClick={host}>
                 Create an invite
               </button>
-              <span>or paste an invite someone sent you:</span>
+              <span>or paste an invite someone sent you, a link or a code:</span>
             </p>
           )}
-          {code && (
+          {role === 'host' && link && (
+            <>
+              <label>
+                Send this link to the other person
+                <input readOnly value={link.url} onFocus={select} />
+              </label>
+              <p>
+                <span>
+                  {link.reach === 'network'
+                    ? 'It opens from a machine that can reach this dev server: one on your network.'
+                    : 'This dev server listens on this machine only, so the link opens from this machine only. Start it with shabd dev --host to invite someone on your network.'}
+                </span>
+                {!byCode && (
+                  <button type="button" className="sb-studio-action" onClick={() => setByCode(true)}>
+                    Use codes instead
+                  </button>
+                )}
+              </p>
+            </>
+          )}
+          {codes && (
             <label>
-              {role === 'host' ? 'Send this invite to the other person' : 'Send this reply back'}
-              <textarea readOnly rows={3} value={code} onFocus={(event) => event.currentTarget.select()} />
+              Send this invite to the other person
+              <textarea readOnly rows={3} value={code} onFocus={select} />
             </label>
           )}
-          {(role === 'host' || !code) && (
+          {role === 'guest' && code && (
+            <label>
+              Send this reply back
+              <textarea readOnly rows={3} value={code} onFocus={select} />
+            </label>
+          )}
+          {role === 'guest' && !code && !problem && <p role="status">Joining…</p>}
+          {(codes || !role) && (
             <label>
               {role === 'host' ? 'Paste their reply' : 'Invite'}
               <textarea rows={3} value={pasted} onChange={(event) => setPasted(event.target.value)} />
             </label>
           )}
-          {pasted.trim() && (
+          {(codes || !role) && pasted.trim() && (
             <p>
               <button type="button" className="sb-studio-action" onClick={submit}>
                 {role === 'host' ? 'Connect' : 'Join'}

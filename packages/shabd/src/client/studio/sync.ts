@@ -104,6 +104,41 @@ function hasUsableCandidate(description: RTCSessionDescription | null): boolean 
 /** A problem worth showing to the person as it is. */
 export class PeerError extends Error {}
 
+/*
+ * An invitation by link. The one who invites leaves their offer with their own dev server
+ * (src/node/vite/signal.ts), and the link is where. Whoever is sent the link reads the offer from it and
+ * leaves the answer there, so neither has a code to copy back. The link leads to the other person's dev
+ * server, which this browser has to be able to reach.
+ */
+
+/** What such a link looks like: a dev server's address, the route, and the name the offer was left under. */
+const INVITE_LINK = /^https?:\/\/\S+\/_shabd\/studio\/signal\/[2-9A-HJ-NP-Z]{12}$/
+
+export const isInviteLink = (text: string): boolean => INVITE_LINK.test(text.trim())
+
+const NOT_REACHED =
+  'That link could not be opened from this machine. It leads to the other person\'s dev server, which has to be reachable from here. Ask them for the code instead.'
+
+/** The offer that was left at a link. */
+export async function offerAt(link: string): Promise<string> {
+  const response = await fetch(link.trim()).catch(() => {
+    throw new PeerError(NOT_REACHED)
+  })
+  const body = (await response.json().catch(() => ({}))) as { offer?: string; error?: string }
+  if (!response.ok || !body.offer) throw new PeerError(body.error ?? 'That link does not lead to an invitation.')
+  return body.offer
+}
+
+/** Leave the answer where the offer was. It is sent as plain text, which a page of another site may send without asking first. */
+export async function answerAt(link: string, answer: string): Promise<void> {
+  const response = await fetch(link.trim(), { method: 'POST', body: answer }).catch(() => {
+    throw new PeerError(NOT_REACHED)
+  })
+  if (response.ok) return
+  const body = (await response.json().catch(() => ({}))) as { error?: string }
+  throw new PeerError(body.error ?? 'The answer could not be left at that link.')
+}
+
 /**
  *   idle       nothing started
  *   waiting    a code was made; the other side has not connected yet
@@ -113,11 +148,14 @@ export class PeerError extends Error {}
 export type PeerState = 'idle' | 'waiting' | 'connected' | 'failed'
 
 /**
- * A two-person WebRTC channel with copy-and-paste signalling.
+ * A two-person WebRTC channel. The two browsers each need a note from the other before they can talk:
  *
- *   host:   const invite = await channel.invite()        → send the code to the guest
- *   guest:  const reply  = await channel.join(invite)    → send the code back
+ *   host:   const invite = await channel.invite()        → the guest is given it
+ *   guest:  const reply  = await channel.join(invite)    → the host is given that
  *   host:   await channel.accept(reply)                  → connected
+ *
+ * How a note gets across is the caller's business: left with the host's dev server and read from a
+ * link (above), or copied and pasted by the two people.
  */
 export class PeerChannel implements StudioChannel {
   #iceServers: RTCIceServer[]

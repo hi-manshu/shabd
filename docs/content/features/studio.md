@@ -133,18 +133,37 @@ done by [Yjs](https://yjs.dev) in the browsers themselves.
 
 Every editor saves the text it holds a quarter of a second after it last changed, whoever typed the change.
 
-With `peers`, the Studio gets an **Edit together** section. One person creates an invite and sends it; the other
-pastes it and sends back the reply. The two codes are how the browsers find each other. After that, drafts travel
-between the two browsers with no server in between, and each Studio saves to its own copy of the files.
+With `peers`, the Studio gets an **Edit together** section. One person chooses **Create an invite** and is given
+a link, which they send to the other. The other pastes it into their own Studio and chooses **Join**. That is all
+either of them does: the two browsers find each other, and from then on drafts travel between them with no server
+in between. Each Studio saves to its own copy of the files.
 
-The invite exchange uses a public STUN server to learn each browser's network address. No draft passes through it.
+The link leads to the dev server of the person who invites. Their browser left a note there that says how it can
+be reached, and the other person's Studio reads that note and leaves its own. So the link works from a machine
+that can reach that dev server:
+
+- From the same machine, always.
+- From the same network, when the dev server is started with `shabd dev --host`. The link then carries the
+  machine's address on the network, and the Studio says which of the two it has given you.
+- From another network, only over a tunnel or a VPN that you set up yourself.
+
+Where the link cannot be opened, choose **Use codes instead**. The two notes are then two long codes: you send
+yours, the other person pastes it and sends theirs back, and you paste that. It is more copying, and it works
+wherever the two of you can send each other a message.
+
+An invitation is for one person and lasts ten minutes. The two notes are all that passes through the dev server:
+no draft does.
+
+Making a note asks a public STUN server for the browser's network address. No draft passes through that either.
 
 If the two browsers cannot reach each other, or the connection drops, the Studio says so and offers to start again
 with a new invite.
 
 The connection has been tested between two separate browser sessions on one machine, in Chromium, Firefox and
-WebKit. It has not been tested between two machines on different networks, where firewalls decide whether a direct
-connection is possible.
+WebKit, by a link and by codes. It has not been tested between two machines on different networks, where firewalls
+decide whether a direct connection is possible. The link has not been opened from a second machine, or by a
+Studio that another dev server sent: that a page of another site may read a note and answer it is tested without
+a browser.
 
 ### When two editors meet
 
@@ -180,6 +199,10 @@ The Studio's endpoints exist only in the dev server, and they are narrow on purp
   its folder, its name or its kind: the name is made by the dev server from letters, digits and hyphens, the
   extension follows from what the first bytes say the file is, and a file that is not one of the five kinds of
   image, or is larger than 10 MB, is refused.
+- With `sync: peers`, two requests are answered for a page of any site, because the other person's Studio is
+  one: reading the note that an invitation holds, and answering it. Both take the invitation's name, which is
+  twelve characters made up for it, lasts ten minutes and is used up by the first answer. Making an invitation,
+  waiting on it and taking it back are for the site's own pages, like everything else here.
 - One file outside the content folder can change: `shabd.config.yaml` gains a line when you accept the offer of a
   redirect. The redirect must lead from an address that has no page to one that has.
 

@@ -134,6 +134,7 @@ GitHub's machines have not run any of it.
 | Fast Refresh while the theme's own source is edited | Built. A component is in a file of its own, and a test holds the client to that. Tried by hand in Chromium: a change to a link, an icon, a hook or the router's provider is taken in place and the page keeps its state. A change to the router's own file still starts the page again, because the app's entry imports it |
 | Versions of the docs (`versions:`) and languages of the site (`languages:`) | Built, tested in three browser engines, one of the languages written from right to left. Each is a folder of the content, with a sidebar and a search of its own, and a menu leads to the same page in the others. A language can say the site's own words, the header's links and the footer in its own way. What stays as it is written is under "Not checked" below |
 | Studio: drafts that merge (Yjs). Two people type in one page at the same moment and both keep what they typed | Built, tested between two tabs in three browser engines and between two browser sessions on one machine. Not tried between two machines |
+| Studio: an invitation by link. The dev server holds the two notes the browsers need, where two codes were pasted by hand | Built, tested between two browser sessions on one dev server, in three engines. Not opened from a second machine. The codes remain for a machine that cannot reach the dev server |
 | A benchmark for large sites (`npm run bench`) | Built. Its numbers are below |
 
 ### What the accessibility pass found
@@ -236,9 +237,11 @@ Not checked:
 
 ### 0.3: Finish the four headline features
 
-Search, MCP and the sandboxes have what was listed for them, and drafts in the Studio merge. What is left:
+Search, MCP and the sandboxes have what was listed for them. In the Studio, drafts merge and an invitation is a
+link. What is left:
 
-- Signalling that does not need two codes pasted by hand.
+- An invitation that works between two networks with nothing set up. The link leads to the dev server of the one
+  who invites, so it is for the same machine or the same network: across networks it is still two codes.
 - In a shared draft: where the other person's cursor is.
 
 ### Later

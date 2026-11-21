@@ -410,7 +410,8 @@
     color: var(--sb-muted);
   }
 
-  .sb-studio-peers textarea {
+  .sb-studio-peers textarea,
+  .sb-studio-peers input {
     padding: 0.4rem 0.5rem;
     border: var(--sb-line) solid var(--sb-border);
     border-radius: min(4px, var(--sb-radius));

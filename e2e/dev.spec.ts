@@ -1084,16 +1084,13 @@ test.describe('studio', () => {
     await otherTab.close()
   })
 
-  test('two editors connect peer to peer and share a draft', async ({ page, browser, browserName, site }) => {
-    // On GitHub's Linux machines, Playwright's Firefox and WebKit connect two pages only some of the time: the
-    // same commit passed and failed there. Chromium connects every time, and all three do on macOS.
-    test.skip(process.platform === 'linux' && browserName !== 'chromium', 'peer connections between two pages are not dependable in this browser on Linux')
-    await site.track('content/guide/setup.md')
-    const host = page
-    // Not every browser build can open a peer connection on every machine: WebKit as built for Linux
-    // cannot. Where two connections on one page cannot reach each other, two editors cannot either.
-    await host.goto(`${DEV}/guide/setup`)
-    const canConnect = await host.evaluate(async () => {
+  /**
+   * Can two pages of this browser reach each other at all? Not every browser build can open a peer connection
+   * on every machine: WebKit as built for Linux cannot. Where two connections on one page cannot reach each
+   * other, two editors cannot either.
+   */
+  const canConnect = (page: Page): Promise<boolean> =>
+    page.evaluate(async () => {
       if (typeof RTCPeerConnection !== 'function') return false
       const [first, second] = [new RTCPeerConnection(), new RTCPeerConnection()]
       try {
@@ -1116,7 +1113,15 @@ test.describe('studio', () => {
         second.close()
       }
     })
-    test.skip(!canConnect, 'this browser cannot open a peer connection on this machine')
+
+  test('two editors connect peer to peer and share a draft', async ({ page, browser, browserName, site }) => {
+    // On GitHub's Linux machines, Playwright's Firefox and WebKit connect two pages only some of the time: the
+    // same commit passed and failed there. Chromium connects every time, and all three do on macOS.
+    test.skip(process.platform === 'linux' && browserName !== 'chromium', 'peer connections between two pages are not dependable in this browser on Linux')
+    await site.track('content/guide/setup.md')
+    const host = page
+    await host.goto(`${DEV}/guide/setup`)
+    test.skip(!(await canConnect(host)), 'this browser cannot open a peer connection on this machine')
     const guestContext = await browser.newContext()
     const guest = await guestContext.newPage()
 
@@ -1127,8 +1132,9 @@ test.describe('studio', () => {
     await hostPanel.locator('summary').click()
     await guestPanel.locator('summary').click()
 
-    // Signalling by hand: an invite one way, a reply the other.
+    // By hand, as it is done when the other machine cannot open the link: an invite one way, a reply the other.
     await hostPanel.getByRole('button', { name: 'Create an invite' }).click()
+    await hostPanel.getByRole('button', { name: 'Use codes instead' }).click()
     const invite = hostPanel.getByLabel('Send this invite to the other person')
     await expect(invite).toHaveValue(/.{100,}/, { timeout: 10_000 })
 
@@ -1165,6 +1171,65 @@ test.describe('studio', () => {
     for (const who of [host, guest]) await expect(who.locator('.sb-studio-footer')).toHaveAttribute('data-state', 'saved')
 
     await guestContext.close()
+  })
+
+  test('two editors find each other by a link, with nothing pasted back', async ({ page, browser, browserName, request, site }) => {
+    test.skip(process.platform === 'linux' && browserName !== 'chromium', 'peer connections between two pages are not dependable in this browser on Linux')
+    await site.track('content/guide/setup.md')
+    const host = page
+    await host.goto(`${DEV}/guide/setup`)
+    test.skip(!(await canConnect(host)), 'this browser cannot open a peer connection on this machine')
+    const guestContext = await browser.newContext()
+    const guest = await guestContext.newPage()
+
+    const hostEditor = await openStudio(host, '/guide/setup')
+    const guestEditor = await openStudio(guest, '/guide/setup')
+    const hostPanel = host.locator('.sb-studio-peers')
+    const guestPanel = guest.locator('.sb-studio-peers')
+    await hostPanel.locator('summary').click()
+    await guestPanel.locator('summary').click()
+
+    // The one who invites is given a link: where their offer was left with the dev server.
+    await hostPanel.getByRole('button', { name: 'Create an invite' }).click()
+    const link = hostPanel.getByLabel('Send this link to the other person')
+    await expect(link).toHaveValue(/^http:\/\/localhost:\d+\/_shabd\/studio\/signal\/[2-9A-HJ-NP-Z]{12}$/, { timeout: 10_000 })
+    // The dev server of these tests listens on this machine only, and the Studio says what that means for the link.
+    await expect(hostPanel).toContainText('the link opens from this machine only')
+    const address = await link.inputValue()
+
+    // Anyone who has the link can read the offer. Nobody else can find it, or wait for its answer.
+    expect((await request.get(address)).status()).toBe(200)
+    expect((await request.get(address.replace(/.$/, (last) => (last === '2' ? '3' : '2')))).status()).toBe(404)
+    expect((await request.get(`${address}/answer`)).status()).toBe(403)
+
+    // The other person pastes the link, and that is all either of them does.
+    await guestPanel.getByLabel('Invite', { exact: true }).fill(address)
+    await guestPanel.getByRole('button', { name: 'Join' }).click()
+    await expect(hostPanel).toContainText('You are connected', { timeout: 15_000 })
+    await expect(guestPanel).toContainText('You are connected', { timeout: 15_000 })
+    // The invitation was for one person, and is used up.
+    expect((await request.get(address)).status()).toBe(404)
+
+    await cursorAfter(hostEditor, 'Install the thing.')
+    await host.keyboard.type(' Typed by the host.')
+    await expect(guestEditor).toContainText('Install the thing. Typed by the host.')
+    await cursorAfter(guestEditor, '## Second step')
+    await guest.keyboard.type(' typed by the guest')
+    await expect(hostEditor).toContainText('## Second step typed by the guest')
+    await expect.poll(() => site.read('content/guide/setup.md')).toContain('## Second step typed by the guest')
+    for (const who of [host, guest]) await expect(who.locator('.sb-studio-footer')).toHaveAttribute('data-state', 'saved')
+
+    // A link that leads nowhere is said to, in words for the person who pasted it.
+    await guestContext.close()
+    const late = await browser.newContext()
+    const latecomer = await late.newPage()
+    await openStudio(latecomer, '/guide/setup')
+    const latePanel = latecomer.locator('.sb-studio-peers')
+    await latePanel.locator('summary').click()
+    await latePanel.getByLabel('Invite', { exact: true }).fill(address)
+    await latePanel.getByRole('button', { name: 'Join' }).click()
+    await expect(latePanel.getByRole('alert')).toContainText('This invitation has run out, or was taken back. Ask for a new one.')
+    await late.close()
   })
 
   test('the write endpoint refuses other websites and requests without its token', async ({ request, site }) => {

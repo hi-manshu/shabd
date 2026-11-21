@@ -33,6 +33,7 @@ import { liveDocs } from '../mcp/live.js'
 import { SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, toRoutePath } from '../mcp/source.js'
 import { modelFiles, runtimeFiles } from '../search/model-files.js'
 import { SearchService } from '../search/service.js'
+import { handleSignal, NOTE_LIMIT, SignalRooms } from './signal.js'
 import { createPage, deletePage, movePage, relativeImports, saveImage, StudioRefusal } from './studio-files.js'
 
 const STUDIO_PREFIX = '/_shabd/studio/'
@@ -210,8 +211,23 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
     return mine
   }
 
+  /** Invitations to edit together that wait for their answer (signal.ts). */
+  const rooms = new SignalRooms()
+  server.httpServer?.once('close', () => rooms.closeAll())
+
   const handleStudio = async (req: IncomingMessage, res: ServerResponse, action: string, url: URL): Promise<void> => {
     const { store, config } = context()
+    // Two Studios finding each other. Asked before anything else: the other person's Studio is a page of
+    // another site, and what it may do here is read the offer it was sent the name of, and answer it.
+    if (config.config.features.studio.sync === 'peers' && (action === 'signal' || action.startsWith('signal/'))) {
+      await handleSignal(req, res, action.slice('signal/'.length), {
+        rooms,
+        ownStudio: (request) => sameOrigin(request) && request.headers[STUDIO_TOKEN_HEADER] === studioToken,
+        addresses: () => ({ local: server.resolvedUrls?.local ?? [], network: server.resolvedUrls?.network ?? [] }),
+        readBody: (request) => readBody(request, NOTE_LIMIT + 1024),
+      })
+      return
+    }
     if (!sameOrigin(req)) {
       sendJson(res, { error: 'The Studio can only be used from the docs site itself.' }, 403)
       return
