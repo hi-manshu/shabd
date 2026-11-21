@@ -103,7 +103,7 @@ Not yet checked:
 - Chrome, Firefox and Safari as people install them, and Windows.
 - The system folder picker in the Studio. Its code runs in the tests against real file handles, but the picker
   itself needs a person.
-- Peer editing between two machines on different networks.
+- Peer editing between two machines: on one network by the link, and on different networks by the codes.
 - The MCP handler on a serverless or edge host.
 - Sites with thousands of real pages.
 
@@ -193,13 +193,17 @@ What it found that is not fixed:
 
 ### What has been checked, and what has not
 
-- 708 unit and integration tests pass.
-- 427 browser tests pass in Playwright's Chromium, Firefox and WebKit, on the last commit of the branch. 41 more
-  are skipped: where an engine lacks what a test needs, and the tests that belong to a variation that was not
-  switched on for that run.
-- The four variations of the browser tests pass on the same commit: the whole suite with the search index in
-  SQLite (436 pass, 32 skipped), semantic search with the real embedding model (6 pass, 6 skipped), the same with
-  the model served by the site (12 pass), and reading offline (10 pass, 2 skipped in Firefox).
+- 775 unit and integration tests pass.
+- 472 browser tests pass in Playwright's Chromium, Firefox and WebKit. 41 more are skipped: where an engine lacks
+  what a test needs, and the tests that belong to a variation that was not switched on for that run. That run
+  was made just before two small changes: a mend to the Theme tab, and the one that makes search run once. The
+  tests of the Theme tab, of the Studio's editor and of search were run again after them, in all three engines.
+- The four variations of the browser tests were run once the Theme tab was finished. The whole suite with the
+  search index in SQLite: 480 pass, 32 are skipped and one failed, where a test pressed an arrow key before a
+  search had answered. Search was running twice on a site with versions or languages. It runs once now, and
+  that test and the other tests of search then passed three times over in each engine, on SQLite. Semantic
+  search with the real embedding model: 6 pass, 6 skipped. The same with the model served by the site: 12 pass.
+  Reading offline: 10 pass, 2 skipped in Firefox.
 - The docs site builds and passes `shabd check` with every feature above switched on that it can use.
 
 Not checked:
@@ -217,6 +221,14 @@ Not checked:
   version and every language. The site's title, the words of an API reference and those of a live example are
   the same in every language. And a page written from right to left has been held to two things by a test, the
   sidebar on the other side and nothing wider than the window: nobody who reads such a language has looked at one.
+- In the Studio, between two machines: drafts that merge, and the link that invites. Both were tried between two
+  browser sessions on one machine, on one dev server. With more than two editors on a page the merging is tested
+  without a browser.
+- A site's own `content/404.md`. A build writes it into `404.html`, and from reading the code the built-in page
+  takes its place as soon as the page's script runs. That was so before this branch, and has not been looked at
+  in a browser.
+- Beside the open Studio, a page on a screen narrower than about 1,500 pixels: its text is squeezed between the
+  sidebar and the outline. That was so before this branch too.
 - In the Studio: an image is not moved, renamed or deleted with its page; pasting and dropping are tested with
   events the test makes, not with the real clipboard or a real drag; and while a page is renamed its breadcrumbs
   and its mark in the sidebar are gone for as long as the next page takes to draw.
