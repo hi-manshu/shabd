@@ -32,6 +32,8 @@ export interface SourceFile {
   source: string
   /** Opaque marker of the file's state when it was read; passed back on write to detect outside edits. */
   version: string
+  /** The draft this text was saved from (draft.ts), where the dev server knows: the file was last written by an editor. */
+  draft?: string | undefined
 }
 
 export class ConflictError extends Error {
@@ -48,8 +50,12 @@ export interface StudioBackend {
   /** Shown in the Studio's header. */
   label: string
   read(id: string): Promise<SourceFile>
-  /** Throws ConflictError if the file no longer matches `baseVersion`. */
-  write(id: string, source: string, baseVersion: string): Promise<SourceFile>
+  /**
+   * Throws ConflictError if the file no longer matches `baseVersion`. `draft` names the draft the text is
+   * of (draft.ts): the dev server does not count it a conflict when the file was last written by an
+   * editor that shares that draft.
+   */
+  write(id: string, source: string, baseVersion: string, draft?: string): Promise<SourceFile>
   /** Make a page. Throws if the path cannot be a page's, or a file is already there. */
   create(id: string, source: string): Promise<void>
   /** Move a page's file to `to`. Throws if that path cannot be a page's, or a file is already there. */
@@ -151,14 +157,14 @@ export async function connectServer(): Promise<StudioBackend> {
     async read(id) {
       const response = await fetch(`${endpoint('source')}?id=${encodeURIComponent(id)}`, { headers })
       if (!response.ok) throw new Error(((await response.json()) as { error: string }).error)
-      const file = (await response.json()) as { source: string; hash: string }
-      return { source: file.source, version: file.hash }
+      const file = (await response.json()) as { source: string; hash: string; draft?: string }
+      return { source: file.source, version: file.hash, draft: file.draft }
     },
-    async write(id, source, baseVersion) {
+    async write(id, source, baseVersion, draft) {
       const response = await fetch(endpoint('source'), {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ id, source, baseHash: baseVersion }),
+        body: JSON.stringify({ id, source, baseHash: baseVersion, ...(draft ? { draft } : {}) }),
       })
       const body = (await response.json()) as { hash?: string; source?: string; error?: string }
       if (response.status === 409 && body.source !== undefined && body.hash) {

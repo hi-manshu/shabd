@@ -126,16 +126,16 @@ line, the Studio makes no offer and shows you the line to add yourself.
 | `tabs` | Other tabs and windows of the same browser. The default |
 | `peers` | Another person's browser, directly, over WebRTC |
 
-A draft arrives as the whole page. The editor puts in only the part that differs from what it shows, so your
-cursor stays where it is.
+What is typed in one editor is sent to the others as the change it was, and each of them makes that change
+where it was made. Two people can type in the same page at the same moment: both keep what they typed, and both
+editors end up with the same text. Your cursor stays where it is while the text around it changes. The merging is
+done by [Yjs](https://yjs.dev) in the browsers themselves.
+
+Every editor saves the text it holds a quarter of a second after it last changed, whoever typed the change.
 
 With `peers`, the Studio gets an **Edit together** section. One person creates an invite and sends it; the other
 pastes it and sends back the reply. The two codes are how the browsers find each other. After that, drafts travel
 between the two browsers with no server in between, and each Studio saves to its own copy of the files.
-
-> [!WARNING] Take turns
-> Sync replaces the whole draft with the newest one. Two people typing in the same page at the same moment will
-> overwrite each other. It suits handing a page back and forth, not simultaneous editing.
 
 The invite exchange uses a public STUN server to learn each browser's network address. No draft passes through it.
 
@@ -145,6 +145,24 @@ with a new invite.
 The connection has been tested between two separate browser sessions on one machine, in Chromium, Firefox and
 WebKit. It has not been tested between two machines on different networks, where firewalls decide whether a direct
 connection is possible.
+
+### When two editors meet
+
+Each editor begins with the text of its own file. Changes can only be merged into one text, so when two editors
+meet, in two tabs or over an invite, one of them takes the other's:
+
+- A page that has been typed in is kept over one that has not.
+- Between two alike, the one that was opened first is kept.
+
+Most of the time the two hold the same text already and nothing on screen changes. Where they differ, the editor
+that gives way shows the other's text and saves it to its own file.
+
+> [!WARNING] Connect before you both type
+> If two people have each typed in the same page before they connect, the text of the one who opened the page
+> first replaces the other's. What was replaced is in version control if it was committed, and nowhere else.
+
+A file that changes on disk under an editor with nothing unsaved is followed, [as before](#saving), and the
+editors it is connected to follow it too. An editor with something unsaved keeps what it has until that is saved.
 
 ## Is it safe to leave on?
 
@@ -202,6 +220,10 @@ Set `features.studio: false` to remove the Studio and its endpoints.
 - An image is saved as it is, at the size it has. When its link is deleted from the page, the file stays.
 - Pasting and dropping are tested with events that the test makes and attaches files to, because a test cannot
   use the real clipboard of every browser or drag a file in from outside the page.
+- You do not see where the other person's cursor is, and undo takes back what you typed, not what they typed.
+- Typing at the same moment is tested between two tabs in Chromium, Firefox and WebKit, and between two browser
+  sessions on one machine. It has not been tried between two machines, or with more than two editors on a page
+  outside a unit test.
 - The editor has no autocomplete and no search of its own. The browser's find only sees the lines near the ones
   on screen, because the editor draws no more of a long page than that.
 - Code in a fence is coloured for the six languages named above and no others. An `.mdx` page is coloured as

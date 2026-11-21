@@ -15,7 +15,8 @@ import { usePage } from '../app/router.js'
 import { useSite } from '../app/store.js'
 import { setUi } from '../app/ui.js'
 import { IMAGE_BYTES_LIMIT, IMAGE_TOO_LARGE, imageMarkdown } from '../../shared/image-file.js'
-import { CodeEditor, type EditorInsertion } from '../editor/CodeEditor.js'
+import { CodeEditor, type EditorHandle, type EditorInsertion } from '../editor/CodeEditor.js'
+import { endsLinesWithCrLf, toCrLf, toLineFeeds, type Replacement } from '../editor/text.js'
 import {
   ConflictError,
   connectFolder,
@@ -25,17 +26,9 @@ import {
   type SourceFile,
   type StudioBackend,
 } from './backends.js'
+import { SharedDraft, type Link } from './draft.js'
 import { PageActions } from './PageActions.js'
-import {
-  isNewer,
-  PeerChannel,
-  PeerError,
-  peerId,
-  tabChannel,
-  type DraftMessage,
-  type PeerState,
-  type StudioChannel,
-} from './sync.js'
+import { PeerChannel, PeerError, peerId, tabChannel, type PeerState, type StudioChannel } from './sync.js'
 
 /** How long typing must pause before the file is written. */
 const SAVE_DELAY = 250
@@ -82,8 +75,17 @@ export default function Studio() {
   const [status, setStatus] = useState<Status>({ kind: 'loading' })
 
   /** State the save loop needs without re-subscribing effects on every keystroke. */
-  const live = useRef({ text: '', saved: '', version: '', revision: 0, remotePeer: peerId, saveStarted: 0, timer: 0 })
-  const channel = useRef<StudioChannel | null>(null)
+  const live = useRef({ text: '', saved: '', version: '', crlf: false, saveStarted: 0, timer: 0 })
+  /** The page's text as the editors that are connected share it (draft.ts), and the ways to those editors. */
+  const draft = useRef<SharedDraft | null>(null)
+  const links = useRef(new Map<Link, StudioChannel>())
+  /** The editor on screen, for changes that arrive from other editors. */
+  const editor = useRef<EditorHandle | null>(null)
+  const setEditor = useCallback((handle: EditorHandle | null) => {
+    editor.current = handle
+  }, [])
+  /** The save below, for what is set up before it is. */
+  const saver = useRef<() => void>(() => {})
 
   /* ── backend ── */
 
@@ -102,13 +104,65 @@ export default function Studio() {
     }
   }, [])
 
-  /** Put a file that has been read into the editor. */
-  const show = useCallback((page: string, file: SourceFile) => {
-    live.current = { ...live.current, text: file.source, saved: file.source, version: file.version }
-    setText(file.source)
-    setShown(page)
-    setStatus({ kind: 'idle' })
+  /** The text is now `next`, typed here or by someone else: show it, and save it once typing pauses. */
+  const taken = useCallback((next: string) => {
+    const state = live.current
+    state.text = next
+    setText(next)
+    setStatus((current) => (current.kind === 'conflict' ? current : { kind: 'unsaved' }))
+    window.clearTimeout(state.timer)
+    state.timer = window.setTimeout(() => saver.current(), SAVE_DELAY)
   }, [])
+
+  /** Put a file that has been read into the editor, and begin the draft that is shared with other editors. */
+  const show = useCallback(
+    (page: string, file: SourceFile) => {
+      const state = live.current
+      window.clearTimeout(state.timer)
+      // The draft holds the text with line feeds between its lines, as the editor does. What the file's
+      // lines end in is this machine's own business.
+      const source = toLineFeeds(file.source)
+      const held = draft.current?.page === page ? draft.current : undefined
+      if (held && file.draft === held.meta.draft && held.text !== source) {
+        // The file was read again, and what it holds was saved from the draft that is held here, by another
+        // editor that shares it. Where the two differ, a change is still on its way from one editor to
+        // the other. The draft has the last word, and is saved over the file once it differs from it.
+        Object.assign(state, { saved: file.source, version: file.version })
+        if (state.text !== state.saved) state.timer = window.setTimeout(() => saver.current(), SAVE_DELAY)
+        return
+      }
+      Object.assign(state, { text: file.source, saved: file.source, version: file.version, crlf: endsLinesWithCrLf(file.source) })
+      setText(file.source)
+      setShown(page)
+      setStatus({ kind: 'idle' })
+      // The file was read again and says what the editors share already: there is nothing to tell them.
+      if (held && held.text === source) return
+      const begun: SharedDraft = new SharedDraft({
+        page,
+        source,
+        peer: peerId,
+        // The same page, read again because it changed on disk: this is what the others are to take now.
+        replacing: held,
+        send(message, where) {
+          for (const [link, channel] of links.current) {
+            if ('only' in where ? link === where.only : link !== where.except) channel.send(message)
+          }
+        },
+        changed(changes, shared) {
+          // The Studio has gone on to another page, or read this one again.
+          if (draft.current !== begun) return
+          // Put into the editor at once, so that the next thing typed is typed into the text as it now is.
+          // An editor that is not on screen yet, or that holds another text, is given the whole text below.
+          editor.current?.apply(changes)
+          taken(live.current.crlf ? toCrLf(shared) : shared)
+        },
+        unsaved: () => live.current.text !== live.current.saved,
+      })
+      draft.current = begun
+      begun.greet()
+    },
+    [taken],
+  )
 
   useEffect(() => {
     if (!backend || !id) return
@@ -139,33 +193,35 @@ export default function Studio() {
     state.saveStarted = performance.now()
     setStatus({ kind: 'saving' })
     try {
-      const file = await backend.write(id, writing, state.version)
+      // The draft is named, so that editors that share it and save to the same file do not take each
+      // other's saves for a change from outside.
+      const file = await backend.write(id, writing, state.version, draft.current?.page === id ? draft.current.meta.draft : undefined)
       state.version = file.version
       state.saved = writing
       // More was typed while the write was in flight: go again.
       if (state.text !== writing) state.timer = window.setTimeout(() => void save(), SAVE_DELAY)
-      else setStatus({ kind: 'saved' })
+      else {
+        setStatus({ kind: 'saved' })
+        // An editor that waited for this before it would hand over a newer text is asked again.
+        draft.current?.settled()
+      }
     } catch (error) {
       if (error instanceof ConflictError) setStatus({ kind: 'conflict', current: error.current })
       else setStatus({ kind: 'error', message: error instanceof Error ? error.message : String(error) })
     }
   }, [backend, id])
 
+  useEffect(() => {
+    saver.current = () => void save()
+  }, [save])
+
+  /** Typed in the editor here. The other editors are told the change, as the change it was. */
   const edit = useCallback(
-    (next: string, origin: 'local' | 'remote' = 'local') => {
-      const state = live.current
-      state.text = next
-      setText(next)
-      setStatus((current) => (current.kind === 'conflict' ? current : { kind: 'unsaved' }))
-      window.clearTimeout(state.timer)
-      state.timer = window.setTimeout(() => void save(), SAVE_DELAY)
-      if (origin === 'local' && id) {
-        state.revision++
-        state.remotePeer = peerId
-        channel.current?.send({ type: 'draft', page: id, source: next, revision: state.revision, peer: peerId })
-      }
+    (next: string, changes?: readonly Replacement[]) => {
+      draft.current?.typed(changes, toLineFeeds(next))
+      taken(next)
     },
-    [id, save],
+    [taken],
   )
 
   /* ── for making, renaming and deleting pages, which must not start with a draft on its way ── */
@@ -228,9 +284,12 @@ export default function Studio() {
         state.saveStarted = 0
       } else if (state.text === state.saved) {
         // Someone else changed the file (an editor, git). Nothing unsaved here, so follow it.
+        const before = state.text
         backend.read(id).then(
           (file) => {
-            if (watching) show(id, file)
+            // Unless the text here changed while the file was read: typed in, or changed by another editor.
+            // What was read is out of date then, and the save that follows says so if it matters.
+            if (watching && live.current.text === before && live.current.saved === before) show(id, file)
           },
           () => {},
         )
@@ -261,39 +320,24 @@ export default function Studio() {
 
   /* ── draft sync ── */
 
-  const receive = useCallback(
-    (message: DraftMessage, from: 'tab' | 'peer') => {
-      const state = live.current
-      if (message.page !== id || !isNewer(message, state.revision, state.remotePeer)) return
-      state.revision = message.revision
-      state.remotePeer = message.peer
-      if (message.source === state.text) return
-      if (from === 'peer') {
-        // Another machine: this editor saves the draft to its own copy of the file.
-        edit(message.source, 'remote')
-      } else {
-        // Another tab on this machine shares the file and saves it. Show the
-        // draft and leave the writing to the tab it was typed in.
-        window.clearTimeout(state.timer)
-        state.text = state.saved = message.source
-        setText(message.source)
-      }
-    },
-    [id, edit],
-  )
-
+  /*
+   * Every editor saves the text it holds, whoever typed it. Between tabs of one browser that is the same
+   * file, and the dev server writes it once: a save that says what is on disk already writes nothing.
+   */
   useEffect(() => {
     if (features.studio.sync === 'off') return
     const tabs = tabChannel('shabd-studio')
     if (!tabs) return
-    channel.current = tabs
-    const unsubscribe = tabs.subscribe((message) => receive(message, 'tab'))
+    links.current.set('tabs', tabs)
+    const unsubscribe = tabs.subscribe((message) => draft.current?.receive(message, 'tabs'))
+    // A page that is open already says what it holds to the tabs that are there.
+    draft.current?.greet('tabs')
     return () => {
       unsubscribe()
       tabs.close()
-      if (channel.current === tabs) channel.current = null
+      links.current.delete('tabs')
     }
-  }, [features.studio.sync, receive])
+  }, [features.studio.sync])
 
   /* ── view ── */
 
@@ -312,12 +356,11 @@ export default function Studio() {
   const resolveConflict = (choice: 'disk' | 'mine') => {
     if (status.kind !== 'conflict') return
     const state = live.current
-    state.version = status.current.version
     if (choice === 'disk') {
-      state.text = state.saved = status.current.source
-      setText(status.current.source)
-      setStatus({ kind: 'idle' })
+      // As when the file is read again for any other reason: the editors that share the draft take the file's text.
+      if (id) show(id, status.current)
     } else {
+      state.version = status.current.version
       state.saved = status.current.source
       setStatus({ kind: 'unsaved' })
       void save()
@@ -358,6 +401,7 @@ export default function Studio() {
           value={text}
           readOnly={status.kind === 'loading' || acting}
           onChange={edit}
+          handle={setEditor}
           onSave={() => void save()}
           onFiles={addImages}
         />
@@ -368,8 +412,17 @@ export default function Studio() {
       {features.studio.sync === 'peers' && id && (
         <PeerPanel
           onChannel={(peer) => {
-            channel.current = peer
-            return peer.subscribe((message) => receive(message, 'peer'))
+            links.current.set('peer', peer)
+            const stopMessages = peer.subscribe((message) => draft.current?.receive(message, 'peer'))
+            // Once the two are connected, each says what it holds of the page it is on.
+            const stopState = peer.onState((state) => {
+              if (state === 'connected') draft.current?.greet('peer')
+            })
+            return () => {
+              stopMessages()
+              stopState()
+              if (links.current.get('peer') === peer) links.current.delete('peer')
+            }
           }}
         />
       )}

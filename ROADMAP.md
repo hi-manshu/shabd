@@ -133,6 +133,7 @@ GitHub's machines have not run any of it.
 | `shabd check`: a live snippet that cannot run, or that imports what the site has not named | Built, tested |
 | Fast Refresh while the theme's own source is edited | Built. A component is in a file of its own, and a test holds the client to that. Tried by hand in Chromium: a change to a link, an icon, a hook or the router's provider is taken in place and the page keeps its state. A change to the router's own file still starts the page again, because the app's entry imports it |
 | Versions of the docs (`versions:`) and languages of the site (`languages:`) | Built, tested in three browser engines, one of the languages written from right to left. Each is a folder of the content, with a sidebar and a search of its own, and a menu leads to the same page in the others. A language can say the site's own words, the header's links and the footer in its own way. What stays as it is written is under "Not checked" below |
+| Studio: drafts that merge (Yjs). Two people type in one page at the same moment and both keep what they typed | Built, tested between two tabs in three browser engines and between two browser sessions on one machine. Not tried between two machines |
 | A benchmark for large sites (`npm run bench`) | Built. Its numbers are below |
 
 ### What the accessibility pass found
@@ -235,10 +236,10 @@ Not checked:
 
 ### 0.3: Finish the four headline features
 
-Search, MCP and the sandboxes have what was listed for them. What is left is in the Studio:
+Search, MCP and the sandboxes have what was listed for them, and drafts in the Studio merge. What is left:
 
-- A CRDT (Yjs) for drafts, so two people can type at once. Today the newest draft replaces the other.
 - Signalling that does not need two codes pasted by hand.
+- In a shared draft: where the other person's cursor is.
 
 ### Later
 

@@ -1062,12 +1062,25 @@ test.describe('studio', () => {
     await page.keyboard.type(' Typed in the first tab.')
     await expect(second).toContainText('Install the thing. Typed in the first tab.')
 
-    // The draft replaced the whole text of the second tab. Its cursor is still at the end of the heading.
+    // The change was made in the second tab where it was typed in the first. Its cursor is still at the end of the heading.
     await otherTab.keyboard.type(' of two')
     await expect(first).toContainText('## Second step of two')
     await expect
       .poll(() => site.read('content/guide/setup.md'))
       .toContain('Install the thing. Typed in the first tab.\n\n## Second step of two\n')
+
+    // Typed in both at the same moment, each in its own line: both are kept, in both tabs and in the file.
+    // When the newest draft replaced the other, whichever tab typed last wiped out what the other had typed.
+    await Promise.all([page.keyboard.type(' And more, at once.', { delay: 12 }), otherTab.keyboard.type(', both at once', { delay: 12 })])
+    for (const editor of [first, second]) {
+      await expect(editor).toContainText('Install the thing. Typed in the first tab. And more, at once.')
+      await expect(editor).toContainText('## Second step of two, both at once')
+    }
+    await expect
+      .poll(() => site.read('content/guide/setup.md'))
+      .toContain('Install the thing. Typed in the first tab. And more, at once.\n\n## Second step of two, both at once\n')
+    // Both tabs save the one file, and neither takes the other's save for a change from outside.
+    for (const tab of [page, otherTab]) await expect(tab.locator('.sb-studio-footer')).toHaveAttribute('data-state', 'saved')
     await otherTab.close()
   })
 
@@ -1137,6 +1150,19 @@ test.describe('studio', () => {
     await guestEditor.fill((await textOf(guestEditor)).replace('Typed by the host.', 'Answered by the guest.'))
     await expect(hostEditor).toContainText('Answered by the guest.')
     await expect.poll(() => site.read('content/guide/setup.md')).toContain('Answered by the guest.')
+
+    // The two type at the same moment, each in a line of their own. Both are kept on both sides.
+    await cursorAfter(hostEditor, '## Second step')
+    await cursorAfter(guestEditor, 'Answered by the guest.')
+    await Promise.all([host.keyboard.type(' typed by the host at once', { delay: 12 }), guest.keyboard.type(' Typed by the guest at once.', { delay: 12 })])
+    for (const editor of [hostEditor, guestEditor]) {
+      await expect(editor).toContainText('## Second step typed by the host at once')
+      await expect(editor).toContainText('Answered by the guest. Typed by the guest at once.')
+    }
+    await expect.poll(() => site.read('content/guide/setup.md')).toContain('## Second step typed by the host at once')
+    await expect.poll(() => site.read('content/guide/setup.md')).toContain('Answered by the guest. Typed by the guest at once.')
+    // In this test the two save to one file. The dev server knows them for one draft, and shows neither a conflict.
+    for (const who of [host, guest]) await expect(who.locator('.sb-studio-footer')).toHaveAttribute('data-state', 'saved')
 
     await guestContext.close()
   })

@@ -11,8 +11,8 @@ import { bracketMatching, indentOnInput, indentUnit } from '@codemirror/language
 import { Annotation, Compartment, EditorState, Transaction, type Extension } from '@codemirror/state'
 import { dropCursor, EditorView, keymap } from '@codemirror/view'
 import { useLayoutEffect, useRef } from 'react'
-import type { EditorViewProps } from './CodeEditor.js'
-import { endsLinesWithCrLf, replacement, toCrLf, toLineFeeds } from './text.js'
+import type { EditorHandle, EditorViewProps } from './CodeEditor.js'
+import { endsLinesWithCrLf, replacement, toCrLf, toLineFeeds, type Replacement } from './text.js'
 import { editorTheme } from './theme.js'
 
 interface Props extends EditorViewProps {
@@ -38,17 +38,17 @@ function access(label: string, readOnly: boolean, hintId: string): Extension {
   ]
 }
 
-export function CodeMirrorView({ value, label, onChange, onSave, onFiles, readOnly = false, hintId, grammar }: Props) {
+export function CodeMirrorView({ value, label, onChange, onSave, onFiles, handle, readOnly = false, hintId, grammar }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const mounted = useRef<{ view: EditorView; accessOf: Compartment } | null>(null)
   /** The text as the caller has it: what it passed in last, or what it was told last. */
   const known = useRef(value)
   /** CodeMirror keeps lines apart with a line feed alone. This remembers that the file's lines end in CR LF. */
   const crlf = useRef(false)
-  const handlers = useRef({ onChange, onSave, onFiles })
+  const handlers = useRef({ onChange, onSave, onFiles, handle })
 
   useLayoutEffect(() => {
-    handlers.current = { onChange, onSave, onFiles }
+    handlers.current = { onChange, onSave, onFiles, handle }
   })
 
   useLayoutEffect(() => {
@@ -143,17 +143,41 @@ export function CodeMirrorView({ value, label, onChange, onSave, onFiles, readOn
               landing.from = update.changes.mapPos(landing.from, 1)
               landing.to = update.changes.mapPos(landing.to, 1)
             }
-            if (update.transactions.every((transaction) => transaction.annotation(fromOutside))) return
+            const outside = update.transactions.filter((transaction) => transaction.annotation(fromOutside)).length
+            if (outside === update.transactions.length) return
             const text = update.state.doc.toString()
             // A file with Windows line endings gets them back, so that one keystroke does not rewrite every line of it.
             known.current = crlf.current ? toCrLf(text) : text
-            handlers.current.onChange(known.current)
+            // What was typed, as the change it was. Where a change from outside is mixed in with it, the two
+            // cannot be told apart here, and the caller is left to work out what differs.
+            const changes: Replacement[] = []
+            if (outside === 0) update.changes.iterChanges((from, to, _fromNow, _toNow, inserted) => changes.push({ from, to, insert: inserted.toString() }))
+            handlers.current.onChange(known.current, outside === 0 ? changes : undefined)
           }),
         ],
       }),
     })
     mounted.current = { view, accessOf }
+    const api: EditorHandle = {
+      apply(changes) {
+        try {
+          view.dispatch({
+            changes: changes.map((change) => ({ from: change.from, to: change.to, insert: toLineFeeds(change.insert) })),
+            // As for a new `value`: not typed here, so not reported, and not this editor's to undo.
+            annotations: [fromOutside.of(true), Transaction.addToHistory.of(false)],
+          })
+        } catch {
+          // They were made to another text than the one held here.
+          return false
+        }
+        const text = view.state.doc.toString()
+        known.current = crlf.current ? toCrLf(text) : text
+        return true
+      },
+    }
+    handlers.current.handle?.(api)
     return () => {
+      handlers.current.handle?.(null)
       view.destroy()
       mounted.current = null
     }

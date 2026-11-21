@@ -177,6 +177,39 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
     }
   }
 
+  /**
+   * The draft a page was last saved from, and the text that was saved, by its hash. Editors that share a
+   * draft each save it, and each knows the file as it was when that editor last wrote or read it. A save
+   * from one of them over a save from another is the same text a moment further on, and not a change
+   * from outside. Only the last save counts: a file that another program has set back to a text the
+   * draft once had is a change from outside like any other, and is not written over.
+   */
+  const writtenBy = new Map<string, { draft: string; hash: string }>()
+  /** The draft that the text on disk was saved from, when the last save of the page is what is on disk still. */
+  const draftOf = (page: string, hash: string): string | undefined => {
+    const last = writtenBy.get(page)
+    return last?.hash === hash ? last.draft : undefined
+  }
+
+  /**
+   * One at a time for each file. A save reads the file, compares it with what the editor last saw, and
+   * writes. Editors that share a draft each save it, so two saves of one file arrive together, and the
+   * second would read the file while the first was writing it: empty, or half of what it will be.
+   */
+  const turns = new Map<string, Promise<void>>()
+  const inTurn = <T>(file: string, run: () => Promise<T>): Promise<T> => {
+    const mine = (turns.get(file) ?? Promise.resolve()).then(run)
+    const done = mine.then(
+      () => {},
+      () => {},
+    )
+    turns.set(file, done)
+    void done.then(() => {
+      if (turns.get(file) === done) turns.delete(file)
+    })
+    return mine
+  }
+
   const handleStudio = async (req: IncomingMessage, res: ServerResponse, action: string, url: URL): Promise<void> => {
     const { store, config } = context()
     if (!sameOrigin(req)) {
@@ -200,13 +233,17 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
         sendJson(res, { error: 'No such page.' }, 404)
         return
       }
-      const source = await readFile(page.file, 'utf8')
-      sendJson(res, { id: page.id, source, hash: sha1(source) })
+      const source = await inTurn(page.file, () => readFile(page.file, 'utf8'))
+      const hash = sha1(source)
+      // An editor that reads the file again is told when what it reads was saved from a draft: if that is
+      // the draft it holds, the file has nothing to tell it that the draft will not.
+      const from = draftOf(page.id, hash)
+      sendJson(res, { id: page.id, source, hash, ...(from ? { draft: from } : {}) })
       return
     }
 
     if (action === 'source' && req.method === 'PUT') {
-      let body: { id?: unknown; source?: unknown; baseHash?: unknown }
+      let body: { id?: unknown; source?: unknown; baseHash?: unknown; draft?: unknown }
       try {
         body = JSON.parse(await readBody(req)) as typeof body
       } catch {
@@ -224,20 +261,29 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
         sendJson(res, { error: `This page is made from ${page.generated}. Change the description, and the page follows.` }, 403)
         return
       }
-      const onDisk = await readFile(page.file, 'utf8')
-      if (body.source === onDisk) {
-        // Already what is on disk (another tab saved the same draft): nothing to write.
-        sendJson(res, { id: page.id, hash: sha1(onDisk) })
-        return
-      }
-      if (typeof body.baseHash === 'string' && body.baseHash !== sha1(onDisk)) {
-        sendJson(res, { error: 'The file changed on disk since it was opened.', source: onDisk, hash: sha1(onDisk) }, 409)
-        return
-      }
-      await writeFile(page.file, body.source)
-      // Do not wait for the file watcher: hand the change to the HMR pipeline now.
-      server.watcher.emit('change', normalizePath(page.file))
-      sendJson(res, { id: page.id, hash: sha1(body.source) })
+      const source = body.source
+      const draft = typeof body.draft === 'string' && body.draft.length <= 64 ? body.draft : undefined
+      await inTurn(page.file, async () => {
+        const onDisk = await readFile(page.file, 'utf8')
+        const diskHash = sha1(onDisk)
+        if (source === onDisk) {
+          // Already what is on disk (another editor saved the same draft): nothing to write.
+          if (draft) writtenBy.set(page.id, { draft, hash: diskHash })
+          sendJson(res, { id: page.id, hash: diskHash })
+          return
+        }
+        // Not what this editor last saw. It is still no conflict if an editor that shares its draft wrote it.
+        if (typeof body.baseHash === 'string' && body.baseHash !== diskHash && !(draft && draftOf(page.id, diskHash) === draft)) {
+          sendJson(res, { error: 'The file changed on disk since it was opened.', source: onDisk, hash: diskHash }, 409)
+          return
+        }
+        if (draft) writtenBy.set(page.id, { draft, hash: sha1(source) })
+        else writtenBy.delete(page.id)
+        await writeFile(page.file, source)
+        // Do not wait for the file watcher: hand the change to the HMR pipeline now.
+        server.watcher.emit('change', normalizePath(page.file))
+        sendJson(res, { id: page.id, hash: sha1(source) })
+      })
       return
     }
 
@@ -283,7 +329,7 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
       try {
         // The file as it is on disk. With a connected folder the browser saved it a moment ago, and the
         // watcher may not have told the store yet.
-        const source = await readFile(page.file, 'utf8')
+        const source = await inTurn(page.file, () => readFile(page.file, 'utf8'))
         const compiled = await context().compiler.compile({
           file,
           source,
@@ -363,10 +409,12 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
       const body = await jsonBody(req)
       const page = existingPage(body.id)
       // What is deleted is what the Studio last showed, not something written to the file since.
-      if (typeof body.baseHash === 'string' && body.baseHash !== sha1(await readFile(page.file, 'utf8'))) {
-        throw new StudioRefusal('The file changed on disk since it was opened.', 409)
-      }
-      await deletePage(page.file)
+      await inTurn(page.file, async () => {
+        if (typeof body.baseHash === 'string' && body.baseHash !== sha1(await readFile(page.file, 'utf8'))) {
+          throw new StudioRefusal('The file changed on disk since it was opened.', 409)
+        }
+        await deletePage(page.file)
+      })
       server.watcher.emit('unlink', normalizePath(page.file))
       sendJson(res, { id: page.id })
       return

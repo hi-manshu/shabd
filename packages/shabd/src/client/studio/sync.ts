@@ -1,27 +1,19 @@
 /**
  * Draft sync: share what is being typed before it is saved.
  *
- * A StudioChannel carries DraftMessages between editors. Two transports:
+ * A StudioChannel carries the messages of a shared draft (draft.ts) between
+ * editors. Two transports:
  *
  *   tabChannel   BroadcastChannel. Other tabs and windows of the same browser.
  *   PeerChannel  a WebRTC data channel. Another person's browser, directly:
- *                the two exchange an invite and a reply (copy and paste), and
- *                from then on drafts travel peer to peer with no server between.
+ *                the two exchange an invite and a reply, and from then on
+ *                drafts travel peer to peer with no server between.
  *
- * Merging is last-writer-wins on the whole document, ordered by a revision
- * counter. That is enough for taking turns in one file; it is not a CRDT and
- * two people typing in the same sentence at once will overwrite each other.
+ * What travels is each change as it was typed, and the editors merge them:
+ * see draft.ts for how, and for what happens when two editors meet that
+ * each hold a text of their own.
  */
-
-export interface DraftMessage {
-  type: 'draft'
-  /** Page id, e.g. `guide/install.md`. */
-  page: string
-  source: string
-  /** Increases with every edit; ties are broken by peer id. */
-  revision: number
-  peer: string
-}
+import { isDraftMessage, type DraftMessage } from './draft.js'
 
 export interface StudioChannel {
   send(message: DraftMessage): void
@@ -30,12 +22,8 @@ export interface StudioChannel {
   close(): void
 }
 
+/** This editor, among the others it talks to. */
 export const peerId = Math.random().toString(36).slice(2, 10)
-
-/** True when `incoming` should replace a draft at (`revision`, `peer`). */
-export function isNewer(incoming: DraftMessage, revision: number, peer: string): boolean {
-  return incoming.revision > revision || (incoming.revision === revision && incoming.peer > peer)
-}
 
 export function tabChannel(name: string): StudioChannel | null {
   if (typeof BroadcastChannel === 'undefined') return null
@@ -43,8 +31,8 @@ export function tabChannel(name: string): StudioChannel | null {
   return {
     send: (message) => channel.postMessage(message),
     subscribe(listener) {
-      const onMessage = (event: MessageEvent<DraftMessage>) => {
-        if (event.data?.type === 'draft') listener(event.data)
+      const onMessage = (event: MessageEvent<unknown>) => {
+        if (isDraftMessage(event.data)) listener(event.data)
       }
       channel.addEventListener('message', onMessage)
       return () => channel.removeEventListener('message', onMessage)
@@ -219,8 +207,8 @@ export class PeerChannel implements StudioChannel {
     channel.addEventListener('close', () => this.#data === channel && this.state === 'connected' && this.#setState('failed'))
     channel.addEventListener('message', (event) => {
       try {
-        const message = JSON.parse(String(event.data)) as DraftMessage
-        if (message.type === 'draft') for (const listener of this.#listeners) listener(message)
+        const message: unknown = JSON.parse(String(event.data))
+        if (isDraftMessage(message)) for (const listener of this.#listeners) listener(message)
       } catch {
         // Not a draft message: ignore it.
       }

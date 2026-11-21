@@ -20,6 +20,7 @@
  */
 import type { Extension } from '@codemirror/state'
 import { lazy, Suspense, useId } from 'react'
+import type { Replacement } from './text.js'
 
 export type EditorLanguage = 'markdown' | 'tsx'
 
@@ -28,6 +29,21 @@ export interface EditorInsertion {
   text: string
   /** Where in the text the cursor is left. At its end, if this is left out. */
   cursor?: number
+}
+
+/**
+ * What a caller that shares the text with other editors is handed: a way to
+ * put their changes in the moment they arrive, where a new `value` would
+ * wait for the next time the page is drawn. Something typed in between
+ * would then be typed into a text that is already out of date.
+ */
+export interface EditorHandle {
+  /**
+   * Make these changes to the text now. Each is given by where the text was before any of them, with
+   * line feeds between its lines. They are not reported through `onChange`, and are not the editor's
+   * to undo. False when they do not fit the text the editor holds: nothing was changed then.
+   */
+  apply(changes: readonly Replacement[]): boolean
 }
 
 export interface CodeEditorProps {
@@ -39,8 +55,14 @@ export interface CodeEditorProps {
   language: EditorLanguage
   /** What the text field is called, for someone who cannot see what is around it. */
   label: string
-  /** The whole text, after each edit made in the editor. Not called when `value` replaced the text. */
-  onChange: (value: string) => void
+  /**
+   * The whole text, after each edit made in the editor, and the edit itself: each change by where the
+   * text was before any of them, with line feeds between its lines. Not called when `value` replaced
+   * the text, or for changes made through `handle`.
+   */
+  onChange: (value: string, changes?: readonly Replacement[]) => void
+  /** Called with the editor's handle once the editor is on screen, and with `null` when it has gone. */
+  handle?: ((handle: EditorHandle | null) => void) | undefined
   /** Ctrl or ⌘ + S. Left out, the key stays the browser's. */
   onSave?: (() => void) | undefined
   /**
@@ -77,13 +99,13 @@ const VIEWS = {
   tsx: fetched(() => import('./tsx.js')),
 } satisfies Record<EditorLanguage, unknown>
 
-export function CodeEditor({ value, language, label, onChange, onSave, onFiles, readOnly = false, className }: CodeEditorProps) {
+export function CodeEditor({ value, language, label, onChange, onSave, onFiles, handle, readOnly = false, className }: CodeEditorProps) {
   const hint = useId()
   const View = VIEWS[language]
   return (
     <div className={className ? `sb-editor ${className}` : 'sb-editor'} data-readonly={readOnly ? '' : undefined}>
       <Suspense fallback={<pre className="sb-editor-plain">{value}</pre>}>
-        <View value={value} label={label} onChange={onChange} onSave={onSave} onFiles={onFiles} readOnly={readOnly} hintId={hint} />
+        <View value={value} label={label} onChange={onChange} onSave={onSave} onFiles={onFiles} handle={handle} readOnly={readOnly} hintId={hint} />
       </Suspense>
       {/*
        * Tab indents, so it cannot also move focus on, and someone using a keyboard alone would be held
