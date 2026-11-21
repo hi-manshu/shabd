@@ -180,6 +180,12 @@ export default function Studio() {
 
   const version = useCallback(() => live.current.version, [])
 
+  /**
+   * True while a page is being made, renamed or deleted. The editor is not typed into then: the page stays on
+   * screen until the Studio has gone to the next one, and what was typed in that time would be lost with it.
+   */
+  const [acting, setActing] = useState(false)
+
   /* ── an image pasted or dropped into the editor ── */
 
   const [imageProblem, setImageProblem] = useState('')
@@ -336,7 +342,9 @@ export default function Studio() {
         </button>
       </header>
 
-      {backend && <PageActions backend={backend} page={id && !generated ? { id, path } : null} settle={settle} discard={discard} version={version} />}
+      {backend && (
+        <PageActions backend={backend} page={id && !generated ? { id, path } : null} settle={settle} discard={discard} version={version} acting={setActing} />
+      )}
 
       {generated ? (
         <p className="sb-studio-empty">This page is made from an OpenAPI description. Change the description, and the page follows.</p>
@@ -348,7 +356,7 @@ export default function Studio() {
           language="markdown"
           label={`Markdown source of ${title}`}
           value={text}
-          readOnly={status.kind === 'loading'}
+          readOnly={status.kind === 'loading' || acting}
           onChange={edit}
           onSave={() => void save()}
           onFiles={addImages}

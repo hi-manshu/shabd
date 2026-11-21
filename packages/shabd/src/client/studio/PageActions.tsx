@@ -13,14 +13,14 @@
  * an address the page does not know yet would load the whole document again.
  */
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { pagePathProblem, pageRoute } from '../../shared/page-path.js'
+import { leftBehindProblem, pagePathProblem, pageRoute } from '../../shared/page-path.js'
 import { isPageFile, parentDir, titleize } from '../../shared/paths.js'
 import { flattenSidebar } from '../../shared/sidebar.js'
 import type { PageMeta, SiteData } from '../../shared/types.js'
 import { useRouter } from '../app/router.js'
 import { routeStore, siteStore, useSite } from '../app/store.js'
 import { useHref } from '../ui/Link.js'
-import { addRedirect, checkSite, redirectOffer, type CheckProblem, type RedirectOffer, type StudioBackend } from './backends.js'
+import { addRedirect, checkSite, leftBehind, redirectOffer, type CheckProblem, type RedirectOffer, type StudioBackend } from './backends.js'
 
 interface PageActionsProps {
   backend: StudioBackend
@@ -32,6 +32,8 @@ interface PageActionsProps {
   discard: () => void
   /** The page's file as the Studio last read it: what a delete is allowed to remove. */
   version: () => string
+  /** Told when one of the three starts and when it ends. What is typed in between would belong to a file on its way out. */
+  acting: (now: boolean) => void
 }
 
 type Form = 'create' | 'rename' | 'delete'
@@ -131,9 +133,9 @@ function newProblems(before: CheckProblem[], now: CheckProblem[]): CheckProblem[
   })
 }
 
-export function PageActions({ backend, page, settle, discard, version }: PageActionsProps) {
+export function PageActions({ backend, page, settle, discard, version, acting }: PageActionsProps) {
   const site = useSite()
-  const { navigate } = useRouter()
+  const { navigate, hold } = useRouter()
   const href = useHref()
   const [form, setForm] = useState<Form | null>(null)
   const [typed, setTyped] = useState('')
@@ -189,6 +191,7 @@ export function PageActions({ backend, page, settle, discard, version }: PageAct
   const run = async (work: () => Promise<Outcome>) => {
     const mine = ++turn.current
     setBusy(true)
+    acting(true)
     setProblem('')
     try {
       const result = await work()
@@ -207,6 +210,7 @@ export function PageActions({ backend, page, settle, discard, version }: PageAct
       setProblem(error instanceof Error ? error.message : String(error))
     } finally {
       setBusy(false)
+      acting(false)
     }
   }
 
@@ -230,12 +234,22 @@ export function PageActions({ backend, page, settle, discard, version }: PageAct
       const invalid = placeProblem(to, siteStore.get().pages, page.id)
       if (invalid) throw new Error(invalid)
       if (!(await settle())) throw new Error(UNSAVED)
+      // A page that could not be shown where it went could not be opened here again to be mended.
+      const lost = await leftBehind(page.id, to)
+      if (lost.length > 0) throw new Error(leftBehindProblem(to, lost))
       // What was wrong inside the page before is still wrong in it: counted under its new name, it is not news.
       const renamed = (found: CheckProblem) => (found.file === inContent(page.id) ? { ...found, file: inContent(to) } : found)
       before.current = (await checkSite().catch(() => null))?.map(renamed) ?? null
-      await backend.rename(page.id, to)
-      const moved = (await known(to, true))!
-      await navigate(href(moved.path), { replace: true, keepFocus: true })
+      // The page stays on screen until the Studio has gone to where it went. It is not "not found" in between.
+      const release = hold()
+      let moved: PageMeta
+      try {
+        await backend.rename(page.id, to)
+        moved = (await known(to, true))!
+        await navigate(href(moved.path), { replace: true, keepFocus: true })
+      } finally {
+        release()
+      }
       if (moved.path === page.path) return { summary: `${inContent(page.id)} is now ${inContent(to)}. Its address is still ${page.path}.` }
       return {
         summary: `${inContent(page.id)} is now ${inContent(to)}. Its address changed from ${page.path} to ${moved.path}.`,
@@ -249,9 +263,15 @@ export function PageActions({ backend, page, settle, discard, version }: PageAct
       discard()
       before.current = await checkSite().catch(() => null)
       const next = neighbour(siteStore.get(), page.path)
-      await backend.remove(page.id, version())
-      await known(page.id, false)
-      if (next !== undefined) await navigate(href(next), { replace: true, keepFocus: true })
+      // As for a rename: the deleted page is on screen until the one beside it is.
+      const release = hold()
+      try {
+        await backend.remove(page.id, version())
+        await known(page.id, false)
+        if (next !== undefined) await navigate(href(next), { replace: true, keepFocus: true })
+      } finally {
+        release()
+      }
       return { summary: `Deleted ${inContent(page.id)}.` }
     })
 

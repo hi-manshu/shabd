@@ -57,3 +57,18 @@ export function pagePathProblem(path: unknown): string | undefined {
 export function pageRoute(path: string): string {
   return slugToPath(fileToSlug(path))
 }
+
+/**
+ * What is said when a page is not moved to `to`, because from there it
+ * would not find `files`: what it uses by a path relative to itself, such as
+ * an image beside it. A page whose image is missing cannot be shown at all,
+ * and the Studio could not be opened on it to mend it.
+ */
+export function leftBehindProblem(to: string, files: string[]): string {
+  const folder = to.includes('/') ? `${to.slice(0, to.lastIndexOf('/'))}/` : 'the content folder'
+  const list = files.length > 1 ? `${files.slice(0, -1).join(', ')} and ${files.at(-1)}` : files[0]
+  return (
+    `From ${folder} the page would not find ${list}, which it uses where it is now. ` +
+    'The Studio moves the page and nothing else. Move the page and what it uses together outside the Studio, or keep the page in its folder.'
+  )
+}

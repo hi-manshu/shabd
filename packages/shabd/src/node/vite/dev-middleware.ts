@@ -11,13 +11,13 @@
  * policy before it gets here.
  */
 import { createHash, randomUUID } from 'node:crypto'
-import { createReadStream } from 'node:fs'
+import { createReadStream, existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import path, { extname } from 'node:path'
 import { normalizePath, type Connect, type ViteDevServer } from 'vite'
 import { IMAGE_BYTES_LIMIT, IMAGE_TOO_LARGE } from '../../shared/image-file.js'
-import { pagePathProblem, pageRoute } from '../../shared/page-path.js'
+import { leftBehindProblem, pagePathProblem, pageRoute } from '../../shared/page-path.js'
 import { stripBase } from '../../shared/paths.js'
 import { SEARCH_FILES } from '../../shared/search-core.js'
 import { FEED_FILE, renderFeed } from '../build/feed.js'
@@ -33,7 +33,7 @@ import { liveDocs } from '../mcp/live.js'
 import { SEARCH_INDEX_FILE, SEARCH_VECTORS_FILE, toRoutePath } from '../mcp/source.js'
 import { modelFiles, runtimeFiles } from '../search/model-files.js'
 import { SearchService } from '../search/service.js'
-import { createPage, deletePage, movePage, saveImage, StudioRefusal } from './studio-files.js'
+import { createPage, deletePage, movePage, relativeImports, saveImage, StudioRefusal } from './studio-files.js'
 
 const STUDIO_PREFIX = '/_shabd/studio/'
 
@@ -44,6 +44,8 @@ const CONTENT_TYPES: Record<string, string> = {
   '.wasm': 'application/wasm',
 }
 export const STUDIO_TOKEN_HEADER = 'x-shabd-studio'
+/** Longer than the file watcher takes to find a file that has just been made. */
+const WATCHER_HAS_SEEN_MS = 500
 
 const sha1 = (text: string) => createHash('sha1').update(text).digest('hex')
 
@@ -264,6 +266,57 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
       if (page.generated) throw new StudioRefusal(`This page is made from ${page.generated}. Change the description, and the page follows.`, 403)
       return page
     }
+    /**
+     * What a page uses by a path relative to itself, and would not find if its file were at `to`: an image
+     * beside it, most often. A page whose image is missing is not served at all, so the Studio could not be
+     * opened on it to mend it, and such a move is refused. Vite's own resolver is asked, because that is what
+     * decides it when the page is served.
+     *
+     * The page is compiled as it will be at `to`. That is kept, so the work is done before the file moves
+     * and the browser is not left waiting for the page at its new address.
+     */
+    const leftBehind = async (page: PageRecord, to: string): Promise<string[]> => {
+      // A page that does not compile shows what is wrong with it, wherever its file is.
+      if (page.error) return []
+      const file = path.join(config.contentDir, to)
+      let code: string
+      try {
+        // The file as it is on disk. With a connected folder the browser saved it a moment ago, and the
+        // watcher may not have told the store yet.
+        const source = await readFile(page.file, 'utf8')
+        const compiled = await context().compiler.compile({
+          file,
+          source,
+          format: /\.mdx$/i.test(to) ? 'mdx' : 'md',
+          id: to,
+          routePath: pageRoute(to),
+          hash: sha1(source),
+          liftTitle: page.titleFromHeading,
+        })
+        code = compiled.code
+      } catch {
+        return []
+      }
+      if (path.dirname(file) === path.dirname(page.file)) return []
+      const { pluginContainer } = server.environments.client
+      const found = async (specifier: string, from: string) => (await pluginContainer.resolveId(specifier, from)) !== null
+      const lost: string[] = []
+      for (const specifier of relativeImports(code)) {
+        if ((await found(specifier, page.file)) && !(await found(specifier, file))) lost.push(specifier)
+      }
+      return lost
+    }
+    /**
+     * The watcher finds a new file in its own time, a tenth of a second or so, and the page is listed here
+     * without waiting for it. A file that is deleted on disk before the watcher has found it is one the
+     * watcher never saw: it does not say that the file has gone, and the page stayed listed until the dev
+     * server stopped. So a file made here is looked at once more, when the watcher has had its time.
+     */
+    const lookAgain = (file: string) => {
+      setTimeout(() => {
+        if (!existsSync(file) && context().store.byFile(file)) server.watcher.emit('unlink', normalizePath(file))
+      }, WATCHER_HAS_SEEN_MS).unref()
+    }
 
     if (action === 'page' && req.method === 'POST') {
       const body = await jsonBody(req)
@@ -273,6 +326,7 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
       const file = await createPage(config.contentDir, id, body.source)
       // As for a save: the routes and the navigation follow now, not when the watcher gets to it.
       server.watcher.emit('add', normalizePath(file))
+      lookAgain(file)
       sendJson(res, { id, path: pageRoute(id) }, 201)
       return
     }
@@ -283,13 +337,25 @@ export function devMiddlewares(context: () => ShabdContext, server: ViteDevServe
       const to = newPlace(body.to)
       if (to === page.id) throw new StudioRefusal('That is the name the page has.', 400)
       refuseTakenAddress(to, page)
+      const lost = await leftBehind(page, to)
+      if (lost.length > 0) throw new StudioRefusal(leftBehindProblem(to, lost), 409)
       const file = await movePage(config.contentDir, page.file, to)
       // One hot update for the move, not one for each file. The new file is entered here, and the update that
       // follows the removal of the old one carries both: the browser's list of pages goes from the old state
       // to the new one, with no state in between in which the page is in two places or in none.
       await store.upsert(file)
       server.watcher.emit('unlink', normalizePath(page.file))
+      lookAgain(file)
       sendJson(res, { id: to, path: pageRoute(to), from: page.path })
+      return
+    }
+
+    // What a page would lose by a move, asked before it. The Studio asks with either backend: in a connected
+    // folder the browser moves the file itself, and only the dev server, which compiles the page, can say.
+    if (action === 'left-behind' && req.method === 'GET') {
+      const page = existingPage(url.searchParams.get('id'))
+      const to = newPlace(url.searchParams.get('to'))
+      sendJson(res, { files: await leftBehind(page, to) })
       return
     }
 

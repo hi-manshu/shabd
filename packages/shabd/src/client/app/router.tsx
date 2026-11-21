@@ -129,6 +129,13 @@ interface RouterValue {
    * the Studio that moved the reader, to a page it has just made or renamed.
    */
   navigate(to: string, options?: { replace?: boolean; passage?: PassageTarget; keepFocus?: boolean }): Promise<void>
+  /**
+   * Dev: keep the page that is on screen there, though its file goes, until the function this returns is
+   * called. The Studio holds a page while it renames or deletes it. Without that the page is "not found"
+   * from the moment its file is gone until the Studio has gone to where the page went, and for a long page
+   * that is most of a second.
+   */
+  hold(): () => void
 }
 
 const RouterContext = createContext<RouterValue | null>(null)
@@ -354,13 +361,26 @@ export function RouterProvider({ initial, children }: { initial: LoadedPage; chi
     if (target) applyScroll(target)
   }, [navigation])
 
-  const view = useMemo(() => toPageView(site, page), [site, page])
+  const found = useMemo(() => toPageView(site, page), [site, page])
+  /** The page a caller of `hold` asked to keep on screen. It is shown for as long as there is no page at the address. */
+  const [held, setHeld] = useState<PageView | null>(null)
+  const view = held && found.notFound ? held : found
+  const shown = useRef(view)
+  useEffect(() => {
+    shown.current = view
+  })
+
+  const hold = useCallback(() => {
+    const kept = shown.current
+    setHeld(kept)
+    return () => setHeld((current) => (current === kept ? null : current))
+  }, [])
 
   useEffect(() => {
     document.title = view.title && view.title !== site.site.title ? `${view.title} | ${site.site.title}` : site.site.title
   }, [view.title, site.site.title])
 
-  const router = useMemo<RouterValue>(() => ({ path: page.path, navigate }), [page.path, navigate])
+  const router = useMemo<RouterValue>(() => ({ path: page.path, navigate, hold }), [page.path, navigate, hold])
 
   return (
     <RouterContext value={router}>

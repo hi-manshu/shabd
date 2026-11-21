@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
 import { resolveConfig } from '../src/node/config/load.js'
 import { addRedirect, planRedirect } from '../src/node/config/redirect-edit.js'
-import { createPage, deletePage, movePage, saveImage } from '../src/node/vite/studio-files.js'
+import { createPage, deletePage, movePage, relativeImports, saveImage } from '../src/node/vite/studio-files.js'
 import { IMAGE_BYTES_LIMIT, imageFileName, sniffImage } from '../src/shared/image-file.js'
-import { pagePathProblem, pageRoute } from '../src/shared/page-path.js'
+import { leftBehindProblem, pagePathProblem, pageRoute } from '../src/shared/page-path.js'
 import { temporarySites } from './helpers/site.js'
 
 /** Every way of naming a file that is not a page inside the content folder. None may be accepted anywhere. */
@@ -205,6 +205,55 @@ describe('files the Studio makes, moves and deletes', () => {
     expect(await filesIn(content)).toEqual(['guide/other.md'])
     await expect(deletePage(path.join(content, 'guide'))).rejects.toThrow()
     expect(await filesIn(content)).toEqual(['guide/other.md'])
+  })
+})
+
+describe('what a page would not find from another folder', () => {
+  // As the compiler writes them: one import to a line, each at the start of it.
+  const compiled = [
+    'import {Fragment as _Fragment, jsx as _jsx, jsxs as _jsxs} from "react/jsx-runtime";',
+    'import {useMDXComponents as _provideComponents} from "virtual:shabd/mdx-components";',
+    'import _rehypeMdxImportMedia0 from "./shot.png";',
+    'import _rehypeMdxImportMedia1 from "../guide/far.png";',
+    "import Thing from './Thing';",
+    'import {A, B} from "../parts/ab.tsx";',
+    "import './side.css';",
+    "export {C} from './c.js';",
+    "export const logo = './not-an-import.png';",
+    'function _createMdxContent(props) {',
+    '  return _jsxs(_Fragment, {',
+    '    children: [_jsx(_components.img, {',
+    '      src: _rehypeMdxImportMedia0,',
+    '      alt: "a shot"',
+    '    }), _jsx("img", {',
+    '      src: "./raw.png",',
+    '    }), _jsx(_components.p, {',
+    '      children: "A sentence with import y from \'./in-text.js\' in it."',
+    '    }), _jsx(_components.code, {',
+    '      children: "import x from \'./in-code.js\'\\nimport \'./second-line.js\'"',
+    '    })]',
+    '  });',
+    '}',
+  ].join('\n')
+
+  it('reads the imports that are relative to the page out of what the compiler wrote, and nothing else', () => {
+    expect(relativeImports(compiled)).toEqual(['./shot.png', '../guide/far.png', './Thing', '../parts/ab.tsx', './side.css', './c.js'])
+  })
+
+  it('counts a file once, however often the page uses it', () => {
+    expect(relativeImports('import a from "./shot.png";\nimport b from "./shot.png";\n')).toEqual(['./shot.png'])
+    expect(relativeImports('export default function Page() {}\n')).toEqual([])
+  })
+
+  it('says which files, and from which folder, in words for the person renaming the page', () => {
+    expect(leftBehindProblem('guide/alpha.md', ['./shot.png'])).toBe(
+      'From guide/ the page would not find ./shot.png, which it uses where it is now. The Studio moves the page and nothing else. ' +
+        'Move the page and what it uses together outside the Studio, or keep the page in its folder.',
+    )
+    expect(leftBehindProblem('a/b/alpha.md', ['./one.png', './two.png', '../Thing'])).toContain(
+      'From a/b/ the page would not find ./one.png, ./two.png and ../Thing, which it uses where it is now.',
+    )
+    expect(leftBehindProblem('alpha.md', ['./shot.png'])).toContain('From the content folder the page would not find ./shot.png,')
   })
 })
 

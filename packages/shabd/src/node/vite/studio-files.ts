@@ -134,6 +134,24 @@ export async function deletePage(file: string): Promise<void> {
 }
 
 /**
+ * What a compiled page imports by a path relative to its own file: an image
+ * shown as `./shot.png`, and whatever an MDX page imports or exports from
+ * another file. These are what a move to another folder can break.
+ *
+ * Read from the code the compiler writes, in which each import is a
+ * statement at the start of a line. The page's own text is inside string
+ * literals there, where a line break is an escape, so a sentence about
+ * `import` cannot be taken for one.
+ */
+export function relativeImports(code: string): string[] {
+  const found = new Set<string>()
+  for (const match of code.matchAll(/^\s*(?:import\s*|(?:import|export)\s[^'"]*?\bfrom\s*)['"](\.\.?\/[^'"\n]+)['"]/gm)) {
+    found.add(match[1]!)
+  }
+  return [...found]
+}
+
+/**
  * Save an image beside a page, and return the name it was given.
  * `pageFile` is the file of a page the store knows.
  *

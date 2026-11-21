@@ -9,6 +9,7 @@ import { useSyncExternalStore } from 'react'
 import initialData from 'virtual:shabd/data'
 import { routes as initialRoutes } from 'virtual:shabd/routes'
 import type { SiteData } from '../../shared/types.js'
+import { keepPages } from './hmr.js'
 import type { PageModule } from './types.js'
 
 export interface Store<T> {
@@ -59,6 +60,9 @@ if (import.meta.hot) {
     const style = document.getElementById('sb-theme')
     if (css !== undefined && style && style.textContent !== css) style.textContent = css
   })
+
+  // A page that has gone takes its module with it (see hmr.ts).
+  siteStore.subscribe(() => keepPages(new Set(Object.values(siteStore.get().pages).map((page) => page.id))))
 
   import.meta.hot.accept('virtual:shabd/data', (next) => {
     if (next) siteStore.set(next.default as SiteData)

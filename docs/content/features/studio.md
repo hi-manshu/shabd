@@ -91,6 +91,15 @@ A name is refused while you type it if the file would not be a page: it would be
 does not end in `.md` or `.mdx`, a part of it starts with `_` or `.`, or a page already has the address it would
 get. Nothing is written over a file that is there.
 
+A page is not moved to another folder if it would not find there what it uses by a path relative to itself: an
+image beside it, shown as `./shot.png`, or a file that an `.mdx` page imports. The Studio moves the page and
+nothing else, and a page whose image is missing cannot be shown at all, so the Studio could not be opened on it
+again to mend the link. It says which files they are when you send the name. Move the page and those files
+together in your file manager, or keep the page in its folder, where any name will do.
+
+While one of the three is under way the page stays on screen and the editor cannot be typed into, until the
+Studio has gone to the page that comes next.
+
 ### What a rename leaves behind
 
 A page's address comes from its file name, so a renamed page has a new address, and a deleted one has none. Links
@@ -168,6 +177,14 @@ Set `features.studio: false` to remove the Studio and its endpoints.
 - A deleted page is gone from disk. The Studio keeps no copy, and its undo does not bring a file back: that is
   what version control is for.
 - It renames one page at a time and does not move or rename folders. A folder left empty stays.
+- An image beside a page is not moved, renamed or deleted with the page. A page that uses one stays in its
+  folder, as said above, and the images of a deleted page stay where they were. What a page would not find from
+  another folder is worked out from its imports: an image written as an HTML tag in an `.mdx` page, with a path
+  in `src`, is not one of them and is not noticed.
+- For a moment while a page is renamed or deleted, its breadcrumbs, its previous and next links and its mark in
+  the sidebar are gone: the page is still on screen, and the site no longer lists it at its old address. That
+  lasts as long as the browser takes to fetch and draw the page that comes next: about a hundredth of a second
+  for a short page, and most of a second for a very long one.
 - A rename that changes only capitals is refused on a disk that does not tell them apart, such as the usual
   one on macOS and Windows: to the disk the new name is taken.
 - The list of what `shabd check` reports comes from the dev server, which also shows drafts. `shabd check` itself

@@ -116,6 +116,14 @@ export async function checkSite(): Promise<CheckProblem[]> {
   return (await ask<{ problems: CheckProblem[] }>('check', 'GET')).problems
 }
 
+/**
+ * What a page uses by a path relative to itself and would not find if its file were at `to`: an image beside
+ * it, most often. The dev server compiles the page to answer, so it is asked with either backend.
+ */
+export async function leftBehind(id: string, to: string): Promise<string[]> {
+  return (await ask<{ files: string[] }>(`left-behind?id=${encodeURIComponent(id)}&to=${encodeURIComponent(to)}`, 'GET')).files
+}
+
 export interface RedirectOffer {
   /** False when the line cannot be put into the config without rewriting part of it. */
   possible: boolean

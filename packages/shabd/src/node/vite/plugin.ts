@@ -322,7 +322,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       }
     },
 
-    async hotUpdate({ type, file, modules, read, server }) {
+    async hotUpdate({ type, file, modules, read, server, timestamp }) {
       if (this.environment.name !== 'client') return undefined
       const context = ctx()
       const { config, store } = context
@@ -406,8 +406,18 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
         return beside ? modules.filter((module) => module.file !== normalizePath(file) || module.importers.size > 0) : undefined
       }
 
+      // What Vite has compiled of a page, and what the browser has fetched, is from the file as it was. Vite
+      // keeps both for a file that is gone, and gives them out again when a file of that name comes back: a
+      // page deleted and made again, or renamed and renamed back, was shown as it had been before. Marked out
+      // of date here, the page is compiled again, and the routes fetch it under an address the browser has
+      // not seen.
+      const forget = () => {
+        for (const module of modules) client.moduleGraph.invalidateModule(module, new Set(), timestamp, true)
+      }
+
       if (type === 'delete') {
         if (store.remove(file)) {
+          forget()
           reload(VIRTUAL.routes)
           reload(VIRTUAL.data)
         }
@@ -429,6 +439,7 @@ export function shabd(options: ShabdPluginOptions = {}): PluginOption[] {
       // watchers reporting one save): nothing to update.
       if (change === 'none') return []
       if (change === 'added') {
+        forget()
         reload(VIRTUAL.routes)
         reload(VIRTUAL.data)
         return []

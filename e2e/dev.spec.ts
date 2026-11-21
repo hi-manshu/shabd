@@ -103,6 +103,34 @@ test.describe('hot updates', () => {
     await expect(page.locator('h1.sb-page-title')).toHaveText('Page not found')
   })
 
+  test('a page that is deleted and made again under the same name is shown as it is now, not as it was', async ({ page, site }) => {
+    await open(page, `${DEV}/extras/alpha`)
+    const stillThere = await markPage(page)
+    const extras = page.locator('.sb-nav-category', { hasText: 'Extras' })
+    const content = page.locator('.sb-content')
+    await expect(content).toContainText('First alphabetically.')
+    // Once it has been shown, the page is kept: by the browser as a module, and by Vite as what it compiled.
+    // Both were given out again for the file that came to be there later.
+    await extras.getByRole('link', { name: 'Beta notes' }).click()
+    await expect(page).toHaveURL(`${DEV}/extras/beta`)
+
+    await site.remove('content/extras/alpha.md')
+    await expect(extras.locator('.sb-nav-link')).toHaveText(['Beta notes'])
+    await site.write('content/extras/alpha.md', '---\ntitle: Alpha again\n---\n\nMade a second time.\n')
+    await expect(extras.locator('.sb-nav-link')).toHaveText(['Alpha again', 'Beta notes'])
+    await extras.getByRole('link', { name: 'Alpha again' }).click()
+    await expect(page).toHaveURL(`${DEV}/extras/alpha`)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Alpha again')
+    await expect(content).toContainText('Made a second time.')
+    await expect(content).not.toContainText('First alphabetically.')
+    expect(await stillThere()).toBe(true)
+
+    // A browser that asks for the first time is given the same.
+    await page.reload()
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Alpha again')
+    await expect(page.locator('.sb-content')).toContainText('Made a second time.')
+  })
+
   test('a page renamed on disk moves in the routes and the navigation, and the page on screen is not loaded again', async ({ page, site }) => {
     await open(page, `${DEV}/guide/intro`)
     const stillThere = await markPage(page)
@@ -219,6 +247,27 @@ test.describe('studio', () => {
    */
   const written = (editor: Locator, site: SiteFiles, file: string) =>
     expect.poll(async () => (await site.read(file)) === (await textOf(editor))).toBe(true)
+
+  /**
+   * Note every title the page has from now on, with a word when the Studio has no page to edit. A page that
+   * is renamed or deleted stays on screen until the Studio has gone to the next one, so there is no
+   * "Page not found" among them. The page is watched as it changes, not looked at now and then: the state
+   * that used to come between lasted a few hundredths of a second.
+   */
+  const titlesFrom = async (page: Page): Promise<() => Promise<string[]>> => {
+    await page.evaluate(() => {
+      const seen: string[] = []
+      ;(window as unknown as { titlesSeen: string[] }).titlesSeen = seen
+      const note = () => {
+        const title = document.querySelector('h1.sb-page-title')?.textContent ?? ''
+        const now = document.querySelector('.sb-studio-empty') ? `${title} (nothing to edit)` : title
+        if (seen.at(-1) !== now) seen.push(now)
+      }
+      new MutationObserver(note).observe(document.body, { childList: true, subtree: true, characterData: true })
+      note()
+    })
+    return () => page.evaluate(() => (window as unknown as { titlesSeen: string[] }).titlesSeen)
+  }
 
   test('typing saves to the file and updates the page beside it', async ({ page, site }) => {
     await site.track('content/guide/setup.md')
@@ -537,6 +586,7 @@ test.describe('studio', () => {
     const config = await site.read('shabd.config.yaml')
     const editor = await openStudio(page, '/guide/setup')
     const stillThere = await markPage(page)
+    const titles = await titlesFrom(page)
 
     // Something typed and not saved yet goes with the page.
     await cursorAfter(editor, 'Install the thing.')
@@ -557,6 +607,8 @@ test.describe('studio', () => {
     expect(await site.read('content/guide/install.md')).toContain('Install the thing. Typed just before the move.')
     expect((await request.get(`${DEV}/guide/setup`)).status()).toBe(404)
     expect(await stillThere()).toBe(true)
+    // The page was on screen all the while: not "not found" between the file going and the Studio following it.
+    expect(await titles()).toEqual(['Setting up'])
 
     // Other pages are not rewritten. What the move broke is listed, in the words `shabd check` uses.
     const outcome = page.locator('.sb-studio-outcome')
@@ -642,15 +694,61 @@ test.describe('studio', () => {
     await expect(remove).toBeFocused()
     expect(existsSync(site.path('content/extras/beta.md'))).toBe(true)
 
+    const titles = await titlesFrom(page)
     await remove.click()
     await question.getByRole('button', { name: 'Delete page' }).click()
     await expect(page).toHaveURL(`${DEV}/extras/alpha`)
     await expect(page.locator('h1.sb-page-title')).toHaveText('Alpha notes')
+    // The deleted page was on screen until the one beside it was.
+    expect(await titles()).toEqual(['Beta notes', 'Alpha notes'])
     await expect(page.locator('.sb-studio-file strong')).toHaveText('content/extras/alpha.md')
     await expect(page.locator('.sb-studio-outcome')).toContainText('Deleted content/extras/beta.md.')
     expect(existsSync(site.path('content/extras/beta.md'))).toBe(false)
     expect((await request.get(`${DEV}/extras/beta`)).status()).toBe(404)
     await expect(page.locator('.sb-nav-category', { hasText: 'Extras' }).locator('.sb-nav-link')).toHaveText(['Alpha notes'])
+    expect(await stillThere()).toBe(true)
+  })
+
+  test('a page whose name is used again is shown as it is now, not as the page that had the name before', async ({ page, site }) => {
+    for (const file of ['content/extras/alpha.md', 'content/extras/gamma.md']) await site.track(file)
+    const editor = await openStudio(page, '/extras/alpha')
+    const stillThere = await markPage(page)
+    const content = page.locator('.sb-content')
+    await expect(content).toContainText('First alphabetically.')
+
+    const rename = async (from: string, to: string) => {
+      await page.getByRole('button', { name: 'Rename', exact: true }).click()
+      await page.getByLabel(`New name for ${from}.md, in content/`).fill(to)
+      // The editor can be typed into again once the file has been read under its new name.
+      const read = page.waitForResponse((response) => response.url().includes(`source?id=${encodeURIComponent(`${to}.md`)}`))
+      await page.getByRole('button', { name: 'Rename page' }).click()
+      await expect(page).toHaveURL(`${DEV}/${to}`)
+      await read
+      await expect(editor).toBeEditable()
+    }
+
+    // Renamed, written to under the new name, and renamed back. Vite and the browser both still held the page
+    // as it was before the first move, and showed that.
+    await rename('extras/alpha', 'extras/gamma')
+    await cursorAfter(editor, 'First alphabetically.')
+    await page.keyboard.type(' Written while it was called gamma.')
+    await expect(content).toContainText('First alphabetically. Written while it was called gamma.')
+    await written(editor, site, 'content/extras/gamma.md')
+    await rename('extras/gamma', 'extras/alpha')
+    await expect(content).toContainText('First alphabetically. Written while it was called gamma.')
+    await expect.poll(() => textOf(editor)).toContain('Written while it was called gamma.')
+
+    // Deleted, and made again with nothing in it. The page that was deleted is not what the new one shows.
+    await page.getByRole('button', { name: 'Delete', exact: true }).click()
+    await page.getByRole('button', { name: 'Delete page' }).click()
+    await expect(page.locator('.sb-studio-outcome')).toContainText('Deleted content/extras/alpha.md.')
+    await page.getByRole('button', { name: 'New page' }).click()
+    await page.getByLabel('File for the new page, in content/').fill('extras/alpha')
+    await page.getByRole('button', { name: 'Create page' }).click()
+    await expect(page).toHaveURL(`${DEV}/extras/alpha`)
+    await expect(page.locator('h1.sb-page-title')).toHaveText('Alpha')
+    await expect.poll(() => textOf(editor)).toBe('---\ntitle: Alpha\n---\n\n')
+    await expect(content).not.toContainText('First alphabetically.')
     expect(await stillThere()).toBe(true)
   })
 
@@ -740,6 +838,48 @@ test.describe('studio', () => {
     await written(editor, site, 'content/guide/setup.md')
     await expect(page.locator('.sb-content img')).toHaveCount(1)
     expect(await stillThere()).toBe(true)
+  })
+
+  test('a page that shows an image beside it is not moved to another folder, where it could not be shown', async ({ page, site }) => {
+    for (const file of ['content/extras/alpha.md', 'content/extras/shot.png', 'content/extras/first.md', 'content/guide/alpha.md']) {
+      await site.track(file)
+    }
+    const editor = await openStudio(page, '/extras/alpha')
+    const stillThere = await markPage(page)
+    await cursorAfter(editor, 'First alphabetically.')
+    await page.keyboard.type(' ')
+    await giveFiles(editor, 'paste', [{ name: 'shot.png', type: 'image/png', base64: PIXEL }])
+    await expect(editor).toContainText('First alphabetically. ![](./shot.png)')
+    const picture = page.locator('.sb-content img')
+    await expect.poll(() => picture.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(1)
+    await written(editor, site, 'content/extras/alpha.md')
+
+    // The image would stay where it is. A page whose image is missing is not served at all, so the page would
+    // be gone from the screen, and the Studio with it.
+    await page.getByRole('button', { name: 'Rename', exact: true }).click()
+    const name = page.getByLabel('New name for extras/alpha.md, in content/')
+    await name.fill('guide/alpha')
+    await name.press('Enter')
+    await expect(page.locator('.sb-studio-pages [role="alert"]')).toHaveText(
+      'From guide/ the page would not find ./shot.png, which it uses where it is now. The Studio moves the page and nothing else. ' +
+        'Move the page and what it uses together outside the Studio, or keep the page in its folder.',
+    )
+    await expect(page).toHaveURL(`${DEV}/extras/alpha`)
+    expect(existsSync(site.path('content/guide/alpha.md'))).toBe(false)
+    expect(existsSync(site.path('content/extras/alpha.md'))).toBe(true)
+    await expect(editor).toBeEditable()
+
+    // The form is still open, for a name in the folder the page is in. There the image is still found.
+    await name.fill('extras/first')
+    await name.press('Enter')
+    await expect(page).toHaveURL(`${DEV}/extras/first`)
+    await expect(page.locator('.sb-studio-file strong')).toHaveText('content/extras/first.md')
+    await expect.poll(() => picture.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(1)
+    expect(await stillThere()).toBe(true)
+
+    // The files are put back next, the image among them. Left open, the page would be told that its image has
+    // gone, fail to load again, and say so in the dev server's log.
+    await page.goto('about:blank')
   })
 
   /**
@@ -1040,6 +1180,7 @@ test.describe('studio', () => {
       ['make a page', (headers) => request.post(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/made.md', source: 'made' } })],
       ['move a page', (headers) => request.patch(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/alpha.md', to: 'extras/moved.md' } })],
       ['delete a page', (headers) => request.delete(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/alpha.md' } })],
+      ['ask what a move would leave behind', (headers) => request.get(`${DEV}/_shabd/studio/left-behind?id=extras/alpha.md&to=guide/alpha.md`, { headers })],
       ['read what check reports', (headers) => request.get(`${DEV}/_shabd/studio/check`, { headers })],
       ['ask about a redirect', (headers) => request.get(`${DEV}/_shabd/studio/redirect?from=/gone&to=/guide/intro`, { headers })],
       ['add a redirect', (headers) => request.post(`${DEV}/_shabd/studio/redirect`, { headers, data: { from: '/gone', to: '/guide/intro' } })],
@@ -1182,6 +1323,63 @@ test.describe('studio', () => {
     expect(existsSync(site.path('content/handbook/start/moved.mdx'))).toBe(false)
     await expect.poll(async () => (await request.get(`${DEV}/handbook/start/moved`)).status()).toBe(404)
     await rm(site.path('content/handbook'), { recursive: true, force: true })
+  })
+
+  test('the endpoint does not move a page to a folder from which it would not find the image beside it', async ({ request, site }) => {
+    const headers = { 'x-shabd-studio': await studioToken(request) }
+    for (const file of ['content/extras/alpha.md', 'content/extras/shot.png', 'content/extras/first.md', 'content/guide/alpha.md']) {
+      await site.track(file)
+    }
+    const leftBehind = async (id: string, to: string) => {
+      const response = await request.get(`${DEV}/_shabd/studio/left-behind`, { headers, params: { id, to } })
+      return response.ok() ? ((await response.json()) as { files: string[] }).files : response.status()
+    }
+
+    // An image beside the page, saved as the Studio saves one, and shown by the page.
+    const saved = await request.post(`${DEV}/_shabd/studio/image?id=extras/alpha.md&name=shot.png`, {
+      headers: { ...headers, 'content-type': 'application/octet-stream' },
+      data: Buffer.from(PIXEL, 'base64'),
+    })
+    expect(await saved.json()).toEqual({ name: 'shot.png' })
+    expect(await leftBehind('extras/alpha.md', 'guide/alpha.md')).toEqual([])
+    await site.edit('content/extras/alpha.md', (text) => `${text}\n![A shot](./shot.png)\n`)
+    await expect.poll(() => leftBehind('extras/alpha.md', 'guide/alpha.md')).toEqual(['./shot.png'])
+    // In its own folder it still finds the image, whatever the file is called.
+    expect(await leftBehind('extras/alpha.md', 'extras/first.md')).toEqual([])
+
+    const refused = await request.patch(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/alpha.md', to: 'guide/alpha.md' } })
+    expect([refused.status(), ((await refused.json()) as { error: string }).error]).toEqual([
+      409,
+      'From guide/ the page would not find ./shot.png, which it uses where it is now. The Studio moves the page and nothing else. ' +
+        'Move the page and what it uses together outside the Studio, or keep the page in its folder.',
+    ])
+    expect(existsSync(site.path('content/extras/alpha.md'))).toBe(true)
+    expect(existsSync(site.path('content/guide/alpha.md'))).toBe(false)
+
+    // The question is asked of a page, about a place a page could have.
+    expect(await leftBehind('extras/nothing.md', 'guide/alpha.md')).toBe(404)
+    expect(await leftBehind('extras/alpha.md', '../alpha.md')).toBe(400)
+    expect(await leftBehind('extras/alpha.md', 'guide/_alpha.md')).toBe(400)
+
+    const moved = await request.patch(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/alpha.md', to: 'extras/first.md' } })
+    expect(moved.status()).toBe(200)
+    expect(await site.read('content/extras/first.md')).toContain('![A shot](./shot.png)')
+    // The page is served where it went: its module, which holds the image, is one the dev server can make.
+    await expect
+      .poll(async () => (await request.get(`${DEV}/content/extras/first.md?import`, { headers: { 'sec-fetch-dest': 'script' } })).status())
+      .toBe(200)
+  })
+
+  test('a page made through the endpoint and deleted on disk a moment later does not stay listed', async ({ request, site }) => {
+    const headers = { 'x-shabd-studio': await studioToken(request) }
+    await site.track('content/extras/brief.md')
+
+    const made = await request.post(`${DEV}/_shabd/studio/page`, { headers, data: { id: 'extras/brief.md', source: '# Brief\n' } })
+    expect(made.status()).toBe(201)
+    // Gone before the file watcher has found it. The watcher never says that such a file has gone, and the dev
+    // server once went on listing the page until it stopped. It looks again itself now.
+    await rm(site.path('content/extras/brief.md'))
+    await expect.poll(async () => (await request.get(`${DEV}/extras/brief`)).status()).toBe(404)
   })
 
   test('a page made a moment after another was deleted still reaches the page on screen, which is not loaded again', async ({ page, request, site }) => {

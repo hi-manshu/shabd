@@ -25,3 +25,12 @@ export function onPageUpdate(listener: Listener): () => void {
   listeners.add(listener)
   return () => listeners.delete(listener)
 }
+
+/**
+ * Drop the modules of pages that are gone. A page made later under the name
+ * of one that was deleted is another page: kept here, the old module would
+ * be shown as the new page's content.
+ */
+export function keepPages(ids: Set<string>): void {
+  for (const id of pageModules.keys()) if (!ids.has(id)) pageModules.delete(id)
+}
