@@ -8,7 +8,7 @@
  * sends the script to the frame. What happens in the frame comes back as
  * messages: frame/protocol.ts says which.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { transformSnippet, type Transformed } from '../../shared/snippet.js'
 import { loadedFonts, readLook, watchLook } from './frame/look.js'
 import { FROM_FRAME, FROM_PAGE, frameDocument, type ToFrame, type ToPage } from './frame/protocol.js'
@@ -59,9 +59,26 @@ export function Frame({ code, group, quiet, onProblem }: FrameProps) {
   const send = useRef<(snippet: Transformed) => void>(() => {})
   const report = useRef(onProblem)
   report.current = onProblem
+  /** Hands the frame its script, once: when the frame asks for it, or when its document has been read. */
+  const boot = useRef<() => void>(() => {})
+  const booted = useRef(false)
 
-  useEffect(() => {
+  // A layout effect, so that the page is listening before the frame can have said anything. The frame is in
+  // the document from the moment React puts it there, and asks for its script as soon as its own document
+  // is read. An effect that waited for the page to be painted first was now and then later than that. The
+  // frame's question was then asked of nobody, and the example never started: seen in WebKit on Linux, on
+  // a built site, where a page is quick to be read.
+  useLayoutEffect(() => {
     const post = (message: ToFrame) => frame.current?.contentWindow?.postMessage({ ...message, shabd: FROM_PAGE }, '*')
+    boot.current = () => {
+      if (booted.current) return
+      booted.current = true
+      runtime ??= import('virtual:shabd/sandbox-frame').then((module) => module.default)
+      runtime.then(
+        (script) => post({ type: 'boot', code: script }),
+        (error: unknown) => report.current(`The frame for this example could not be started: ${error instanceof Error ? error.message : String(error)}`),
+      )
+    }
     const start = (snippet: Transformed) => post({ type: 'run', run: ++run.current, ...snippet, state: copyable(group.entries()) })
 
     /** The fonts this frame has been given, by address. */
@@ -81,11 +98,7 @@ export function Frame({ code, group, quiet, onProblem }: FrameProps) {
       if (!message || message.shabd !== FROM_FRAME) return
       switch (message.type) {
         case 'boot':
-          runtime ??= import('virtual:shabd/sandbox-frame').then((module) => module.default)
-          runtime.then(
-            (script) => post({ type: 'boot', code: script }),
-            (error: unknown) => report.current(`The frame for this example could not be started: ${error instanceof Error ? error.message : String(error)}`),
-          )
+          boot.current()
           break
         case 'ready':
           ready.current = true
@@ -162,7 +175,12 @@ export function Frame({ code, group, quiet, onProblem }: FrameProps) {
         // Scripts, and nothing else: not the site's origin, no forms, no new windows, no leaving the page.
         sandbox="allow-scripts"
         srcDoc={source}
-        onLoad={() => setLoaded(true)}
+        // Its document has been read, and with it the line that waits for the script. The frame asks for the
+        // script itself as well: whichever comes first is answered, so that a question nobody heard costs nothing.
+        onLoad={() => {
+          setLoaded(true)
+          boot.current()
+        }}
         // Nothing of it is seen until the snippet is: before that it does not yet look like the page.
         //
         // And it is not laid out at all until its document has been read. Firefox warns when a layout is
