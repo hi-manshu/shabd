@@ -1,14 +1,19 @@
-import { withBase } from '../../shared/paths.js'
-import { useSite } from './store.js'
+import { useHref } from '../ui/href.js'
+import { usePlace, useText } from './edition.js'
 
 /** Body of the page shown for a URL that matches no content file. */
 export function NotFound() {
-  const { site } = useSite()
+  const href = useHref()
+  const text = useText()
+  const { language } = usePlace()
+  // The sentence has a link in it, where it says `{home}`: to where the reader's language starts.
+  const [before, after = ''] = text('notFound.text').split('{home}')
   return (
     <div className="sb-not-found">
       <p>
-        No page lives at this address. It may have been moved or renamed. Try the search, or start again from the{' '}
-        <a href={withBase(site.base, '/')}>home page</a>.
+        {before}
+        <a href={href(language?.prefix || '/')}>{text('notFound.home')}</a>
+        {after}
       </p>
     </div>
   )

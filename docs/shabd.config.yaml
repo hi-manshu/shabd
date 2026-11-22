@@ -10,6 +10,8 @@ site:
   # Used for canonical URLs, the sitemap, llms.txt and MCP.
   url: https://hi-manshu.github.io
   base: /shabd/
+  # GitHub Pages redirects /guide/installation to /guide/installation/, so addresses are written that way to begin with.
+  urls: slash
   lang: en
   logo:
     light: /logo-light.svg
@@ -61,6 +63,7 @@ defaults:
   toc: { minDepth: 2, maxDepth: 3 }
   editLink: true
   pagination: true
+  lastUpdated: true # the day of each page's last commit; the build needs the whole Git history
 
 layouts:
   # Editing a built-in: every layout inherits from `base`, so this adds the
@@ -84,9 +87,38 @@ features:
   mcp:
     enabled: true
     route: /mcp
+    semantic: true # search_docs by meaning too, in shabd dev, shabd preview and shabd mcp
   llms: true # llms.txt and llms-full.txt
   studio: true # in-browser editor, dev server only
-  sandbox: true # ```tsx live code fences
+  sandbox: # ```tsx live code fences
+    modules:
+      # A file of this site's, which a snippet on the page about sandboxes imports as `docs/units`.
+      - { name: docs/units, file: ./components/units.ts }
+  feed: true # rss.xml: the pages newest first, by the day each was last changed
+  offline: true # a reader's browser keeps the site after a first visit, to read without a connection
+  socialImages: true # a picture for each page, shown where it is shared; needs @resvg/resvg-js
+
+# Maths between dollar signs, typeset when the site is built (needs remark-math and rehype-katex),
+# and ```mermaid fences drawn as diagrams in the reader's browser (needs mermaid).
+markdown:
+  math: true
+  mermaid: true
+
+# Values a page uses by name. The installation page says which Node.js is needed with {{node}}.
+vars:
+  node: 22
+
+# An API reference made from an OpenAPI description. This one describes the files a built site serves
+# for programs; its pages are under Reference, each with a form that sends the request to this site.
+openapi:
+  spec: ./openapi.yaml
+  path: /reference/files
+  try: true
+
+# The host to build for, when it is Cloudflare, Vercel or Netlify: the build then also writes what that
+# host needs to answer the MCP endpoint. This site is on GitHub Pages, which serves files only, so it names none.
+# build:
+#   adapter: cloudflare
 
 # Components every .mdx file can use without importing them.
 components:

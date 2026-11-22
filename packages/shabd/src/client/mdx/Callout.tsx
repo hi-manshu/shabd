@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react'
+import { useText } from '../app/edition.js'
 
+/** What each kind is called when it is given no title: by the key of its word. */
 const TITLES = {
-  note: 'Note',
-  tip: 'Tip',
-  important: 'Important',
-  warning: 'Warning',
-  caution: 'Caution',
+  note: 'callout.note',
+  tip: 'callout.tip',
+  important: 'callout.important',
+  warning: 'callout.warning',
+  caution: 'callout.caution',
 } as const
 
 export type CalloutType = keyof typeof TITLES
@@ -20,9 +22,10 @@ export type CalloutType = keyof typeof TITLES
  */
 export function Callout({ type = 'note', title, children }: { type?: CalloutType; title?: string; children?: ReactNode }) {
   const kind = type in TITLES ? type : 'note'
+  const text = useText()
   return (
     <aside className="sb-callout" data-type={kind} role="note">
-      <p className="sb-callout-title">{title ?? TITLES[kind]}</p>
+      <p className="sb-callout-title">{title ?? text(TITLES[kind])}</p>
       <div className="sb-callout-body">{children}</div>
     </aside>
   )

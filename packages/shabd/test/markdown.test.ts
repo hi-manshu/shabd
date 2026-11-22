@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { isShabdError } from '../src/node/config/errors.js'
 import { parseCodeMeta } from '../src/node/markdown/code-meta.js'
 import { MarkdownCompiler, type CompileInput } from '../src/node/markdown/compile.js'
+import { themedCodeCss } from '../src/node/markdown/plugins/rehype-code.js'
 import { resolvePageLink } from '../src/node/markdown/plugins/rehype-links.js'
 import { renderCompiled } from './helpers/render.js'
 
@@ -98,13 +99,23 @@ describe('markdown pipeline', () => {
     const result = await menu.compile(page('```ts\nconst a = 1\n```\n\nNo code here.\n'))
     const html = await renderCompiled(result.code)
     const keyword = /<span class="(sbk-[a-z0-9]+)">const<\/span>/.exec(html)?.[1]
-    const block = (key: string) => new RegExp(`:root\\[data-code=${key}\\]\\{([^}]*\\})*?\\.${keyword}\\{--sb-tok:(#[0-9a-f]{6})\\}`).exec(result.codeCss)?.[2]
+    // The page's own stylesheet has the site's two themes and nothing of the menu's: every reader gets it.
+    expect(result.codeCss).toContain(`.${keyword}{--sb-tok:#d73a49}`)
+    expect(result.codeCss).not.toContain('data-code')
+    // The menu's themes are beside it, as colours, for whoever writes the stylesheet a reader fetches on picking one.
+    expect(menu.highlighter.keys).toEqual(['light', 'dark', 't2', 't3'])
+    expect(result.codeColours[keyword!]).toHaveLength(4)
+    const themed = themedCodeCss(menu.highlighter.keys, result.codeColours)
+    expect(themed.startsWith('@media screen{:root[data-code=light]{')).toBe(true)
+    const block = (key: string) => new RegExp(`:root\\[data-code=${key}\\]\\{([^}]*\\})*?\\.${keyword}\\{--sb-tok:(#[0-9a-f]{6})\\}`).exec(themed)?.[2]
     // The site's own two keep their names; the others are numbered.
     expect(block('light')).toBe('#d73a49')
     expect(block('dark')).toBe('#9d7cd8')
     expect(block('t2')).toMatch(/^#[0-9a-f]{6}$/)
     expect(block('t3')).toMatch(/^#[0-9a-f]{6}$/)
     expect(block('t2')).not.toBe(block('light'))
+    // A site with no menu has only its two themes, and nothing to put in such a stylesheet.
+    expect(themedCodeCss(['light', 'dark'], result.codeColours)).toBe('')
 
     // The same colours give the same class in another compiler, so cached pages agree with fresh ones.
     const again = new MarkdownCompiler({
@@ -116,7 +127,9 @@ describe('markdown pipeline', () => {
     expect(await renderCompiled((await again.compile(page('```ts\nconst b = 2\n```\n'))).code)).toContain(`class="${keyword}">const<`)
 
     // A page without code has no stylesheet at all.
-    expect((await menu.compile(page('Just text.\n'))).codeCss).toBe('')
+    const plain = await menu.compile(page('Just text.\n'))
+    expect(plain.codeCss).toBe('')
+    expect(plain.codeColours).toEqual({})
   })
 
   it('moves a syntax colour that is too faint for the code background, and only that one', async () => {
@@ -166,7 +179,9 @@ describe('markdown pipeline', () => {
     expect(keyword).toBeDefined()
     expect(result.codeCss).toContain(`.${keyword}{--sb-tok:#d73a49}`)
     expect(result.codeCss).toMatch(new RegExp(`\\[data-theme=dark\\]\\{[^}]*(\\}[^}]*)*\\.${keyword}\\{--sb-tok:#9d7cd8\\}`))
-    expect(result.codeCss).toContain('@media (prefers-color-scheme:dark){:root:not([data-theme]){')
+    expect(result.codeCss).toContain('@media screen and (prefers-color-scheme:dark){:root:not([data-theme]){')
+    // The dark colours are for screens: a printed page is white.
+    expect(result.codeCss).toContain('@media screen{[data-theme=dark]{')
     // No theme menu, so no rules for other themes.
     expect(result.codeCss).not.toContain('data-code')
 
@@ -176,6 +191,16 @@ describe('markdown pipeline', () => {
     expect(html.match(/sb-line-highlight/g)).toHaveLength(1)
     // An unknown language falls back to plain text rather than failing the build.
     expect(html).toContain('data-lang="nonsense"')
+  })
+
+  it('takes a word for a language only when it is one, whatever else the word names', async () => {
+    // Its own compiler: a fence like these, taken for a language, would leave a compiler unable to load any language after it.
+    const fresh = new MarkdownCompiler({ themes: { light: 'github-light', dark: 'tokyo-night' }, sandbox: false, fingerprint: 'odd-languages' })
+    const odd = await fresh.compile(page('```constructor\nplain\n```\n\n```__proto__\nplain\n```\n\n```toString\nplain\n```\n'))
+    expect((await renderCompiled(odd.code)).match(/<span class="sb-plain">plain<\/span>/g)).toHaveLength(3)
+
+    const after = await fresh.compile(page('```ts\nconst a = 1\n```\n'))
+    expect(await renderCompiled(after.code)).toMatch(/<span class="sbk-[a-z0-9]+">const<\/span>/)
   })
 
   it('turns live fences into sandboxes and leaves other fences alone', async () => {
@@ -262,6 +287,93 @@ describe('markdown pipeline', () => {
   })
 })
 
+describe('HTML in a Markdown page', () => {
+  it('is rendered, where it used to be left out without a word', async () => {
+    const result = await compiler.compile(
+      page(
+        [
+          'Press <kbd>Ctrl</kbd> and <kbd>S</kbd>.',
+          '',
+          '<details>',
+          '<summary>More about saving</summary>',
+          '',
+          'The file is **written** at once.',
+          '',
+          '</details>',
+          '',
+          'H<sub>2</sub>O, and a line<br>break.',
+        ].join('\n'),
+      ),
+    )
+    const html = await renderCompiled(result.code)
+    expect(html).toContain('Press <kbd>Ctrl</kbd> and <kbd>S</kbd>.')
+    expect(html).toContain('<summary>More about saving</summary>')
+    // Markdown inside the block is still Markdown.
+    expect(html).toContain('<p>The file is <strong>written</strong> at once.</p>')
+    expect(html).toContain('H<sub>2</sub>O, and a line<br/>break.')
+    // What was in the tags is searched like the rest of the page.
+    expect(result.sections[0]?.text).toContain('More about saving')
+  })
+
+  it('is treated like the Markdown it stands in for: a heading gets its id, and a link is rewritten', async () => {
+    const result = await compiler.compile(
+      page('<h2>Written as a tag</h2>\n\n<a href="./other.md#part">Elsewhere</a> and <img src="/logo.svg" alt="The logo">\n'),
+    )
+    const html = await renderCompiled(result.code)
+    expect(html).toContain('<h2 id="written-as-a-tag">Written as a tag</h2>')
+    expect(html).toContain('<a href="/guide/other#part">Elsewhere</a>')
+    expect(result.toc).toEqual([{ depth: 2, id: 'written-as-a-tag', text: 'Written as a tag' }])
+    expect(result.links).toEqual(['/guide/other#part'])
+    // A picture written as a tag that has its alternative text is not one to report.
+    expect(result.unlabelled).toEqual([])
+  })
+
+  it('leaves a page\'s callouts, code options and sandboxes as they were, though the page is read again as HTML', async () => {
+    const result = await compiler.compile(
+      page(
+        [
+          'Press <kbd>Ctrl</kbd>.',
+          '',
+          '> [!WARNING] Back up first',
+          '> It rewrites files.',
+          '',
+          '```ts title="src/app.ts" {2} ins={1}',
+          'const a = 1',
+          'const b = 2',
+          '```',
+          '',
+          '```tsx live group="demo"',
+          '<button>Hi</button>',
+          '```',
+        ].join('\n'),
+      ),
+    )
+    const html = await renderCompiled(result.code)
+    expect(html).toContain('<kbd>Ctrl</kbd>')
+    // An HTML parser would put the component's name in lower case, where nothing answers to it.
+    expect(html).toContain('<aside data-callout="warning" data-title="Back up first">')
+    // What follows a fence's language is kept beside the tree, where an HTML parser would lose it.
+    expect(html).toContain('data-title="src/app.ts"')
+    expect(html).toContain('class="line sb-line-ins"')
+    expect(html).toContain('class="line sb-line-highlight"')
+    expect(html).toContain('<div data-sandbox="tsx" data-group="demo">')
+    // Nothing of the round trip is left on the page.
+    expect(html).not.toMatch(/sb-component|data-sb-/)
+  })
+
+  it('notes a tag written like a component, which a .md page cannot have', async () => {
+    const source = 'Text.\n\n<Tabs>\n<Tab label="npm">Use npm.</Tab>\n</Tabs>\n\nAnd `<Card>` in code is only code.\n'
+    const result = await compiler.compile(page(source))
+    expect(result.strays).toEqual([
+      { name: 'Tabs', line: 3 },
+      { name: 'Tab', line: 4 },
+    ])
+    // The same text in an .mdx page is components, and nothing is noted.
+    const mdx = await compiler.compile(page(source, { format: 'mdx', file: '/site/content/guide/page.mdx', id: 'guide/page.mdx' }))
+    expect(mdx.strays).toEqual([])
+  })
+})
+
 describe('code fence meta', () => {
   it('parses titles, line ranges, flags and attributes', () => {
     const meta = parseCodeMeta('title="a b.ts" {1,3-5} live group=cart showLineNumbers')
@@ -269,6 +381,23 @@ describe('code fence meta', () => {
     expect(meta.highlight).toEqual([1, 3, 4, 5])
     expect([...meta.flags]).toEqual(['live', 'showLineNumbers'])
     expect(meta.attrs).toEqual({ group: 'cart' })
+  })
+
+  it('reads the lines that were added and removed, apart from the lines that are marked', () => {
+    const meta = parseCodeMeta('{1} ins={3, 5-6} del=2 title="a.ts" wrap')
+    expect(meta.highlight).toEqual([1])
+    expect(meta.inserted).toEqual([3, 5, 6])
+    expect(meta.deleted).toEqual([2])
+    expect(meta.title).toBe('a.ts')
+    expect([...meta.flags]).toEqual(['wrap'])
+    expect(meta.attrs).toEqual({})
+  })
+
+  it('marks added and removed lines with a class and nothing else', async () => {
+    const result = await compiler.compile(page('```ts ins={2} del={1}\nconst a = 1\nconst a = 2\nconst b = 3\n```\n'))
+    const html = await renderCompiled(result.code)
+    const classes = [...html.matchAll(/<span class="(line[^"]*)"/g)].map((match) => match[1])
+    expect(classes).toEqual(['line sb-line-del', 'line sb-line-ins', 'line'])
   })
 })
 

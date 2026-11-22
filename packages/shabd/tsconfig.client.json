@@ -6,6 +6,9 @@
     "lib": ["es2023", "dom", "dom.iterable"],
     "jsx": "react-jsx",
     "types": ["vite/client"],
+    // src/client/virtual.d.ts names this package as a site would. Here that is the source, not the
+    // declarations a build wrote from it, which are as old as the last build.
+    "paths": { "@himanshoe/shabd/client": ["./src/client/index.ts"] },
     "noEmit": true
   },
   "include": ["src/client", "src/shared"]

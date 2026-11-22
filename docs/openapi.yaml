@@ -1,0 +1,206 @@
+# What a built Shabd site serves for programs, described in OpenAPI.
+#
+# `openapi:` in shabd.config.yaml makes the pages under /reference/files from this file, with a "Try it"
+# form on each. It is here to show the feature at work on something true: every address below is a file
+# that `shabd build` writes, and the server is this site as it is deployed.
+openapi: 3.1.0
+info:
+  title: Files for programs
+  version: "0.1"
+  description: |
+    Besides its pages, a built Shabd site holds a few files that are written to be read by programs: AI
+    agents, the search dialog, crawlers and feed readers. They are files, so any static host serves them,
+    and each is fetched with a plain `GET`.
+
+    These pages are made from an OpenAPI description, as [OpenAPI](/features/openapi) describes. The
+    requests go to this site as it is deployed.
+servers:
+  - url: https://hi-manshu.github.io/shabd
+    description: This site
+tags:
+  - name: For agents
+    description: What a language model reads in place of the pages.
+  - name: For search
+  - name: For crawlers and feed readers
+paths:
+  /llms.txt:
+    get:
+      operationId: getLlmsTxt
+      summary: The map of the site
+      tags: [For agents]
+      description: |
+        The site's title and description, and its pages as links to their Markdown copies, grouped as the
+        sidebar groups them. It follows the [llms.txt convention](https://llmstxt.org). Written when
+        `features.llms` is on, which it is unless a site turns it off.
+      responses:
+        "200":
+          description: The map, as Markdown.
+          content:
+            text/plain:
+              schema: { type: string }
+              example: |
+                # Shabd
+
+                > Documentation sites configured in YAML.
+
+                ## Guide
+
+                - [Introduction](https://docs.example.com/guide/introduction.md): What Shabd is.
+  /llms-full.txt:
+    get:
+      operationId: getLlmsFullTxt
+      summary: Every page in one file
+      tags: [For agents]
+      description: |
+        The Markdown of every page, one after another in the order of the sidebar, each with the address it
+        came from above it. Written unless `features.llms.full` is off.
+      responses:
+        "200":
+          description: Every page, as Markdown.
+          content:
+            text/plain:
+              schema: { type: string }
+  /index.md:
+    get:
+      operationId: getHomeMarkdown
+      summary: A page as Markdown
+      tags: [For agents]
+      description: |
+        Every page has a copy in Markdown at its own address with `.md` after it: `/guide/installation` is
+        also at `/guide/installation.md`. This is the home page's. A copy has no frontmatter: the title the
+        page takes from it is put at the top as a heading. The `import` and `export` lines of an `.mdx` page
+        are left out, and its components stay as they are written.
+      responses:
+        "200":
+          description: The page, as Markdown.
+          content:
+            text/markdown:
+              schema: { type: string }
+  /_shabd/docs.json:
+    get:
+      operationId: getDocs
+      summary: Every page as JSON
+      tags: [For agents]
+      description: |
+        What the MCP endpoint answers from. A host that runs the endpoint as a function reads this file
+        from the site. Written when `features.mcp` is on.
+      responses:
+        "200":
+          description: The site's pages.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Docs" }
+  /_shabd/search-index.json:
+    get:
+      operationId: getSearchIndex
+      summary: The search index
+      tags: [For search]
+      description: |
+        Every section of every page, as text. The search dialog fetches it the first time it is opened, and
+        the MCP endpoint's `search_docs` reads it too. The vectors for search by meaning are in a file of
+        their own beside it, `search-vectors.bin`.
+      responses:
+        "200":
+          description: The sections.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchIndex" }
+  /sitemap.xml:
+    get:
+      operationId: getSitemap
+      summary: The sitemap
+      tags: [For crawlers and feed readers]
+      description: |
+        The address of every page a search engine may list, with the day it was last changed where the site
+        knows it. Written when `site.url` is set. A page with `noindex` is left out.
+      responses:
+        "200":
+          description: The sitemap.
+          content:
+            application/xml:
+              schema: { type: string }
+  /rss.xml:
+    get:
+      operationId: getFeed
+      summary: The feed
+      tags: [For crawlers and feed readers]
+      description: The pages that have a day, newest first, as RSS 2.0. Written when `features.feed` is on.
+      responses:
+        "200":
+          description: The feed.
+          content:
+            application/xml:
+              schema: { type: string }
+components:
+  schemas:
+    Docs:
+      type: object
+      required: [version, name, description, pages]
+      properties:
+        version:
+          type: integer
+          enum: [1]
+          description: The format of the file.
+        name:
+          type: string
+          description: The site's title.
+        description:
+          type: string
+          description: The site's description.
+        pages:
+          type: array
+          items: { $ref: "#/components/schemas/Page" }
+    Page:
+      type: object
+      required: [path, title, description, url, markdown]
+      properties:
+        path:
+          type: string
+          description: The page's address on the site, without the site's base.
+          example: /guide/installation
+        title: { type: string }
+        description: { type: string }
+        url:
+          type: string
+          description: The address of the page's Markdown copy.
+        markdown:
+          type: string
+          description: The page as Markdown.
+    SearchIndex:
+      type: object
+      required: [version, docs, semantic]
+      properties:
+        version:
+          type: integer
+          enum: [1]
+          description: The format of the file.
+        docs:
+          type: array
+          description: One entry for each section. A long section is cut into several.
+          items: { $ref: "#/components/schemas/Section" }
+        semantic:
+          description: The model the vectors were made with and how long each is, or `null` when the site was built without them.
+          oneOf:
+            - type: "null"
+            - type: object
+              required: [model, dims]
+              properties:
+                model: { type: string }
+                dims: { type: integer }
+    Section:
+      type: object
+      required: [path, anchor, title, heading, text]
+      properties:
+        path:
+          type: string
+          description: The address of the page the section is on.
+        anchor:
+          type: string
+          description: The id of the section's heading. Empty for the text before a page's first heading.
+        title:
+          type: string
+          description: The page's title.
+        heading:
+          type: string
+          description: The section's heading. Empty for the text before a page's first heading.
+        text: { type: string }

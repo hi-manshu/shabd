@@ -72,14 +72,15 @@ export function createMcpHandler(
       })
     }
 
-    const docs = typeof source === 'function' ? await source() : source
-    const server = createDocsServer(docs)
-    const transport = new WebStandardStreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true,
-    })
-
+    let server: ReturnType<typeof createDocsServer> | undefined
     try {
+      // A source that cannot be loaded (a function that could not fetch its files) is answered like any
+      // other failure: as JSON that says what went wrong, with the headers a browser needs to read it.
+      server = createDocsServer(typeof source === 'function' ? await source() : source)
+      const transport = new WebStandardStreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      })
       await server.connect(transport)
       const response = await transport.handleRequest(request)
       const headers = new Headers(response.headers)
@@ -88,7 +89,7 @@ export function createMcpHandler(
     } catch (error) {
       return rpcError(500, error instanceof Error ? error.message : 'Internal error', cors(request))
     } finally {
-      void server.close().catch(() => {})
+      void server?.close().catch(() => {})
     }
   }
 }

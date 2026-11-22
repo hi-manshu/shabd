@@ -13,7 +13,8 @@
  * not, so there a fine pattern (a star, a grid line) reaches the text at
  * full sharpness. A theme has to be readable both ways.
  */
-import { PRESET_NAMES, THEME_PRESETS, contrast, type ThemePreset } from '../packages/shabd/src/shared/presets.js'
+import { contrastOn, parseColor, toHex, type Rgba } from '../packages/shabd/src/shared/color.js'
+import { HEADER_MUTED, PRESET_NAMES, THEME_PRESETS, type ThemePreset } from '../packages/shabd/src/shared/presets.js'
 import { BUILT, expect, test } from './support/fixtures.js'
 
 const THEMES = PRESET_NAMES.filter((name) => (THEME_PRESETS[name] as ThemePreset).look !== undefined)
@@ -54,8 +55,16 @@ for (const scheme of ['light', 'dark'] as const) {
       const inks = await page.evaluate(() => {
         const style = getComputedStyle(document.documentElement)
         const read = (name: string) => style.getPropertyValue(name).trim()
-        return { text: read('--sb-text'), muted: read('--sb-muted'), accent: read('--sb-accent') }
+        return { text: read('--sb-text'), muted: read('--sb-muted'), accent: read('--sb-accent'), header: read('--sb-header-text') }
       })
+      // What each kind of text is drawn in. A header with an ink of its own (`colors.headerText`) is not
+      // written in the page's colours: its text is that ink, its quiet text the same ink with the header
+      // showing through, and the accent is not used on it at all.
+      const page_ = { text: parseColor(inks.text)!, muted: parseColor(inks.muted)!, accent: parseColor(inks.accent)! }
+      const ownInk = parseColor(inks.header)!
+      const inHeader =
+        inks.header === inks.text ? page_ : { text: ownInk, muted: [ownInk[0], ownInk[1], ownInk[2], HEADER_MUTED] as Rgba }
+      const drawnOn = (panel: string): Partial<Record<keyof typeof FLOORS, Rgba>> => (panel === 'header' ? inHeader : page_)
       await page.addStyleTag({ content: HIDE_FOREGROUND })
 
       for (const [panel, selector] of Object.entries(PANELS)) {
@@ -83,14 +92,17 @@ for (const scheme of ['light', 'dark'] as const) {
         }, picture.toString('base64'))
 
         for (const [ink, floor] of Object.entries(FLOORS) as [keyof typeof FLOORS, number][]) {
+          const drawn = drawnOn(panel)[ink]
+          if (!drawn) continue
           let worst = Infinity
           let behind = ''
           for (const packed of pixels) {
-            const colour = hex([(packed >> 16) & 255, (packed >> 8) & 255, packed & 255])
-            const ratio = contrast(inks[ink], colour)
-            if (ratio < worst) [worst, behind] = [ratio, colour]
+            const pixel: Rgba = [(packed >> 16) & 255, (packed >> 8) & 255, packed & 255, 1]
+            const ratio = contrastOn(drawn, pixel)
+            if (ratio < worst) [worst, behind] = [ratio, hex(pixel.slice(0, 3))]
           }
-          if (worst < floor) misses.push(`${theme} ${scheme}: ${ink} ${inks[ink]} on the ${panel} falls to ${worst.toFixed(2)} (over ${behind}), needs ${floor}`)
+          const written = `${toHex(drawn)}${drawn[3] < 1 ? ` at ${drawn[3] * 100}%` : ''}`
+          if (worst < floor) misses.push(`${theme} ${scheme}: ${ink} ${written} on the ${panel} falls to ${worst.toFixed(2)} (over ${behind}), needs ${floor}`)
         }
       }
       await context.close()

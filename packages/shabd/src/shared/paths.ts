@@ -62,6 +62,60 @@ export function withBase(base: string, path: string): string {
   return `${base.replace(/\/$/, '')}/${path.replace(/^\//, '')}`.replace(/(.)\/$/, '$1') || '/'
 }
 
+/**
+ * How a page's address is written, and so which file a build writes it to:
+ *
+ *   clean  /guide/install       guide/install/index.html
+ *   slash  /guide/install/      guide/install/index.html
+ *   html   /guide/install.html  guide/install.html
+ *
+ * A route is the same in all three (`/guide/install`), and `normalizePath`
+ * turns any of the addresses back into it.
+ */
+export const URL_STYLES = ['clean', 'slash', 'html'] as const
+export type UrlStyle = (typeof URL_STYLES)[number]
+
+/** A page's address as links write it, before the site's base. The home page is `/` in every style. */
+export function pageUrl(routePath: string, style: UrlStyle): string {
+  if (routePath === '/' || style === 'clean') return routePath
+  return style === 'slash' ? `${routePath}/` : `${routePath}.html`
+}
+
+/** The file a build writes a page to, relative to the output folder. */
+export function pageFile(routePath: string, style: UrlStyle): string {
+  if (routePath === '/') return 'index.html'
+  return style === 'html' ? `${routePath.slice(1)}.html` : `${routePath.slice(1)}/index.html`
+}
+
+/**
+ * The href for a link inside the site: the base in front and, when the link
+ * leads to a page, the page's address in the site's style. What comes after
+ * a `?` or a `#` is kept. `isPage` says whether a route has a page; a path
+ * that has none (an image, `/llms.txt`) only gets the base.
+ */
+export function siteHref(
+  href: string,
+  site: { base: string; urls: UrlStyle },
+  isPage: (routePath: string) => boolean,
+): string {
+  if (isExternal(href) || href.startsWith('#')) return href
+  const cut = href.search(/[?#]/)
+  const path = cut === -1 ? href : href.slice(0, cut)
+  const rest = cut === -1 ? '' : href.slice(cut)
+  const route = normalizePath(path.startsWith('/') ? path : `/${path}`)
+  if (!isPage(route)) return withBase(site.base, path) + rest
+  // The home page is the folder the site is served from, and a folder's address ends in a slash.
+  if (route === '/') return site.base + rest
+  const address = withBase(site.base, pageUrl(route, site.urls))
+  // `withBase` drops a slash at the end, which is the one thing the `slash` style is there to keep.
+  return (site.urls === 'slash' ? `${address}/` : address) + rest
+}
+
+/** Where a page's Markdown copy is served: `/guide/install` → `/guide/install.md`, `/` → `/index.md`. */
+export function markdownPath(routePath: string): string {
+  return routePath === '/' ? '/index.md' : `${routePath}.md`
+}
+
 /** Inverse of `withBase` for a location pathname. */
 export function stripBase(base: string, pathname: string): string {
   const prefix = base.replace(/\/$/, '')

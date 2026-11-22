@@ -22,3 +22,45 @@ export default function Meter() {
   return <output>{level}%</output>
 }
 ```
+
+```tsx live title="Package"
+import GithubSlugger, { slug } from 'github-slugger'
+
+export default function Slugs() {
+  const slugs = new GithubSlugger()
+  return <output>{slug('A Package')} {slugs.slug('twice')} {slugs.slug('twice')}</output>
+}
+```
+
+```tsx live title="File"
+import Gauge, { unit } from 'fixture/gauge'
+
+export default () => <p><Gauge value={3} /> <small>in {unit}</small></p>
+```
+
+```tsx live isolated title="Apart"
+import Gauge from 'fixture/gauge'
+
+export default function Apart() {
+  const [count, setCount] = useShared('apart', 2)
+  return (
+    <p>
+      <button onClick={() => setCount(count + 1)}>Raise</button> <Gauge value={count} />
+    </p>
+  )
+}
+```
+
+```tsx live isolated title="Reach"
+export default function Reach() {
+  let seen = 'refused'
+  try {
+    seen = window.parent.document.title
+  } catch {}
+  let kept = 'refused'
+  try {
+    kept = typeof window.localStorage
+  } catch {}
+  return <output>page: {seen}; storage: {kept}</output>
+}
+```

@@ -33,13 +33,18 @@ The tests start two servers on copies of the small site in `e2e/site`: `shabd de
 watch the page follow, and `shabd preview` of a production build for the rest. Nothing in `e2e/site` or `docs/` is
 modified.
 
-Three variations are switched on from the environment:
+Five variations are switched on from the environment:
 
 ```sh
 SHABD_E2E_STORE=sqlite npx playwright test                 # the whole suite on the SQLite search store
 SHABD_E2E_SEMANTIC=1 npx playwright test e2e/semantic.spec.ts   # the real embedding model (downloads 22 MB)
+SHABD_E2E_SEMANTIC=1 SHABD_E2E_MODEL=site npx playwright test e2e/semantic.spec.ts   # the model served from the site
+SHABD_E2E_OFFLINE=1 npx playwright test e2e/offline.spec.ts     # the worker that keeps the site for reading offline
 npx playwright test --project=firefox e2e/dev.spec.ts      # one browser, one file
 ```
+
+The tests on GitHub run the suite as it is and once more on the SQLite store. The model and the worker are not
+run there: run those here when you change search, or what a build writes for a reader's browser.
 
 On macOS the tests keep the display awake while they run. Without that, WebKit stopped answering clicks in runs
 where the display had gone to sleep. The cause was not proven; the note in `e2e/support/global-setup.ts` has the
@@ -47,14 +52,45 @@ evidence.
 
 The log of a run is full of `Invalid page` and `Invalid configuration` messages from `[WebServer]`. They are not
 failures. Several tests break a page or the config on purpose, to see that the mistake is shown and that fixing it
-clears it, and the dev server reports each one as it would to you. One test deletes a page that the sidebar file
-still lists, so the log also holds a `does not match any page` warning. The count at the end is what says how the
-run went. Some tests are skipped where a browser lacks what they need: the clipboard and the File System Access API
+clears it, and the dev server reports each one as it would to you. The count at the end is what says how the run
+went. Some tests are skipped where a browser lacks what they need: the clipboard and the File System Access API
 outside Chromium, and the SQLite and semantic tests unless they are switched on.
 
 A new feature that has something to click belongs in these tests. They have caught bugs the unit tests could not:
 a hydration error, a hot update that reloaded into a blank page, and a watcher that reported deleted files as
 changed.
+
+`e2e/a11y.spec.ts` is where accessibility is tested. It runs [axe](https://github.com/dequelabs/axe-core) over each
+kind of page in both colour modes, and over the parts that open over a page: search, the theme menu, the
+navigation on a small screen, the form that tries a request. A new kind of page, or a new thing that opens,
+belongs in its list. axe finds what can be found by rule, such as a control with no name or text that is too
+faint. It cannot tell where the focus goes, so the tests after it press the keys: add one for anything that opens,
+closes or moves the focus.
+
+## Large sites
+
+`npm run bench` measures Shabd on sites far larger than its own docs. It writes a site of 1,000 pages and one of
+5,000 under `.shabd/bench/`, which Git ignores, and times reading the site, a build with nothing cached, the same
+build again, `shabd check`, `shabd dev` (the first page, a page not seen before, an edit) and, on the built site,
+a page and a search. It reports the most memory each took and what the build wrote. Build the package first, and
+install Playwright's Chromium: two of the measurements open the site in a browser.
+
+```sh
+npm run bench                                    # 1,000 and 5,000 made-up pages
+npm run bench -- 200 2000                        # other sizes
+npm run bench -- 5000 --corpus path/to/markdown  # real pages, from a folder of Markdown
+npm run bench -- 1000 --only build,check         # some of the measurements
+npm run bench -- 1000 --semantic                 # with embeddings, which take far longer than the rest
+```
+
+The made-up pages are shaped like reference documentation, and the same number always gives the same site. They
+cannot show what real Markdown does to the pipeline, so run it on real pages as well. `--corpus` copies the first
+pages of any folder of Markdown, with the files beside them, and cuts their frontmatter down to a title and a
+description. The numbers in the roadmap came from [MDN's content](https://github.com/mdn/content): thousands of
+pages of plain Markdown, each in a folder of its own with its pictures.
+
+Run it before and after a change to the content store, the sidebar resolver or the build. The first run found
+three places where the time grew with the square of the number of pages.
 
 ## Where things go
 
@@ -66,6 +102,13 @@ changed.
   so cached pages are rebuilt.
 - Anything that runs in the browser must not import `src/shared/schema.ts` except for types. It would pull Zod into
   every page.
+- A file in `src/client/` that exports a component exports nothing else: a hook, a helper or a table goes in a
+  file beside it. React can then take a change to the component in place while `shabd dev` runs, where a file
+  that mixes the two starts the whole page again. `test/refresh.test.ts` holds every file to this.
+- A new host adapter needs a name in `src/shared/adapters.ts` and a module in `src/node/adapters/`. The registry's
+  type makes the compiler insist on both. The module's header says which page of the host's documentation each
+  detail comes from. What runs on the host is in `src/node/adapters/function/`. It is bundled into one file, so it
+  must not import anything from Node.
 
 ## Writing docs
 
@@ -132,20 +175,26 @@ shabd/
 │   │   │   ├── search/             sections, embeddings, index
 │   │   │   ├── llms/               llms.txt, llms-full.txt, Markdown copies
 │   │   │   ├── mcp/                MCP server, HTTP handler, stdio
-│   │   │   └── cli.ts              dev, build, preview, check, mcp
+│   │   │   ├── import/             shabd import: one module for each tool it reads
+│   │   │   ├── adapters/           what `shabd build --adapter` writes for a host, and the function it deploys
+│   │   │   ├── openapi/            pages made from an OpenAPI description
+│   │   │   ├── sandbox/            the script that runs in the frame of an isolated snippet
+│   │   │   └── cli.ts              dev, build, preview, check, mcp, import
 │   │   └── client/                 shipped as source, compiled by the site's build
 │   │       ├── app/                router, stores, hot-update hub
 │   │       ├── layout/             PageLayout (the layout engine) and its blocks
 │   │       ├── mdx/                components Markdown renders as
 │   │       ├── search/             search worker and dialog
-│   │       ├── studio/             editor, file backends, draft sync
-│   │       ├── sandbox/            live code sandboxes
+│   │       ├── studio/             the Studio's panel, file backends, draft sync
+│   │       ├── editor/             the code editor (CodeMirror), fetched when one is shown
+│   │       ├── sandbox/            live code sandboxes, in the page and in a frame of their own
 │   │       └── styles/             the default theme
 │   └── test/                       unit and integration tests
 ├── packages/create-shabd/          the starter (npm package "@himanshoe/create-shabd")
 │   ├── src/create.js               writes a new site; no dependencies
 │   └── template/                   the files it copies, laid out as the site they become
 ├── scripts/logo/                   draws the logo files
+├── scripts/bench/                  measures Shabd on sites of thousands of pages
 ├── e2e/                            browser tests, and the small site they run against
 └── docs/                           the documentation site, built with Shabd
     ├── shabd.config.yaml

@@ -5,6 +5,7 @@
  * "doc", "splash" and "api" are not special cases in any component: they are
  * three entries in a table that `shabd.config.yaml` can edit or add to.
  */
+import { placeOf } from './editions.js'
 import { BUILTIN_BLOCKS, REGIONS, type RegionName } from './blocks.js'
 import type { BlockRef, Frontmatter, LayoutDefinition, ShabdConfig, TocOptions } from './schema.js'
 import type { LayoutWidth, ResolvedLayout, SiteData, TocEntry } from './types.js'
@@ -22,6 +23,9 @@ export const BUILTIN_LAYOUT_DEFINITIONS: Record<string, LayoutDefinition> = {
         'nav',
         'spacer',
         'search',
+        // Each is there on a site that has more than one version, or more than one language, and nowhere else.
+        'version-menu',
+        'language-menu',
         'studio-toggle',
         'social',
         'theme-menu',
@@ -35,7 +39,7 @@ export const BUILTIN_LAYOUT_DEFINITIONS: Record<string, LayoutDefinition> = {
     width: 'content',
     regions: {
       sidebar: blocks('sidebar-nav'),
-      main: blocks('breadcrumbs', 'page-header', 'content', 'page-footer', 'pagination'),
+      main: blocks('version-notice', 'breadcrumbs', 'page-header', 'page-actions', 'content', 'page-footer', 'pagination'),
       aside: blocks('toc'),
     },
   },
@@ -49,9 +53,11 @@ export const BUILTIN_LAYOUT_DEFINITIONS: Record<string, LayoutDefinition> = {
   api: {
     extends: 'base',
     width: 'full',
+    // What a request looks like stays in view beside what is said about it.
+    split: true,
     regions: {
       sidebar: blocks('sidebar-nav'),
-      main: blocks('breadcrumbs', 'page-header', 'api-endpoint', 'content', 'pagination'),
+      main: blocks('version-notice', 'breadcrumbs', 'page-header', 'page-actions', 'api-endpoint', 'content', 'pagination'),
     },
   },
 }
@@ -81,7 +87,12 @@ export function resolveLayouts(
     const builtin = BUILTIN_LAYOUT_DEFINITIONS[name]
     definitions[name] =
       builtin && user.extends === undefined
-        ? { extends: builtin.extends, width: user.width ?? builtin.width, regions: { ...builtin.regions, ...user.regions } }
+        ? {
+            extends: builtin.extends,
+            width: user.width ?? builtin.width,
+            split: user.split ?? builtin.split,
+            regions: { ...builtin.regions, ...user.regions },
+          }
         : user
 
     for (const region of REGIONS) {
@@ -126,7 +137,8 @@ export function resolveLayouts(
     }
 
     const width: LayoutWidth = definition.width ?? parent?.width ?? 'content'
-    const layout: ResolvedLayout = { name, width, regions: { ...parent?.regions, ...definition.regions } }
+    const split = definition.split ?? parent?.split ?? false
+    const layout: ResolvedLayout = { name, width, split, regions: { ...parent?.regions, ...definition.regions } }
     resolved[name] = layout
     return layout
   }
@@ -154,23 +166,65 @@ export function resolveTocOptions(
   return { ...defaults.toc, ...frontmatter.toc }
 }
 
+const patterns = new Map<string, RegExp>()
+
+/**
+ * Does a path match a pattern such as `/guide/**`? `*` stands for one part
+ * of a path and `**` for any number. `/guide/**` takes in `/guide` itself:
+ * the page that stands for a folder belongs with what is in it.
+ */
+export function matchesPath(pattern: string, path: string): boolean {
+  let regex = patterns.get(pattern)
+  if (!regex) {
+    const trimmed = pattern.length > 1 ? pattern.replace(/\/+$/, '') : pattern
+    const escape = (text: string) => text.replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+    const source = trimmed
+      .split('**')
+      .map((part) => part.split('*').map(escape).join('[^/]*'))
+      .join('.*')
+    // `/guide/.*` as written would leave `/guide` out.
+    regex = new RegExp(`^${source.endsWith('/.*') ? `${source.slice(0, -3)}(?:/.*)?` : source}$`)
+    patterns.set(pattern, regex)
+  }
+  return regex.test(path)
+}
+
+/** Is a block that has a `when:` shown on this page? */
+export function meetsCondition(when: BlockRef['when'], path: string, frontmatter: Record<string, unknown>): boolean {
+  if (!when) return true
+  if (when.path) {
+    const wanted = when.path.filter((pattern) => !pattern.startsWith('!'))
+    const unwanted = when.path.filter((pattern) => pattern.startsWith('!')).map((pattern) => pattern.slice(1))
+    if (wanted.length > 0 && !wanted.some((pattern) => matchesPath(pattern, path))) return false
+    if (unwanted.some((pattern) => matchesPath(pattern, path))) return false
+  }
+  for (const [key, value] of Object.entries(when.frontmatter ?? {})) {
+    // A list or a map in YAML is compared by what it holds.
+    if (JSON.stringify(frontmatter[key]) !== JSON.stringify(value)) return false
+  }
+  return true
+}
+
 /**
  * Decide what a page renders: pick the layout named in frontmatter, then
- * apply the page's own switches (`sidebar: false`, `toc: false`, …).
+ * apply the page's own switches (`sidebar: false`, `toc: false`, …) and the
+ * conditions blocks were given (`when:`).
  *
  * Pure and synchronous: the same function runs during prerendering and on
  * every client navigation, so server and client markup cannot disagree.
  */
 export function resolvePageLayout(
-  site: Pick<SiteData, 'layouts' | 'defaults'> & Partial<Pick<SiteData, 'site' | 'features' | 'palettes'>>,
-  frontmatter: Pick<Frontmatter, 'layout' | 'sidebar' | 'toc' | 'pagination'> & Partial<Pick<Frontmatter, 'api'>>,
+  site: Pick<SiteData, 'layouts' | 'defaults'> & Partial<Pick<SiteData, 'site' | 'features' | 'palettes' | 'editions' | 'siteIn'>>,
+  frontmatter: Pick<Frontmatter, 'layout' | 'sidebar' | 'toc' | 'pagination'> & Partial<Pick<Frontmatter, 'api'>> & Record<string, unknown>,
   toc: TocEntry[],
+  /** The page's route, for blocks that are shown on some paths only. */
+  path = '/',
 ): ActiveLayout {
   const layout =
     site.layouts[frontmatter.layout ?? site.defaults.layout] ??
     site.layouts[site.defaults.layout] ??
     site.layouts.doc ??
-    ({ name: 'doc', width: 'content', regions: {} } satisfies ResolvedLayout)
+    ({ name: 'doc', width: 'content', split: false, regions: {} } satisfies ResolvedLayout)
 
   const tocOptions = resolveTocOptions(site.defaults, frontmatter)
   const visibleToc = tocOptions
@@ -185,17 +239,28 @@ export function resolvePageLayout(
   if ((frontmatter.pagination ?? site.defaults.pagination) === false) hidden.add('pagination')
   if (frontmatter.api === undefined) hidden.add('api-endpoint')
   if (site.site) {
-    if (!site.site.footer) hidden.add('footer')
-    if (site.site.nav.length === 0) hidden.add('nav')
+    // A language can have a footer and links of its own (`languages[].footer`, `.nav`).
+    const said = site.siteIn?.[placeOf(path, site.editions ?? {}).language?.lang ?? '']
+    if (!(said?.footer ?? site.site.footer)) hidden.add('footer')
+    if ((said?.nav ?? site.site.nav).length === 0) hidden.add('nav')
     if (site.site.social.length === 0) hidden.add('social')
   }
   if (site.features && !site.features.search.enabled) hidden.add('search')
+  // The actions lead to the page's Markdown copy, which is written with llms.txt.
+  if (site.features && !site.features.llms.enabled) hidden.add('page-actions')
   if (!site.palettes?.length) hidden.add('theme-menu')
+  // A menu of versions or of languages is for a site with more than one, and the notice for a page of an older version.
+  const versions = site.editions?.versions ?? []
+  if (versions.length < 2) hidden.add('version-menu')
+  if ((site.editions?.languages?.length ?? 0) < 2) hidden.add('language-menu')
+  if (versions.length < 2 || (placeOf(path, site.editions ?? {}).version?.prefix ?? '') === '') hidden.add('version-notice')
 
   const regions: ActiveLayout['regions'] = {}
   for (const region of REGIONS) {
     if (region === 'sidebar' && frontmatter.sidebar.visible === false) continue
-    const kept = layout.regions[region]?.filter((blockRef) => !hidden.has(blockRef.block))
+    const kept = layout.regions[region]?.filter(
+      (blockRef) => !hidden.has(blockRef.block) && meetsCondition(blockRef.when, path, frontmatter),
+    )
     if (kept?.length) regions[region] = kept
   }
 

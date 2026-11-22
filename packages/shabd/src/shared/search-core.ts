@@ -6,6 +6,7 @@
  *   - the MCP server (so an agent searching the docs sees what a reader sees)
  *   - tests
  */
+import { editDistance } from './edit-distance.js'
 
 /** One searchable unit: a section of a page (long sections are split further). */
 export interface SearchDoc {
@@ -30,6 +31,10 @@ export const SEARCH_FILES = {
   database: '_shabd/search.sqlite',
   /** Fingerprint and size of the database, so a browser can tell whether its copy is current. */
   manifest: '_shabd/search-manifest.json',
+  /** A folder: the embedding model's files, when `features.search.modelSource` is `site`. */
+  models: '_shabd/models/',
+  /** A folder: the WebAssembly runtime that executes the model, when `modelSource` is `site`. */
+  runtime: '_shabd/runtime/',
 } as const
 
 export interface SearchManifest {
@@ -54,6 +59,8 @@ export interface SearchHit {
   matched: { keywords: boolean; meaning: boolean }
   /** A passage of the section around the first matching word. */
   snippet: string
+  /** The words to mark in the snippet, and on the page when the reader goes to it: see `wordsToMark`. */
+  marks: string[]
 }
 
 /* ─────────────────────────────── tokens ─────────────────────────────── */
@@ -61,13 +68,126 @@ export interface SearchHit {
 const WORD = /[\p{L}\p{N}\p{M}]+/gu
 const LATIN_DIACRITICS = /[\u0300-\u036f]/g
 
+/** The form a word is indexed and matched in. */
+const fold = (text: string) => text.toLowerCase().normalize('NFD').replace(LATIN_DIACRITICS, '')
+
+/**
+ * The scripts that are written without spaces between words: Chinese and
+ * Japanese, Thai, and Lao, Khmer and Burmese, which are cut the same way.
+ * A run of letters in one of them is a phrase or a sentence, not a word.
+ *
+ * A letter is taken by the scripts it is used in, not the one it belongs to:
+ * the long-vowel mark in ブラウザー belongs to none, and is used in Japanese.
+ */
+const UNSPACED_SCRIPTS = ['Han', 'Hiragana', 'Katakana', 'Thai', 'Lao', 'Khmer', 'Myanmar']
+  .map((script) => String.raw`\p{Script_Extensions=${script}}`)
+  .join('')
+const UNSPACED = new RegExp(`[${UNSPACED_SCRIPTS}]`, 'u')
+/** A run of letters taken apart: stretches in those scripts (the first group), and what is between them. */
+const STRETCH = new RegExp(`([${UNSPACED_SCRIPTS}]+)|[^${UNSPACED_SCRIPTS}]+`, 'gu')
+/** A letter with the marks that sit on it. */
+const LETTER = /\P{M}\p{M}*/gu
+
+/** True for a word in a script that is written without spaces. */
+export const isUnspaced = (word: string): boolean => UNSPACED.test(word)
+
+let segmenter: Intl.Segmenter | null | undefined
+
+/**
+ * What cuts a stretch of such text into words: `Intl.Segmenter`, which has a
+ * dictionary for each of these scripts, or null in a runtime without it.
+ *
+ * The locale is fixed, so that a build and a browser set to different
+ * languages cut the same text the same way. Which locale it is matters
+ * little: these scripts are cut by dictionary whatever the locale, and Node
+ * gave the same words for `en`, `ja`, `zh` and `th`.
+ */
+function wordSegmenter(): Intl.Segmenter | null {
+  if (segmenter === undefined) {
+    segmenter = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('en', { granularity: 'word' }) : null
+  }
+  return segmenter
+}
+
+/**
+ * Use this segmenter, or none (null), in place of the runtime's own. Tests
+ * call it to see what a browser without `Intl.Segmenter` does. Pass
+ * undefined to go back to the runtime's own.
+ */
+export function setSegmenter(next: Intl.Segmenter | null | undefined): void {
+  segmenter = next
+}
+
+/**
+ * Where the words of a stretch of unspaced text start and end.
+ *
+ * Without a segmenter there is no telling where a word ends, so every pair
+ * of neighbouring letters is taken as one: 搜索功能 gives 搜索, 索功 and 功能.
+ * Two of the three are words, and most words of Chinese are two letters long.
+ */
+function cutStretch(stretch: string): [start: number, end: number][] {
+  const cutter = wordSegmenter()
+  if (cutter) return Array.from(cutter.segment(stretch), (part) => [part.index, part.index + part.segment.length])
+  const letters = [...stretch.matchAll(LETTER)]
+  if (letters.length < 2) return [[0, stretch.length]]
+  return letters.slice(1).map((letter, index) => [letters[index]!.index, letter.index + letter[0].length])
+}
+
 /**
  * Lower-cased words, with Latin accents folded (`café` matches `cafe`).
  * Combining marks in other scripts are kept: in Devanagari they are part of
- * the word, not decoration.
+ * the word, not decoration. Text in a script without spaces is cut into
+ * words by a dictionary, or into pairs of letters where there is none.
  */
 export function tokenize(text: string): string[] {
-  return text.toLowerCase().normalize('NFD').replace(LATIN_DIACRITICS, '').match(WORD) ?? []
+  // Text with no such script in it is cut exactly as it was before there was any cutting by dictionary.
+  if (!UNSPACED.test(text)) return fold(text).match(WORD) ?? []
+  return wordSpans(text).map((span) => span.token)
+}
+
+/** A word where it stands in a text, with the form it is indexed and matched in. */
+export interface WordSpan {
+  token: string
+  start: number
+  end: number
+}
+
+/**
+ * The words of `text` and where each one is, for code that cuts or marks the
+ * text itself: the excerpt under a result, the marks on a page.
+ */
+export function wordSpans(text: string): WordSpan[] {
+  const spans: WordSpan[] = []
+  const add = (start: number, end: number) => {
+    // A run of accents on their own folds away to nothing.
+    const [token] = fold(text.slice(start, end)).match(WORD) ?? []
+    if (token) spans.push({ token, start, end })
+  }
+  for (const run of text.matchAll(WORD)) {
+    if (!UNSPACED.test(run[0])) {
+      add(run.index, run.index + run[0].length)
+      continue
+    }
+    // Japanese runs Latin letters and digits into its own with no space between: "Node18以上".
+    // Each stretch is cut on its own.
+    for (const stretch of run[0].matchAll(STRETCH)) {
+      const at = run.index + stretch.index
+      if (stretch[1] === undefined) {
+        add(at, at + stretch[0].length)
+        continue
+      }
+      // The stretch is folded once and its words sliced out of the result, which is quicker than folding each
+      // word: 2,000 sections of Chinese were cut in 400 ms where that took 480. It can be done where folding
+      // moved no letter, which is where it left the length as it was.
+      const folded = fold(stretch[0])
+      const inPlace = folded.length === stretch[0].length
+      for (const [start, end] of cutStretch(stretch[0])) {
+        const token = inPlace ? folded.slice(start, end) : fold(stretch[0].slice(start, end))
+        if (token) spans.push({ token, start: at + start, end: at + end })
+      }
+    }
+  }
+  return spans
 }
 
 /**
@@ -91,6 +211,185 @@ export function queryTerms(query: string): string[] {
   return kept.length > 0 ? kept : words
 }
 
+/* ─────────────────────────────── typos ──────────────────────────────── */
+
+/** A match by a word one edit from the one typed counts for half of an exact match; two edits, for a quarter. */
+const TYPO_DISCOUNT = 0.5
+/** Cap on how many indexed words a misspelt one may be taken for. */
+const MAX_TYPO_TERMS = 20
+
+/**
+ * How many edits a query word is forgiven: none under four letters, one up
+ * to seven, two from eight. A short word has too many neighbours for a near
+ * miss to mean anything ("for", "far", "fir"). And a number one digit away
+ * is another number, not a misspelling.
+ */
+export function typoBudget(word: string): number {
+  if (/\p{N}/u.test(word)) return 0
+  const letters = [...word].length
+  return letters >= 8 ? 2 : letters >= 4 ? 1 : 0
+}
+
+/**
+ * The indexed words a misspelt query word may have been meant as: those
+ * within its budget of edits, nearest first. Filler words are never offered:
+ * "form" is one edit from "for" and from "from", which most sections have.
+ */
+export function closeTerms(word: string, vocabulary: Iterable<string>): { term: string; edits: number }[] {
+  const budget = typoBudget(word)
+  if (budget === 0) return []
+  const close: { term: string; edits: number }[] = []
+  for (const term of vocabulary) {
+    const edits = editDistance(word, term, budget)
+    if (edits > 0 && edits <= budget && !STOPWORDS.has(term)) close.push({ term, edits })
+  }
+  close.sort((a, b) => a.edits - b.edits || (a.term < b.term ? -1 : 1))
+  return close.slice(0, MAX_TYPO_TERMS)
+}
+
+/* ────────────────────────── looking a query up ───────────────────────── */
+
+/** An indexed term that stands for a word of a query. */
+export interface TermMatch {
+  term: string
+  /** What a match by it counts for, against 1 for the word as it was typed. */
+  weight: number
+  /** Set when the store is asked for every word that starts with `term`, and not for the term alone. */
+  prefix?: true
+}
+
+/** How one word of a query is looked up in an index. */
+export interface QueryWord {
+  word: string
+  terms: TermMatch[]
+  /** True when the word itself matched nothing, and `terms` are the words it was taken for. */
+  corrected: boolean
+}
+
+/** What a store says about the terms it holds, for a query to be looked up in it. */
+export interface Vocabulary {
+  /** The terms that match a word as it stands, and as the start of longer words when `asPrefix` is set. */
+  find(word: string, asPrefix: boolean): TermMatch[]
+  has(term: string): boolean
+  /** Every term. Only asked for when a word has to be measured against all of them. */
+  all(): Iterable<string>
+}
+
+/** A word longer than this is not cut again: it is no word, and every way of cutting it would be tried. */
+const MAX_RECUT_LETTERS = 16
+
+/**
+ * A word cut along the index's own words: at each letter, the longest term
+ * that starts there. A letter that starts none is passed over.
+ */
+function recut(word: string, has: (term: string) => boolean): string[] {
+  // A letter goes with its marks: ド is held as ト and a mark, and サイト is another word.
+  const letters = word.match(LETTER) ?? []
+  if (letters.length > MAX_RECUT_LETTERS) return []
+  const pieces: string[] = []
+  let from = 0
+  while (from < letters.length) {
+    // The word as a whole is known not to be a term.
+    let to = from === 0 ? letters.length - 1 : letters.length
+    while (to > from && !has(letters.slice(from, to).join(''))) to--
+    if (to === from) {
+      from++
+      continue
+    }
+    pieces.push(letters.slice(from, to).join(''))
+    from = to
+  }
+  return pieces
+}
+
+/**
+ * How each word of a query is looked up: as itself, as the start of a longer
+ * word while it is being typed, and, only if that finds nothing, as the words
+ * it may have been meant as.
+ *
+ * Both stores look a query up through this function, each with its own
+ * vocabulary, so the same word is taken for the same terms in either.
+ *
+ * A word in a script without spaces gets two more tries before it is taken
+ * for a misspelling, because a query is not always cut where the index was.
+ *
+ *   - The dictionary goes by what is around a word. Node gave แพ็กเกจ as
+ *     แพ็ก, เก and จ in a sentence, and as แพ็ก and เกจ on its own.
+ *   - Engines have different dictionaries. The SQLite store's index is cut
+ *     by Node when the site is built, and the query by the reader's browser:
+ *     Playwright's Firefox gave サイドバー as one word where Node gave サイド
+ *     and バー, and ทำ and งาน where Node gave ทำงาน. (The in-memory store
+ *     builds its index in the browser, so there both are cut by one engine.)
+ *
+ * So such a word is tried as the start of a longer word, and then cut again
+ * along the words the index does have.
+ */
+export function planQuery(query: string, vocabulary: Vocabulary): QueryWord[] {
+  const words = queryTerms(query)
+  // While someone is typing, the last word is probably unfinished.
+  const typing = !/\s$/.test(query)
+
+  return words.map((word, position) => {
+    const unfinished = typing && position === words.length - 1
+    const found = vocabulary.find(word, unfinished)
+    if (found.length > 0) return { word, terms: found, corrected: false }
+
+    if (isUnspaced(word)) {
+      const longer = unfinished ? [] : vocabulary.find(word, true)
+      if (longer.length > 0) return { word, terms: longer, corrected: false }
+      const pieces = recut(word, (term) => vocabulary.has(term))
+      if (pieces.length > 0) return { word, terms: pieces.map((term) => ({ term, weight: 1 })), corrected: true }
+    }
+
+    // Only a word that matched nothing is taken for a misspelling, so a correct word is never second-guessed.
+    const close = closeTerms(word, vocabulary.all())
+    return {
+      word,
+      terms: close.map(({ term, edits }) => ({ term, weight: TYPO_DISCOUNT ** edits })),
+      corrected: close.length > 0,
+    }
+  })
+}
+
+/** The words to look for in a result's text: the query's own, or what one that matched nothing was taken for. */
+export function soughtWords(plan: readonly QueryWord[]): string[] {
+  return plan.flatMap(({ word, terms, corrected }) => (corrected ? terms.map(({ term }) => term) : [word]))
+}
+
+/**
+ * The words to mark where a result is shown. A word of the text is marked
+ * when it starts with one of them. Very short ones ("a", "to") are left out:
+ * marking them lights up half the text and says nothing about why it matched.
+ * That is a rule for alphabets. In a script without spaces most words are
+ * one or two letters long, so there every word is kept: see `spansToMark`.
+ */
+export function wordsToMark(plan: readonly QueryWord[]): string[] {
+  return soughtWords(plan).filter((word) => word.length > 2 || isUnspaced(word))
+}
+
+/** One letter, with its marks, of a script without spaces. */
+const isLoneLetter = (word: string) => isUnspaced(word) && (word.match(LETTER)?.length ?? 0) === 1
+
+/**
+ * The words of a text to mark, out of all its words: those that start with
+ * one of `words` (see `wordsToMark`).
+ *
+ * In a script without spaces a word can be a single letter, and a query often
+ * has one that is only grammar (的, の), or is a term the dictionary does not
+ * know and has cut into its letters (侧, 边, 栏). Such a letter is marked
+ * where it touches another marked word, as part of what was typed, and not
+ * wherever else the text has it. A query that is one letter and no more is
+ * marked wherever that letter is.
+ */
+export function spansToMark(spans: readonly WordSpan[], words: readonly string[]): WordSpan[] {
+  const wanted = spans.filter((span) => words.some((word) => span.token.startsWith(word)))
+  if (words.length < 2) return wanted
+  return wanted.filter(
+    (span, index) =>
+      !isLoneLetter(span.token) || wanted[index - 1]?.end === span.start || wanted[index + 1]?.start === span.end,
+  )
+}
+
 /* ──────────────────────────── keyword index ─────────────────────────── */
 
 const K1 = 1.2
@@ -108,7 +407,11 @@ interface Posting {
   tf: number
 }
 
-/** A BM25 index over SearchDocs with as-you-type prefix matching on the last word. */
+/**
+ * A BM25 index over SearchDocs. The last word of a query also matches as the
+ * start of a longer word, as it is typed, and a word that matches nothing
+ * matches the words it may be a misspelling of.
+ */
 export class KeywordIndex {
   readonly docs: SearchDoc[]
   #postings = new Map<string, Posting[]>()
@@ -147,25 +450,36 @@ export class KeywordIndex {
 
   /** Document indexes with scores, best first. */
   search(query: string, limit: number): { doc: number; score: number }[] {
-    const words = queryTerms(query)
-    if (words.length === 0) return []
-    // While someone is typing, the last word is probably unfinished.
-    const lastIsPrefix = !/\s$/.test(query)
+    return this.rank(this.plan(query), limit)
+  }
 
+  /** How each word of a query is looked up here: see `planQuery`. */
+  plan(query: string): QueryWord[] {
+    return planQuery(query, {
+      find: (word, asPrefix) => {
+        const terms: TermMatch[] = []
+        if (this.#postings.has(word)) terms.push({ term: word, weight: 1 })
+        if (asPrefix) {
+          for (const term of this.#termsWithPrefix(word)) {
+            if (term !== word) terms.push({ term, weight: PREFIX_DISCOUNT })
+          }
+        }
+        return terms
+      },
+      has: (term) => this.#postings.has(term),
+      all: () => this.#terms,
+    })
+  }
+
+  /** Document indexes with scores, best first, for a query that has been looked up with `plan`. */
+  rank(plan: readonly QueryWord[], limit: number): { doc: number; score: number }[] {
+    if (plan.length === 0) return []
     const scores = new Map<number, number>()
     const coverage = new Map<number, number>()
 
-    words.forEach((word, position) => {
-      const candidates: { term: string; weight: number }[] = []
-      if (this.#postings.has(word)) candidates.push({ term: word, weight: 1 })
-      if (lastIsPrefix && position === words.length - 1) {
-        for (const term of this.#termsWithPrefix(word)) {
-          if (term !== word) candidates.push({ term, weight: PREFIX_DISCOUNT })
-        }
-      }
-
+    for (const { terms } of plan) {
       const matchedDocs = new Set<number>()
-      for (const { term, weight } of candidates) {
+      for (const { term, weight } of terms) {
         const postings = this.#postings.get(term)!
         const idf = Math.log(1 + (this.docs.length - postings.length + 0.5) / (postings.length + 0.5))
         for (const { doc, tf } of postings) {
@@ -175,12 +489,12 @@ export class KeywordIndex {
         }
       }
       for (const doc of matchedDocs) coverage.set(doc, (coverage.get(doc) ?? 0) + 1)
-    })
+    }
 
     // A section matching every word should beat one that repeats a single word.
     const ranked = [...scores].map(([doc, score]) => ({
       doc,
-      score: score * ((coverage.get(doc) ?? 0) / words.length) ** 2,
+      score: score * ((coverage.get(doc) ?? 0) / plan.length) ** 2,
     }))
     ranked.sort((a, b) => b.score - a.score || a.doc - b.doc)
     return ranked.slice(0, limit)
@@ -268,15 +582,18 @@ export function fuseRanks(lists: number[][], k = 60): Map<number, number> {
 
 /* ───────────────────────────── snippets ─────────────────────────────── */
 
-/** A window of `text` around the first query word, cut at word boundaries. */
-export function makeSnippet(text: string, query: string, maxLength = 180): string {
+/**
+ * A window of `text` around the first query word, cut at word boundaries.
+ * `query` is the query as typed, or the words to look for when they are not
+ * the ones typed: see `soughtWords`.
+ */
+export function makeSnippet(text: string, query: string | readonly string[], maxLength = 180): string {
   if (text.length <= maxLength) return text
-  const words = new Set(queryTerms(query))
+  const words = typeof query === 'string' ? queryTerms(query) : query
   let start = 0
-  for (const match of text.matchAll(WORD)) {
-    const [token = ''] = tokenize(match[0])
-    if ([...words].some((word) => token.startsWith(word))) {
-      start = Math.max(0, match.index - Math.floor(maxLength / 3))
+  for (const span of wordSpans(text)) {
+    if (words.some((word) => span.token.startsWith(word))) {
+      start = Math.max(0, span.start - Math.floor(maxLength / 3))
       break
     }
   }
@@ -342,15 +659,18 @@ export function search(
   minSimilarity = MIN_SIMILARITY,
 ): SearchHit[] {
   const pool = candidatePool(limit)
-  const keywordIds = index.search(query, pool).map((hit) => hit.doc)
+  const plan = index.plan(query)
+  const keywordIds = index.rank(plan, pool).map((hit) => hit.doc)
   const meaningIds =
     semantic && queryVector
       ? rankBySimilarity(similarities(queryVector, semantic.vectors, semantic.dims), pool, minSimilarity)
       : []
 
+  const sought = soughtWords(plan)
+  const marks = wordsToMark(plan)
   return fuseHits(keywordIds, meaningIds, limit).map(({ id, score, matched }) => {
     const doc = index.docs[id]!
-    return { doc, score, matched, snippet: makeSnippet(doc.text, query) }
+    return { doc, score, matched, snippet: makeSnippet(doc.text, sought), marks }
   })
 }
 
@@ -365,7 +685,8 @@ export function search(
  *                 full-text search by FTS5, and in the browser the file is
  *                 kept in the origin-private file system and read page by
  *                 page, so a large index is neither re-downloaded nor held
- *                 in memory.
+ *                 in memory. Its vectors are: they are read out once a query
+ *                 is made by meaning, 384 bytes a section.
  */
 export interface SearchStore {
   readonly kind: 'memory' | 'sqlite'

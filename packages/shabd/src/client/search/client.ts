@@ -5,7 +5,7 @@
 import { withBase } from '../../shared/paths.js'
 import { SEARCH_FILES, type SearchHit } from '../../shared/search-core.js'
 import { createStore, siteStore } from '../app/store.js'
-import type { ModelStatus, WorkerRequest, WorkerResponse } from './protocol.js'
+import type { ModelStatus, SearchScope, WorkerRequest, WorkerResponse } from './protocol.js'
 
 export interface SearchStatus {
   index: 'loading' | 'ready' | 'error'
@@ -70,6 +70,9 @@ function start(): Worker {
     manifestUrl: file('manifest'),
     model: features.search.model,
     minSimilarity: features.search.minSimilarity,
+    modelSource: features.search.modelSource,
+    modelsUrl: file('models'),
+    runtimeUrl: file('runtime'),
   })
   return worker
 }
@@ -94,10 +97,10 @@ export function openSearch(): void {
 }
 
 /** Search. The promise for an older query never resolves once a newer one is sent. */
-export function runSearch(query: string, limit: number): Promise<SearchResults> {
+export function runSearch(query: string, limit: number, scope?: SearchScope): Promise<SearchResults> {
   start()
   return new Promise((resolve) => {
     latest = { id: nextId++, query, resolve }
-    send({ type: 'query', id: latest.id, query, limit })
+    send({ type: 'query', id: latest.id, query, limit, scope })
   })
 }

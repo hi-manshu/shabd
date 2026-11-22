@@ -16,6 +16,8 @@ export const BUILTIN_BLOCKS = [
   'nav',
   'spacer',
   'search',
+  'version-menu',
+  'language-menu',
   'social',
   'theme-toggle',
   'theme-menu',
@@ -23,8 +25,10 @@ export const BUILTIN_BLOCKS = [
   // sidebar
   'sidebar-nav',
   // main
+  'version-notice',
   'breadcrumbs',
   'page-header',
+  'page-actions',
   'api-endpoint',
   'hero',
   'content',

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { TocEntry } from '../../../shared/types.js'
+import { useText } from '../../app/edition.js'
 import { usePage } from '../../app/router.js'
 
 /** The heading the reader is currently under, tracked on scroll. */
@@ -42,14 +43,15 @@ function useActiveHeading(entries: TocEntry[]): string | null {
 }
 
 /** "On this page". Depth comes from `toc:` frontmatter, falling back to `defaults.toc` in the config. */
-export function Toc({ title = 'On this page' }: { title?: string }) {
+export function Toc({ title }: { title?: string }) {
   const entries = usePage().layout.toc
+  const text = useText()
   const active = useActiveHeading(entries)
   if (entries.length === 0) return null
   const shallowest = Math.min(...entries.map((entry) => entry.depth))
   return (
     <div className="sb-toc">
-      <p className="sb-toc-title">{title}</p>
+      <p className="sb-toc-title">{title ?? text('toc')}</p>
       <ul>
         {entries.map((entry) => (
           <li key={entry.id} data-indent={entry.depth - shallowest}>

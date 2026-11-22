@@ -101,7 +101,7 @@ beforeAll(async () => {
 afterAll(async () => {
   gate = undefined
   await server?.close()
-  await rm(scratch, { recursive: true, force: true })
+  await rm(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 describe('the page list in dev', () => {
@@ -148,6 +148,39 @@ describe('the page list in dev', () => {
     const [routes, data] = await late
     expect(routes).toContain('"/guide/fourth"')
     expect(data).toContain('"/guide/fourth"')
+  })
+
+  it('does not bring back a page that was deleted while a change to it was being read', async () => {
+    const id = 'guide/gone.md'
+    await addPage(id)
+
+    // A change to the page is read, and is held before the page list takes it in.
+    const upsert = context.store.upsert.bind(context.store)
+    let letIn!: () => void
+    let wasRead!: () => void
+    const held = new Promise<void>((resolve) => (letIn = resolve))
+    const read = new Promise<void>((resolve) => (wasRead = resolve))
+    context.store.upsert = async (file, source) => {
+      wasRead()
+      await held
+      return upsert(file, source)
+    }
+    try {
+      await writeFile(fileOf(id), '---\ntitle: Changed\n---\n\nOther text.\n')
+      server.watcher.emit('change', normalizePath(fileOf(id)))
+      await read
+
+      // Meanwhile the page is deleted, as when the Studio saves a page and renames it at once.
+      await removePage(id)
+      letIn()
+      await tick(50)
+    } finally {
+      context.store.upsert = upsert
+    }
+
+    expect(context.store.byId(id)).toBeUndefined()
+    expect(await request(DATA)).not.toContain('"/guide/gone"')
+    expect(await request(ROUTES)).not.toContain('"/guide/gone"')
   })
 
   it('numbers what it sends, so that the browser can tell which of two answers is the newer', async () => {

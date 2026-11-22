@@ -5,6 +5,8 @@
  *     node e2e/support/serve.mjs dev      dev server on :4411
  *     node e2e/support/serve.mjs preview  static build, then preview on :4412
  *
+ * The ports are the defaults; see ports.mjs.
+ *
  * The copies live inside the repository (e2e/.work) so that `react` and
  * `shabd/client` resolve from the repository's node_modules.
  */
@@ -12,10 +14,10 @@ import { cp, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { build, dev, preview } from '../../packages/shabd/dist/node/index.js'
+import { PORTS as ports } from './ports.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const mode = process.argv[2]
-const ports = { dev: 4411, preview: 4412 }
 if (!(mode in ports)) throw new Error(`usage: serve.mjs <${Object.keys(ports).join('|')}>`)
 
 const root = path.join(here, '..', '.work', mode)
@@ -27,6 +29,10 @@ const configFile = path.join(root, 'shabd.config.yaml')
 let config = await readFile(configFile, 'utf8')
 if (process.env.SHABD_E2E_SEMANTIC) config = config.replace('semantic: false', 'semantic: true')
 if (process.env.SHABD_E2E_STORE) config = config.replace('search: {', `search: { store: ${process.env.SHABD_E2E_STORE},`)
+if (process.env.SHABD_E2E_MODEL) config = config.replace('search: {', `search: { modelSource: ${process.env.SHABD_E2E_MODEL},`)
+// A worker that keeps the site in the browser. It answers every request of the site, so it is not on by default.
+if (process.env.SHABD_E2E_OFFLINE) config = config.replace('  feed: true\n', '  feed: true\n  offline: true\n')
+if (process.env.SHABD_E2E_OFFLINE && !config.includes('offline: true')) throw new Error('serve.mjs: could not switch features.offline on in the fixture')
 await writeFile(configFile, config)
 
 if (mode === 'dev') {

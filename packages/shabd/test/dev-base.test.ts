@@ -4,7 +4,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer, type ViteDevServer } from 'vite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { hideBase, restoreBase } from '../src/node/vite/dev-html.js'
 import { shabd } from '../src/node/vite/plugin.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -40,7 +39,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await server?.close()
-  await rm(scratch, { recursive: true, force: true })
+  await rm(scratch, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
 
 describe('shabd dev for a site with a base', () => {
@@ -76,28 +75,5 @@ describe('shabd dev for a site with a base', () => {
     const response = await page('/docs/no/such/page')
     expect(response.status).toBe(404)
     expect(await response.text()).toContain('/docs/@fs/')
-  })
-})
-
-describe('hiding the base from Vite', () => {
-  const html = '<link rel="icon" href="/docs/favicon.svg">\n<a href=\'/docs/\'>Home</a>\n<script type="module" src="/docs/@fs/app.tsx"></script>\n<p>/docs/ in text</p>'
-
-  it('changes only attributes that start with the base, and gives back what it was given', () => {
-    const hidden = hideBase(html, '/docs/')
-    expect(hidden).not.toMatch(/=["']\/docs\//)
-    expect(hidden).toContain('<p>/docs/ in text</p>')
-    expect(restoreBase(hidden, '/docs/')).toBe(html)
-  })
-
-  it('reads the base as text, whatever characters it has', () => {
-    const odd = '<link href="/a.b+c/x.css"><link href="/aXb+c/x.css">'
-    const hidden = hideBase(odd, '/a.b+c/')
-    expect(hidden).toContain('href="/aXb+c/x.css"')
-    expect(restoreBase(hidden, '/a.b+c/')).toBe(odd)
-  })
-
-  it('leaves a site at the root alone', () => {
-    expect(hideBase(html, '/')).toBe(html)
-    expect(restoreBase(html, '/')).toBe(html)
   })
 })

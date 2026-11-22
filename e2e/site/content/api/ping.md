@@ -7,6 +7,11 @@ api:
   path: /v1/ping/{region}
   baseUrl: https://api.fixture.test
   auth: none
+  try: true
 ---
 
 Returns `pong`.
+
+```sh
+curl https://api.fixture.test/v1/ping/eu
+```
